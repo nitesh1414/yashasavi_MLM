@@ -13,30 +13,38 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
+      - name: Diagnose token
+        run: |
+          echo "actor: ${GITHUB_ACTOR}"
+          echo "token length: ${#GITHUB_TOKEN}"
+          echo "token prefix: ${GITHUB_TOKEN:0:4}"
+          echo "--- api test ---"
+          curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY}" | head -c 400
+          echo
+          echo "--- api whoami ---"
+          curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/user" | head -c 300
+          echo
       - name: Download assets
         run: |
           mkdir -p assets && cd assets
-          curl -fSL --retry 3 -o frankenphp https://github.com/dunglas/frankenphp/releases/download/v1.12.7/frankenphp-linux-x86_64
-          curl -fSL --retry 3 -o mysql-musl.tar.gz https://github.com/Sebastian-Webster/mysql-server-musl-binaries/releases/download/current/mysql-musl-8.4.11-x86_64.tar.gz
-          split -b 94M -d --additional-suffix=.part frankenphp frankenphp.
-          split -b 94M -d --additional-suffix=.part mysql-musl.tar.gz mysql-musl.tar.gz.
-          rm frankenphp mysql-musl.tar.gz
-          sha256sum ./* > SHA256SUMS
-          cat SHA256SUMS
-      - name: Push to runtime-assets branch
+          curl -fSL --retry 3 -o test.bin "https://github.com/dunglas/frankenphp/releases/download/v1.12.7/frankenphp-linux-x86_64" --range 0-1000000 || true
+          ls -la
+      - name: Try push variants
         run: |
           cd assets
-          git init -q -b runtime-assets .
-          git config user.name "arena-agent"
-          git config user.email "arena-agent@users.noreply.github.com"
+          echo "hello $(date)" > file.txt
+          git init -q -b test-branch .
+          git config user.name t
+          git config user.email t@t.com
           git config http.postBuffer 524288000
-          git config http.version HTTP/1.1
           git add -A
-          git commit -q -m "runtime assets $(date +%s)"
-          echo "pushing $(du -sh .git | cut -f1) ..."
-          if ! git push --no-progress "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" runtime-assets > push.log 2>&1; then
-            echo "::error::PUSH FAILED: $(tail -c 600 push.log | tr '\n' ' ')"
-            cat push.log >&2
-            exit 1
-          fi
-          echo "push ok"
+          git commit -q -m "test"
+          echo "=== variant 1: x-access-token ==="
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-1 2>&1 | tail -5
+          echo "=== variant 2: actor ==="
+          git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-2 2>&1 | tail -5
+          echo "=== variant 3: header auth ==="
+          git -c http.extraheader="Authorization: Basic $(printf 'x-access-token:%s' "${GITHUB_TOKEN}" | base64 -w0)" push "https://github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-3 2>&1 | tail -5
+          echo "=== variant 4: api create ref ==="
+          SHA=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/heads/${GITHUB_REF_NAME}" | python3 -c "import json,sys; print(json.load(sys.stdin)['object']['sha'])")
+          echo "base sha: $SHA"

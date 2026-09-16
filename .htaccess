@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------
+# Yashasavi MLM — Apache configuration
+# ---------------------------------------------------------------------
+
+# Protect sensitive files from direct web access
+<FilesMatch "^(config\.php)$">
+    Require all denied
+</FilesMatch>
+
+# Block the includes folder
+RedirectMatch 404 ^/includes/.*$
+
+# Block the install folder once installed (install.php itself checks
+# for install.lock, this is an extra layer)
+# RedirectMatch 404 ^/install/.*$
+
+# Disable directory listings
+Options -Indexes
+
+# ---------------------------------------------------------------------
+# OPTIONAL pretty URLs (uncomment after testing on your server)
+# ---------------------------------------------------------------------
+# RewriteEngine On
+# RewriteRule ^page/([a-zA-Z0-9\-_]+)/?$ page.php?slug=$1 [L,QSA]
+# RewriteRule ^product/([0-9]+)/?$ product.php?id=$1 [L,QSA]
