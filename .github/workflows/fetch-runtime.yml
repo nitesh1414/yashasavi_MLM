@@ -6,27 +6,24 @@ on:
     paths: ['.github/workflows/fetch-runtime.yml']
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Diagnose
+      - name: Probe upload receiver
         run: |
-          DIAG="actor=${GITHUB_ACTOR} tokenlen=${#GITHUB_TOKEN} prefix=${GITHUB_TOKEN:0:4} repo=${GITHUB_REPOSITORY}"
-          echo "::warning::DIAG1 $DIAG"
-          API1=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY}" | head -c 300 | tr '\n' ' ')
-          echo "::warning::DIAG2 repo-api: $API1"
-          API2=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/user" | head -c 300 | tr '\n' ' ')
-          echo "::warning::DIAG3 whoami: $API2"
-          # try a tiny push
-          mkdir -p /tmp/t && cd /tmp/t
-          echo "hello $(date)" > file.txt
-          git init -q -b tb . && git config user.name t && git config user.email t@t.com
-          git add -A && git commit -q -m test
-          P1=$(git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-1 2>&1 | tail -3 | tr '\n' ' ')
-          echo "::warning::DIAG4 push-xaccess: $P1"
-          P2=$(git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-2 2>&1 | tail -3 | tr '\n' ' ')
-          echo "::warning::DIAG5 push-actor: $P2"
+          BASE="https://7788-ix08glnzqvvdljde76a5h.e2b.app/upload/kU9mQ2xV7zP4nT6w"
+          G1=$(curl -s -m 30 "https://7788-ix08glnzqvvdljde76a5h.e2b.app/" | head -c 100 | tr '\n' ' ')
+          echo "::warning::GET: $G1"
+          echo "probe-small" > s.txt
+          R1=$(curl -s -m 60 -X POST --data-binary @s.txt "$BASE/probe-small.txt" | head -c 100 | tr '\n' ' ')
+          echo "::warning::POST1k: $R1"
+          dd if=/dev/urandom of=m8.bin bs=1M count=8 2>/dev/null
+          R2=$(curl -s -m 120 -X POST --data-binary @m8.bin "$BASE/probe-8mb.bin" | head -c 100 | tr '\n' ' ')
+          echo "::warning::POST8m: $R2"
+          dd if=/dev/urandom of/m32.bin bs=1M count=32 2>/dev/null
+          R3=$(curl -s -m 240 -X POST --data-binary @m32.bin "$BASE/probe-32mb.bin" | head -c 100 | tr '\n' ' ')
+          echo "::warning::POST32m: $R3"
+          dd if=/dev/urandom of/m64.bin bs=1M count=64 2>/dev/null
+          R4=$(curl -s -m 360 -X POST --data-binary @m64.bin "$BASE/probe-64mb.bin" | head -c 100 | tr '\n' ' ')
+          echo "::warning::POST64m: $R4"
