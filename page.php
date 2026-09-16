@@ -9,7 +9,7 @@ if (!$page) {
     $pageTitle = 'Page Not Found';
     require __DIR__ . '/includes/site_header.php';
     echo '<section class="content-page"><div class="container content-wrap text-center">
-          <h1 style="font-size:60px;color:var(--green)">404</h1>
+          <h1 style="font-size:60px;color:#000">404</h1>
           <h2>Page not found</h2>
           <p class="mt-2">The page you are looking for does not exist or has been moved.</p>
           <p class="mt-3"><a class="btn btn-primary" href="' . url('index.php') . '">Go to Homepage</a></p>

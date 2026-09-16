@@ -55,8 +55,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= e($r['order_no'] ?: '—') ?></td>
                 <td><?= $r['level'] ? 'L' . (int)$r['level'] : '—' ?></td>
                 <td><?= e($r['bv']) ?></td>
-                <td><b style="color:#1b5e20">+<?= money($r['amount']) ?></b></td>
-                <td><small style="color:#8d9c8d"><?= e($r['note']) ?></small></td>
+                <td><b style="color:#000">+<?= money($r['amount']) ?></b></td>
+                <td><small style="color:#000"><?= e($r['note']) ?></small></td>
             </tr>
             <?php endforeach; ?>
         </table>

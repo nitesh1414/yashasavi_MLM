@@ -2,7 +2,10 @@
 /** Distributor registration (binary placement under a sponsor) */
 require_once __DIR__ . '/includes/init.php';
 
-if (current_user()) {
+// Logged-in users are normally sent to their dashboard, but they may open the
+// form from a tree "empty position" link (which carries ?ref=) to sign up a
+// new downline member.
+if (current_user() && get_str('ref') === '') {
     redirect('user/index.php');
 }
 
@@ -50,6 +53,31 @@ if (is_post()) {
         $f['bank_ifsc'] = strtoupper($f['bank_ifsc']);
         $f['pan_no'] = strtoupper($f['pan_no']);
         $f['password'] = $password;
+
+        // KYC document uploads (PAN card + Aadhaar card images) — required
+        $panImg = handle_upload('pan_card', 'kyc');
+        if ($panImg === null) {
+            $errors[] = 'Please upload your PAN card image (required for KYC).';
+        } elseif ($panImg === false) {
+            $errors[] = 'PAN card image could not be uploaded — use JPG, PNG, WEBP or GIF under ' . MAX_UPLOAD_MB . ' MB.';
+        }
+        $aadImg = handle_upload('aadhaar_card', 'kyc');
+        if ($aadImg === null) {
+            $errors[] = 'Please upload your Aadhaar card image (required for KYC).';
+        } elseif ($aadImg === false) {
+            $errors[] = 'Aadhaar card image could not be uploaded — use JPG, PNG, WEBP or GIF under ' . MAX_UPLOAD_MB . ' MB.';
+        }
+        if (!$errors) {
+            $f['pan_image'] = $panImg;
+            $f['aadhaar_image'] = $aadImg;
+        } else {
+            // don't leave orphaned files behind when validation failed
+            if (is_string($panImg)) { delete_upload($panImg); }
+            if (is_string($aadImg)) { delete_upload($aadImg); }
+        }
+    }
+
+    if (!$errors) {
         [$ok, $uid, $msg] = register_distributor($f);
         if ($ok) {
             $u = q_row("SELECT username, full_name FROM users WHERE id = ?", [$uid]);
@@ -81,10 +109,10 @@ require __DIR__ . '/includes/site_header.php';
             </div>
         <?php endif; ?>
 
-        <form method="post" autocomplete="off">
+        <form method="post" autocomplete="off" enctype="multipart/form-data">
             <?= csrf_field() ?>
 
-            <h3 style="font-size:15px;margin-bottom:12px;color:var(--green-dark)">1️⃣ Position in Network</h3>
+            <h3 style="font-size:15px;margin-bottom:12px;color:#000">1️⃣ Position in Network</h3>
             <div class="form-grid">
                 <div class="form-group">
                     <label>Sponsor ID <span class="req">*</span></label>
@@ -102,7 +130,7 @@ require __DIR__ . '/includes/site_header.php';
                 </div>
             </div>
 
-            <h3 style="font-size:15px;margin:18px 0 12px;color:var(--green-dark)">2️⃣ Personal Details</h3>
+            <h3 style="font-size:15px;margin:18px 0 12px;color:#000">2️⃣ Personal Details</h3>
             <div class="form-grid">
                 <div class="form-group">
                     <label>Full Name <span class="req">*</span></label>
@@ -154,7 +182,7 @@ require __DIR__ . '/includes/site_header.php';
                 </div>
             </div>
 
-            <h3 style="font-size:15px;margin:18px 0 12px;color:var(--green-dark)">3️⃣ Nominee Details</h3>
+            <h3 style="font-size:15px;margin:18px 0 12px;color:#000">3️⃣ Nominee Details</h3>
             <div class="form-grid">
                 <div class="form-group">
                     <label>Nominee Name</label>
@@ -166,7 +194,7 @@ require __DIR__ . '/includes/site_header.php';
                 </div>
             </div>
 
-            <h3 style="font-size:15px;margin:18px 0 12px;color:var(--green-dark)">4️⃣ Bank Details (for payouts)</h3>
+            <h3 style="font-size:15px;margin:18px 0 12px;color:#000">4️⃣ Bank Details (for payouts)</h3>
             <div class="form-grid">
                 <div class="form-group">
                     <label>Account Holder Name</label>
@@ -198,7 +226,21 @@ require __DIR__ . '/includes/site_header.php';
                 </div>
             </div>
 
-            <h3 style="font-size:15px;margin:18px 0 12px;color:var(--green-dark)">5️⃣ Login Details</h3>
+            <h3 style="font-size:15px;margin:18px 0 12px;color:#000">5️⃣ KYC Documents</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>PAN Card Image <span class="req">*</span></label>
+                    <input class="form-control" type="file" name="pan_card" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+                    <div class="form-hint">Clear photo/scan of your PAN card (JPG, PNG or WEBP, max <?= MAX_UPLOAD_MB ?> MB).</div>
+                </div>
+                <div class="form-group">
+                    <label>Aadhaar Card Image <span class="req">*</span></label>
+                    <input class="form-control" type="file" name="aadhaar_card" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+                    <div class="form-hint">Clear photo/scan of your Aadhaar card (JPG, PNG or WEBP, max <?= MAX_UPLOAD_MB ?> MB).</div>
+                </div>
+            </div>
+
+            <h3 style="font-size:15px;margin:18px 0 12px;color:#000">6️⃣ Login Details</h3>
             <div class="form-grid">
                 <div class="form-group">
                     <label>Password <span class="req">*</span></label>

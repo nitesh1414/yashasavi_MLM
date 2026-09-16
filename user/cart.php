@@ -149,7 +149,7 @@ require __DIR__ . '/../includes/dash_header.php';
                     <tr>
                         <td>
                             <b><?= e($it['p']['name']) ?></b><br>
-                            <small style="color:#8d9c8d"><?= e($it['p']['size']) ?></small>
+                            <small style="color:#000"><?= e($it['p']['size']) ?></small>
                         </td>
                         <td><?= money($it['p']['dp']) ?></td>
                         <td><?= e($it['p']['bv']) ?></td>
@@ -176,7 +176,7 @@ require __DIR__ . '/../includes/dash_header.php';
         <table class="kv-table" style="width:100%">
             <tr><td>MRP Total</td><td><?= money($totalMrp) ?></td></tr>
             <tr><td>DP Total (payable)</td><td><b><?= money($totalDp) ?></b></td></tr>
-            <tr><td>Total BV</td><td><b style="color:var(--dash-gold)"><?= bv($totalBv) ?></b></td></tr>
+            <tr><td>Total BV</td><td><b style="color:#000"><?= bv($totalBv) ?></b></td></tr>
             <tr><td>Retail Profit (MRP−DP)</td><td><?= money($totalMrp - $totalDp) ?></td></tr>
         </table>
 

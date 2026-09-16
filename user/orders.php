@@ -51,7 +51,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= (int)$items ?></td>
                 <td><?= money($o['total_dp']) ?></td>
                 <td><?= bv($o['total_bv']) ?></td>
-                <td><?= e($pmLabel) ?><br><small style="color:#8d9c8d"><?= status_badge($o['payment_status']) ?></small></td>
+                <td><?= e($pmLabel) ?><br><small style="color:#000"><?= status_badge($o['payment_status']) ?></small></td>
                 <td><?= status_badge($o['status']) ?></td>
                 <td><a class="btn btn-outline btn-sm" href="order_view.php?id=<?= (int)$o['id'] ?>">View</a></td>
             </tr>

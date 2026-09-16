@@ -53,7 +53,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <tr>
                 <td>
                     <b><?= e($r['name']) ?></b><br>
-                    <small style="color:#8d9c8d"><?= e($r['email'] ?: '') ?><?= $r['email'] && $r['mobile'] ? ' · ' : '' ?><?= e($r['mobile'] ?: '') ?></small>
+                    <small style="color:#000"><?= e($r['email'] ?: '') ?><?= $r['email'] && $r['mobile'] ? ' · ' : '' ?><?= e($r['mobile'] ?: '') ?></small>
                 </td>
                 <td><?= e($r['subject']) ?></td>
                 <td style="max-width:340px"><small><?= e($r['message']) ?></small></td>

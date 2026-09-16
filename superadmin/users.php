@@ -82,7 +82,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td>
                     <b><?= e($r['username']) ?></b>
                     <?= (int)$r['is_active'] ? badge('Act', 'success') : badge('Inact', 'warning') ?><br>
-                    <small style="color:#8d9c8d"><?= e($r['full_name']) ?> · <?= e($r['mobile']) ?></small>
+                    <small style="color:#000"><?= e($r['full_name']) ?> · <?= e($r['mobile']) ?></small>
                 </td>
                 <td><?= e($r['sponsor_name'] ?: '—') ?></td>
                 <td><?= e(number_format((float)$r['left_bv'], 0)) ?> / <?= e(number_format((float)$r['right_bv'], 0)) ?></td>

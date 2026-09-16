@@ -33,7 +33,7 @@ $u = current_user();
 <meta name="description" content="<?= e($metaDesc) ?>">
 <link rel="icon" href="<?= e(upload_url(setting('site_favicon')) ?: placeholder('icon')) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/style.css') ?>?v=<?= APP_VERSION ?>">
 </head>
 <body<?= isset($bodyClass) ? ' class="' . e($bodyClass) . '"' : '' ?>>
@@ -78,7 +78,7 @@ $u = current_user();
 </nav>
 
 <?php if (setting('announcement_bar')): ?>
-<div style="background:var(--gold-light);color:#7a5c0d;text-align:center;font-size:13.5px;padding:8px 16px;">
+<div style="background:var(--gold-light);color:#000;text-align:center;font-size:13.5px;padding:8px 16px;">
     📢 <?= e(setting('announcement_bar')) ?>
 </div>
 <?php endif; ?>

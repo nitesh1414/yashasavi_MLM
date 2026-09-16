@@ -71,12 +71,12 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><b><?= e($o['order_no']) ?></b></td>
                 <td>
                     <a href="user_view.php?id=<?= (int)$o['user_id'] ?>"><b><?= e($o['username']) ?></b></a><br>
-                    <small style="color:#8d9c8d"><?= e($o['full_name']) ?></small>
+                    <small style="color:#000"><?= e($o['full_name']) ?></small>
                 </td>
                 <td>
                     <?= e(ucfirst(str_replace('_', ' ', $o['payment_mode']))) ?><br>
                     <?= status_badge($o['payment_status']) ?>
-                    <?php if ($o['txn_ref']): ?><br><small style="color:#8d9c8d">Ref: <?= e($o['txn_ref']) ?></small><?php endif; ?>
+                    <?php if ($o['txn_ref']): ?><br><small style="color:#000">Ref: <?= e($o['txn_ref']) ?></small><?php endif; ?>
                 </td>
                 <td><?= money($o['total_dp']) ?></td>
                 <td><b><?= e($o['total_bv']) ?></b></td>

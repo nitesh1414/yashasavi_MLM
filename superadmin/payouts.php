@@ -70,17 +70,17 @@ require __DIR__ . '/../includes/dash_header.php';
             <tr><th>Request</th><th>User</th><th>Bank</th><th>Amount</th><th>Deductions</th><th>Net</th><th>Status</th><th>Actions</th></tr>
             <?php foreach ($rows as $r): ?>
             <tr>
-                <td><b><?= e($r['request_no']) ?></b><br><small style="color:#8d9c8d"><?= dmy($r['created_at']) ?></small></td>
+                <td><b><?= e($r['request_no']) ?></b><br><small style="color:#000"><?= dmy($r['created_at']) ?></small></td>
                 <td><a href="user_view.php?id=<?= (int)$r['user_id'] ?>"><b><?= e($r['username']) ?></b></a><br>
-                    <small style="color:#8d9c8d"><?= e($r['full_name']) ?></small></td>
+                    <small style="color:#000"><?= e($r['full_name']) ?></small></td>
                 <td><small><?= e($r['bank_name'] ?: '—') ?><br><?= e(mask_acct($r['bank_account_no'])) ?><br><?= e($r['bank_ifsc'] ?: '') ?></small></td>
                 <td><?= money($r['amount']) ?></td>
                 <td><small>TDS <?= money($r['tds_amount']) ?><br>Chg <?= money($r['admin_charge']) ?></small></td>
                 <td><b><?= money($r['net_amount']) ?></b></td>
                 <td>
                     <?= status_badge($r['status']) ?>
-                    <?php if ($r['paid_at']): ?><br><small style="color:#8d9c8d"><?= dmy($r['paid_at']) ?></small><?php endif; ?>
-                    <?php if ($r['reject_reason']): ?><br><small style="color:#b71c1c"><?= e($r['reject_reason']) ?></small><?php endif; ?>
+                    <?php if ($r['paid_at']): ?><br><small style="color:#000"><?= dmy($r['paid_at']) ?></small><?php endif; ?>
+                    <?php if ($r['reject_reason']): ?><br><small style="color:#000"><?= e($r['reject_reason']) ?></small><?php endif; ?>
                 </td>
                 <td>
                     <?php if ($r['status'] === 'pending'): ?>

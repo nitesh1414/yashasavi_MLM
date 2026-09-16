@@ -91,7 +91,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr>
                     <td><?= $i + 1 ?></td>
                     <td><a href="user_view.php?id=<?= (int)$t['id'] ?>"><b><?= e($t['username']) ?></b></a><br>
-                        <small style="color:#8d9c8d"><?= e($t['full_name']) ?></small></td>
+                        <small style="color:#000"><?= e($t['full_name']) ?></small></td>
                     <td><?= e($t['rank_name'] ?: '—') ?></td>
                     <td><b><?= money($t['total_earned']) ?></b></td>
                     <td><?= money($t['wallet_balance']) ?></td>

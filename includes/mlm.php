@@ -216,9 +216,9 @@ function register_distributor($data)
            (username, password, full_name, email, mobile, dob, marital_status, nationality,
             address, city, state, pincode, nominee_name, nominee_relation,
             bank_holder, bank_account_no, bank_ifsc, bank_name, bank_branch,
-            aadhaar_no, pan_no, sponsor_id, placement_id, leg, status, kyc_status,
+            aadhaar_no, pan_no, pan_image, aadhaar_image, sponsor_id, placement_id, leg, status, kyc_status,
             left_bv, right_bv, self_bv, matched_pairs, wallet_balance, created_at)
-           VALUES ('', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'pending',
+           VALUES ('', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'pending',
                    0, 0, 0, 0, 0, ?)",
            [
                password_hash($data['password'], PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]),
@@ -229,6 +229,7 @@ function register_distributor($data)
                $data['bank_holder'], $data['bank_account_no'], $data['bank_ifsc'],
                $data['bank_name'], $data['bank_branch'],
                $data['aadhaar_no'], $data['pan_no'],
+               $data['pan_image'] ?: null, $data['aadhaar_image'] ?: null,
                $sponsor['id'], $placementId, $leg, now(),
            ]);
 

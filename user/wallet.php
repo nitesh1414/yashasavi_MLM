@@ -46,11 +46,11 @@ require __DIR__ . '/../includes/dash_header.php';
             <tr>
                 <td><?= dmy($r['created_at'], true) ?></td>
                 <td><?= badge(ucfirst($r['type']), $r['type'] === 'credit' ? 'success' : 'danger') ?></td>
-                <td style="font-weight:700;color:<?= $r['type'] === 'credit' ? '#1b5e20' : '#b71c1c' ?>">
+                <td style="font-weight:600;color:#000">
                     <?= $r['type'] === 'credit' ? '+' : '−' ?><?= money($r['amount']) ?></td>
                 <td><?= money($r['balance_after']) ?></td>
                 <td><?= badge(ucfirst($r['ref_type']), 'secondary') ?></td>
-                <td><small style="color:#8d9c8d"><?= e($r['note']) ?></small></td>
+                <td><small style="color:#000"><?= e($r['note']) ?></small></td>
             </tr>
             <?php endforeach; ?>
         </table>

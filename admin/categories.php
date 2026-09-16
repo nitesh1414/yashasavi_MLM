@@ -72,7 +72,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <?php foreach ($categories as $c): ?>
                 <tr>
                     <td><img class="table-img" src="<?= e(upload_url($c['image']) ?: placeholder('C')) ?>" alt=""></td>
-                    <td><b><?= e($c['name']) ?></b><br><small style="color:#8d9c8d"><?= e($c['slug']) ?></small></td>
+                    <td><b><?= e($c['name']) ?></b><br><small style="color:#000"><?= e($c['slug']) ?></small></td>
                     <td><?= (int)$c['product_count'] ?></td>
                     <td><?= badge($c['status'], $c['status'] === 'active' ? 'success' : 'secondary') ?></td>
                     <td>

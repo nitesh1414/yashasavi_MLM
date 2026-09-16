@@ -46,6 +46,8 @@ return [
     bank_branch VARCHAR(120) NULL,
     aadhaar_no VARCHAR(20) NULL,
     pan_no VARCHAR(20) NULL,
+    pan_image VARCHAR(255) NULL,
+    aadhaar_image VARCHAR(255) NULL,
     sponsor_id INT UNSIGNED NULL,
     placement_id INT UNSIGNED NULL,
     leg ENUM('L','R') NOT NULL DEFAULT 'L',

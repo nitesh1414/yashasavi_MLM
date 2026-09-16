@@ -91,9 +91,9 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><?= dmy($r['created_at'], true) ?></td>
                     <td><a href="user_view.php?id=<?= (int)$r['user_id'] ?>"><b><?= e($r['username']) ?></b></a></td>
                     <td><?= badge(ucfirst($r['type']), $r['type'] === 'credit' ? 'success' : 'danger') ?></td>
-                    <td style="font-weight:700"><?= $r['type'] === 'credit' ? '+' : '−' ?><?= money($r['amount']) ?></td>
+                    <td style="font-weight:600"><?= $r['type'] === 'credit' ? '+' : '−' ?><?= money($r['amount']) ?></td>
                     <td><?= money($r['balance_after']) ?></td>
-                    <td><small style="color:#8d9c8d"><?= e($r['note']) ?></small></td>
+                    <td><small style="color:#000"><?= e($r['note']) ?></small></td>
                 </tr>
                 <?php endforeach; ?>
             </table>
@@ -146,7 +146,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <?php foreach (q_all("SELECT id, username, full_name, wallet_balance FROM users ORDER BY wallet_balance DESC LIMIT 8") as $t): ?>
                 <tr>
                     <td><a href="user_view.php?id=<?= (int)$t['id'] ?>"><b><?= e($t['username']) ?></b></a><br>
-                        <small style="color:#8d9c8d"><?= e($t['full_name']) ?></small></td>
+                        <small style="color:#000"><?= e($t['full_name']) ?></small></td>
                     <td><b><?= money($t['wallet_balance']) ?></b></td>
                 </tr>
                 <?php endforeach; ?>

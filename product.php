@@ -43,7 +43,7 @@ require __DIR__ . '/includes/site_header.php';
                 </div>
             </div>
             <div class="pd-info">
-                <?php if ($product['cat_name']): ?><span class="p-badge" style="display:inline-block;background:var(--gold-light);color:#7a5c0d;padding:4px 14px;border-radius:20px;font-size:12.5px;font-weight:600"><?= e($product['cat_name']) ?></span><?php endif; ?>
+                <?php if ($product['cat_name']): ?><span class="p-badge" style="display:inline-block;background:var(--gold-light);color:#000;padding:4px 14px;border-radius:20px;font-size:12.5px;font-weight:600"><?= e($product['cat_name']) ?></span><?php endif; ?>
                 <h1 style="margin-top:10px"><?= e($product['name']) ?></h1>
                 <p style="color:var(--ink-soft)"><?= e($product['short_desc']) ?></p>
                 <div class="pd-price-row">

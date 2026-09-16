@@ -60,7 +60,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php foreach ($products as $p): ?>
             <tr>
                 <td><img class="table-img" src="<?= e(upload_url($p['image']) ?: placeholder('P')) ?>" alt=""></td>
-                <td><b><?= e($p['name']) ?></b><br><small style="color:#8d9c8d"><?= e($p['size']) ?><?= (int)$p['is_featured'] ? ' · ⭐ featured' : '' ?></small></td>
+                <td><b><?= e($p['name']) ?></b><br><small style="color:#000"><?= e($p['size']) ?><?= (int)$p['is_featured'] ? ' · ⭐ featured' : '' ?></small></td>
                 <td><?= e($p['cat_name'] ?: '—') ?></td>
                 <td><?= money($p['mrp']) ?></td>
                 <td><?= money($p['dp']) ?></td>

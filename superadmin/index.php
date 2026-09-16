@@ -104,7 +104,7 @@ require __DIR__ . '/../includes/dash_header.php';
                     <tr><th>User</th><th>Sponsor</th><th>Status</th></tr>
                     <?php foreach ($recentUsers as $r): ?>
                     <tr>
-                        <td><b><?= e($r['username']) ?></b><br><small style="color:#8d9c8d"><?= e($r['full_name']) ?></small></td>
+                        <td><b><?= e($r['username']) ?></b><br><small style="color:#000"><?= e($r['full_name']) ?></small></td>
                         <td><?= e($r['sponsor_name'] ?: '—') ?></td>
                         <td><?= (int)$r['is_active'] ? badge('Active', 'success') : badge('Inactive', 'warning') ?></td>
                     </tr>

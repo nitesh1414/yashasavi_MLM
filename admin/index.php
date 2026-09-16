@@ -37,7 +37,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><th>Name</th><th>Subject</th><th>Date</th><th>Status</th></tr>
                 <?php foreach ($recentEnq as $en): ?>
                 <tr>
-                    <td><b><?= e($en['name']) ?></b><br><small style="color:#8d9c8d"><?= e($en['email'] ?: $en['mobile']) ?></small></td>
+                    <td><b><?= e($en['name']) ?></b><br><small style="color:#000"><?= e($en['email'] ?: $en['mobile']) ?></small></td>
                     <td><?= e($en['subject']) ?></td>
                     <td><?= dmy($en['created_at']) ?></td>
                     <td><?= status_badge($en['status']) ?></td>

@@ -66,7 +66,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                 <div>
                     <b><?= e($t['name']) ?></b> <small style="color:var(--ink-soft)"><?= e($t['designation']) ?></small>
-                    <span style="color:var(--dash-gold)"><?= str_repeat('★', (int)$t['rating']) ?></span>
+                    <span style="color:#000"><?= str_repeat('★', (int)$t['rating']) ?></span>
                     <?= badge($t['status'], $t['status'] === 'active' ? 'success' : 'secondary') ?>
                 </div>
                 <div class="table-actions">

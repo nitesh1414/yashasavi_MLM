@@ -127,6 +127,30 @@ require __DIR__ . '/../includes/dash_header.php';
                 PAN: <b><?= e($u['pan_no'] ?: '—') ?></b> · Aadhaar: <b><?= e($u['aadhaar_no'] ? 'XXXX-XXXX-' . substr($u['aadhaar_no'], -4) : '—') ?></b>
                 <?php if ($u['kyc_remark']): ?><br>Remark: <?= e($u['kyc_remark']) ?><?php endif; ?>
             </p>
+            <?php if ($u['pan_image'] || $u['aadhaar_image']): ?>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin:10px 0">
+                <?php if ($u['pan_image']): ?>
+                <a href="<?= e(upload_url($u['pan_image'])) ?>" target="_blank" title="View full PAN card image">
+                    <figure style="text-align:center;margin:0">
+                        <img src="<?= e(upload_url($u['pan_image'])) ?>" alt="PAN card"
+                             style="width:150px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">
+                        <figcaption style="font-size:11px;color:var(--ink-soft);margin-top:4px">PAN Card</figcaption>
+                    </figure>
+                </a>
+                <?php endif; ?>
+                <?php if ($u['aadhaar_image']): ?>
+                <a href="<?= e(upload_url($u['aadhaar_image'])) ?>" target="_blank" title="View full Aadhaar card image">
+                    <figure style="text-align:center;margin:0">
+                        <img src="<?= e(upload_url($u['aadhaar_image'])) ?>" alt="Aadhaar card"
+                             style="width:150px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">
+                        <figcaption style="font-size:11px;color:var(--ink-soft);margin-top:4px">Aadhaar Card</figcaption>
+                    </figure>
+                </a>
+                <?php endif; ?>
+            </div>
+            <?php else: ?>
+            <p style="font-size:12px;color:var(--ink-soft)">No KYC documents uploaded (registered before this requirement).</p>
+            <?php endif; ?>
             <?php if ($u['kyc_status'] !== 'verified'): ?>
             <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
                 <?= csrf_field() ?>
@@ -160,7 +184,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <?php foreach ($directs as $d): ?>
                 <tr>
                     <td><a href="user_view.php?id=<?= (int)$d['id'] ?>"><b><?= e($d['username']) ?></b></a><br>
-                        <small style="color:#8d9c8d"><?= e($d['full_name']) ?></small></td>
+                        <small style="color:#000"><?= e($d['full_name']) ?></small></td>
                     <td><?= e($d['self_bv']) ?></td>
                     <td><?= (int)$d['is_active'] ? badge('Active', 'success') : badge('Inactive', 'warning') ?></td>
                     <td><?= dmy($d['created_at']) ?></td>

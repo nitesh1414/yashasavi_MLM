@@ -190,7 +190,7 @@ require __DIR__ . '/includes/site_header.php';
                     <?php if ($t['photo']): ?>
                         <img src="<?= e(upload_url($t['photo'])) ?>" alt="">
                     <?php else: ?>
-                        <span class="avatar" style="width:46px;height:46px;border-radius:50%;background:var(--green-light);color:var(--green-dark);display:flex;align-items:center;justify-content:center;font-weight:700"><?= e(strtoupper(substr($t['name'], 0, 1))) ?></span>
+                        <span class="avatar" style="width:46px;height:46px;border-radius:50%;background:var(--green-light);color:#000;display:flex;align-items:center;justify-content:center;font-weight:600"><?= e(strtoupper(substr($t['name'], 0, 1))) ?></span>
                     <?php endif; ?>
                     <div><b><?= e($t['name']) ?></b><span><?= e($t['designation']) ?></span></div>
                 </div>

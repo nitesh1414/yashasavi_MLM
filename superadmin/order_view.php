@@ -51,7 +51,7 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><b><?= money($it['total']) ?></b></td>
                 </tr>
                 <?php endforeach; ?>
-                <tr><td colspan="4" style="text-align:right"><b>Total BV</b></td><td><b style="color:var(--dash-gold)"><?= e($o['total_bv']) ?></b></td></tr>
+                <tr><td colspan="4" style="text-align:right"><b>Total BV</b></td><td><b style="color:#000"><?= e($o['total_bv']) ?></b></td></tr>
                 <tr><td colspan="4" style="text-align:right"><b>Payable</b></td><td><b><?= money($o['total_dp']) ?></b></td></tr>
             </table>
         </div>

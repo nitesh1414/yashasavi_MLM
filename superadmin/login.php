@@ -28,7 +28,7 @@ $logo = upload_url(setting('site_logo')) ?: placeholder('Logo');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Super Admin Login — <?= e($siteName) ?></title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/dash.css') ?>?v=<?= APP_VERSION ?>">
 </head>
 <body class="dash-login-body">
@@ -52,7 +52,7 @@ $logo = upload_url(setting('site_logo')) ?: placeholder('Logo');
         <button class="btn btn-primary btn-block" type="submit">Login →</button>
     </form>
     <p style="text-align:center;margin-top:16px;font-size:12.5px">
-        <a href="<?= url('index.php') ?>" style="color:#66735f">← Back to website</a>
+        <a href="<?= url('index.php') ?>" style="color:#000">← Back to website</a>
     </p>
 </div>
 </body>

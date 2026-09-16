@@ -38,7 +38,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <?php endforeach; ?>
                 <tr>
                     <td colspan="5" style="text-align:right"><b>Total BV</b></td>
-                    <td><b style="color:var(--dash-gold)"><?= bv($order['total_bv']) ?></b></td>
+                    <td><b style="color:#000"><?= bv($order['total_bv']) ?></b></td>
                 </tr>
                 <tr>
                     <td colspan="5" style="text-align:right"><b>Payable (DP Total)</b></td>

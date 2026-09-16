@@ -95,7 +95,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
                 <td><?= money($r['admin_charge']) ?></td>
                 <td><b><?= money($r['net_amount']) ?></b></td>
                 <td><?= status_badge($r['status']) ?></td>
-                <td><?= $r['paid_at'] ? dmy($r['paid_at']) : ($r['reject_reason'] ? '<small style="color:#b71c1c">' . e($r['reject_reason']) . '</small>' : '—') ?></td>
+                <td><?= $r['paid_at'] ? dmy($r['paid_at']) : ($r['reject_reason'] ? '<small style="color:#000">' . e($r['reject_reason']) . '</small>' : '—') ?></td>
             </tr>
             <?php endforeach; ?>
         </table>

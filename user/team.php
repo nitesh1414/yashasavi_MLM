@@ -64,7 +64,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php foreach ($rows as $r): ?>
             <tr>
                 <td><b><?= e($r['username']) ?></b></td>
-                <td><?= e($r['full_name']) ?><br><small style="color:#8d9c8d"><?= e($r['mobile']) ?></small></td>
+                <td><?= e($r['full_name']) ?><br><small style="color:#000"><?= e($r['mobile']) ?></small></td>
                 <td><?= $r['leg'] === 'L' ? badge('Left', 'info') : badge('Right', 'warning') ?></td>
                 <td><?= e($r['sponsor_name'] ?? '—') ?></td>
                 <td><?= bv($r['self_bv']) ?></td>

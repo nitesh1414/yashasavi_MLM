@@ -34,7 +34,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <title><?= e($pageTitle ?? 'Dashboard') ?> — <?= e($siteName) ?></title>
 <link rel="icon" href="<?= e(upload_url(setting('site_favicon')) ?: placeholder('i')) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/dash.css') ?>?v=<?= APP_VERSION ?>">
 </head>
 <body class="dash-body area-<?= e($area) ?>">

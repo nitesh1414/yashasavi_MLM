@@ -41,7 +41,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <tr>
                 <td>
                     <b><?= e($p['title']) ?></b>
-                    <?php if ($p['parent_title']): ?><br><small style="color:#8d9c8d">↳ under: <?= e($p['parent_title']) ?></small><?php endif; ?>
+                    <?php if ($p['parent_title']): ?><br><small style="color:#000">↳ under: <?= e($p['parent_title']) ?></small><?php endif; ?>
                 </td>
                 <td><code>page.php?slug=<?= e($p['slug']) ?></code></td>
                 <td><?= (int)$p['show_in_menu'] ? badge('Yes', 'success') : badge('No', 'secondary') ?></td>

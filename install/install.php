@@ -198,24 +198,24 @@ if ($isCli) {
 <style>
 :root{--green:#2e7d32;--dark:#1b3a1f;--gold:#c99a2e;--bg:#f5f7f4;--danger:#c62828}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:#22301f;padding:40px 16px;line-height:1.6}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:#000;padding:40px 16px;line-height:1.6}
 .wrap{max-width:720px;margin:0 auto}
 .card{background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(27,58,31,.08);padding:32px;margin-bottom:20px}
-h1{color:var(--dark);font-size:26px;margin-bottom:6px}
-h2{color:var(--dark);font-size:18px;margin:18px 0 10px}
-p.lead{color:#5a6b58;margin-bottom:18px}
-label{display:block;font-weight:600;font-size:13px;margin:12px 0 4px;color:#33452f}
+h1{color:#000;font-size:26px;margin-bottom:6px}
+h2{color:#000;font-size:18px;margin:18px 0 10px}
+p.lead{color:#000;margin-bottom:18px}
+label{display:block;font-weight:600;font-size:13px;margin:12px 0 4px;color:#000}
 input[type=text],input[type=password]{width:100%;padding:10px 12px;border:1px solid #cfd8cf;border-radius:8px;font-size:14px}
 input:focus{outline:2px solid var(--green);border-color:var(--green)}
 button{margin-top:20px;background:var(--green);color:#fff;border:0;padding:12px 26px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
 button:hover{background:var(--dark)}
 table.req{width:100%;border-collapse:collapse;margin-top:8px}
 table.req td{padding:7px 4px;border-bottom:1px solid #edf1ed;font-size:14px}
-.ok{color:#2e7d32;font-weight:700}.warn{color:#c99a2e;font-weight:700}.bad{color:var(--danger);font-weight:700}
+.ok{color:#000;font-weight:600}.warn{color:#000;font-weight:600}.bad{color:#000;font-weight:600}
 .creds{background:#f0f6ef;border:1px solid #cfe0cf;border-radius:10px;padding:16px 20px;margin-top:14px}
 .creds code{background:#fff;border:1px solid #dbe5db;padding:2px 8px;border-radius:6px;font-size:13px}
-.note{font-size:13px;color:#77787a;margin-top:10px}
-.err{background:#fdecec;border:1px solid #f5c6c6;color:#8a1f1f;padding:12px 16px;border-radius:8px;margin-bottom:16px}
+.note{font-size:13px;color:#000;margin-top:10px}
+.err{background:#fdecec;border:1px solid #f5c6c6;color:#000;padding:12px 16px;border-radius:8px;margin-bottom:16px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 </style>
 </head>
@@ -252,7 +252,7 @@ table.req td{padding:7px 4px;border-bottom:1px solid #edf1ed;font-size:14px}
                 <div class="err"><strong>Installation failed:</strong> <?= htmlspecialchars($error) ?></div>
                 <p><a href="install.php">&larr; Go back and try again</a></p>
             <?php else: ?>
-                <h2 style="color:#2e7d32">✅ Installation complete!</h2>
+                <h2 style="color:#000">✅ Installation complete!</h2>
                 <div class="creds">
                     <h2 style="margin-top:0">Default logins</h2>
                     <p>🌐 <strong>Website</strong> — <a href="../index.php">Open site</a></p>

@@ -85,7 +85,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><th>Name</th><th>Username</th><th>Role</th><th>Last Login</th><th>Status</th><th>Actions</th></tr>
                 <?php foreach ($staff as $s): ?>
                 <tr>
-                    <td><b><?= e($s['name']) ?></b><br><small style="color:#8d9c8d"><?= e($s['email'] ?: '') ?></small></td>
+                    <td><b><?= e($s['name']) ?></b><br><small style="color:#000"><?= e($s['email'] ?: '') ?></small></td>
                     <td><?= e($s['username']) ?></td>
                     <td><?= $s['role'] === 'superadmin' ? badge('👑 Super Admin', 'primary') : badge('CMS Admin', 'info') ?></td>
                     <td><?= dmy($s['last_login'], true) ?></td>

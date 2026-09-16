@@ -80,12 +80,12 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td>#<?= (int)$r['id'] ?></td>
                 <td><?= dmy($r['created_at'], true) ?></td>
                 <td><a href="user_view.php?id=<?= (int)$r['user_id'] ?>"><b><?= e($r['username']) ?></b></a><br>
-                    <small style="color:#8d9c8d"><?= e($r['full_name']) ?></small></td>
+                    <small style="color:#000"><?= e($r['full_name']) ?></small></td>
                 <td><?= badge(ucfirst($r['type']), $r['type'] === 'binary' ? 'info' : 'primary') ?><?= $r['level'] ? ' L' . (int)$r['level'] : '' ?></td>
                 <td><?= e($r['order_no'] ?: '—') ?></td>
                 <td><?= e($r['bv']) ?></td>
                 <td><b><?= money($r['amount']) ?></b></td>
-                <td><small style="color:#8d9c8d"><?= e($r['note']) ?></small></td>
+                <td><small style="color:#000"><?= e($r['note']) ?></small></td>
             </tr>
             <?php endforeach; ?>
         </table>

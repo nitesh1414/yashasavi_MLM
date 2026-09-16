@@ -120,8 +120,8 @@ require __DIR__ . '/../includes/dash_header.php';
             <table class="kv-table" style="width:100%">
                 <?php foreach ($recentTx as $t): ?>
                 <tr>
-                    <td><?= dmy($t['created_at']) ?><br><small style="color:#8d9c8d"><?= e($t['note']) ?></small></td>
-                    <td style="text-align:right;color:<?= $t['type'] === 'credit' ? '#1b5e20' : '#b71c1c' ?>;font-weight:700">
+                    <td><?= dmy($t['created_at']) ?><br><small style="color:#000"><?= e($t['note']) ?></small></td>
+                    <td style="text-align:right;color:#000;font-weight:600">
                         <?= $t['type'] === 'credit' ? '+' : '−' ?><?= money($t['amount']) ?>
                     </td>
                 </tr>

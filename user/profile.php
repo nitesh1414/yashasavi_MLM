@@ -153,6 +153,35 @@ $u = current_user(); // refreshed
         </div>
 
         <div class="card">
+            <div class="card-title">🪪 KYC Documents <?= status_badge($u['kyc_status']) ?></div>
+            <?php if ($u['pan_image'] || $u['aadhaar_image']): ?>
+            <div style="display:flex;gap:14px;flex-wrap:wrap">
+                <?php if ($u['pan_image']): ?>
+                <a href="<?= e(upload_url($u['pan_image'])) ?>" target="_blank" title="View full PAN card image">
+                    <figure style="text-align:center;margin:0">
+                        <img src="<?= e(upload_url($u['pan_image'])) ?>" alt="PAN card"
+                             style="width:150px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">
+                        <figcaption style="font-size:11px;color:var(--ink-soft);margin-top:4px">PAN Card</figcaption>
+                    </figure>
+                </a>
+                <?php endif; ?>
+                <?php if ($u['aadhaar_image']): ?>
+                <a href="<?= e(upload_url($u['aadhaar_image'])) ?>" target="_blank" title="View full Aadhaar card image">
+                    <figure style="text-align:center;margin:0">
+                        <img src="<?= e(upload_url($u['aadhaar_image'])) ?>" alt="Aadhaar card"
+                             style="width:150px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">
+                        <figcaption style="font-size:11px;color:var(--ink-soft);margin-top:4px">Aadhaar Card</figcaption>
+                    </figure>
+                </a>
+                <?php endif; ?>
+            </div>
+            <p class="form-hint">Documents uploaded at registration. Contact support to re-upload if a document is rejected.</p>
+            <?php else: ?>
+            <p style="font-size:13px;color:var(--ink-soft)">No KYC documents on file. Please contact support to complete your KYC.</p>
+            <?php endif; ?>
+        </div>
+
+        <div class="card">
             <div class="card-title">🌳 Network Position</div>
             <table class="kv-table" style="width:100%">
                 <tr><td>My User ID</td><td><b><?= e($u['username']) ?></b></td></tr>
