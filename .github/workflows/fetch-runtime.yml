@@ -13,38 +13,20 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Diagnose token
+      - name: Diagnose
         run: |
-          echo "actor: ${GITHUB_ACTOR}"
-          echo "token length: ${#GITHUB_TOKEN}"
-          echo "token prefix: ${GITHUB_TOKEN:0:4}"
-          echo "--- api test ---"
-          curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY}" | head -c 400
-          echo
-          echo "--- api whoami ---"
-          curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/user" | head -c 300
-          echo
-      - name: Download assets
-        run: |
-          mkdir -p assets && cd assets
-          curl -fSL --retry 3 -o test.bin "https://github.com/dunglas/frankenphp/releases/download/v1.12.7/frankenphp-linux-x86_64" --range 0-1000000 || true
-          ls -la
-      - name: Try push variants
-        run: |
-          cd assets
+          DIAG="actor=${GITHUB_ACTOR} tokenlen=${#GITHUB_TOKEN} prefix=${GITHUB_TOKEN:0:4} repo=${GITHUB_REPOSITORY}"
+          echo "::warning::DIAG1 $DIAG"
+          API1=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY}" | head -c 300 | tr '\n' ' ')
+          echo "::warning::DIAG2 repo-api: $API1"
+          API2=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/user" | head -c 300 | tr '\n' ' ')
+          echo "::warning::DIAG3 whoami: $API2"
+          # try a tiny push
+          mkdir -p /tmp/t && cd /tmp/t
           echo "hello $(date)" > file.txt
-          git init -q -b test-branch .
-          git config user.name t
-          git config user.email t@t.com
-          git config http.postBuffer 524288000
-          git add -A
-          git commit -q -m "test"
-          echo "=== variant 1: x-access-token ==="
-          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-1 2>&1 | tail -5
-          echo "=== variant 2: actor ==="
-          git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-2 2>&1 | tail -5
-          echo "=== variant 3: header auth ==="
-          git -c http.extraheader="Authorization: Basic $(printf 'x-access-token:%s' "${GITHUB_TOKEN}" | base64 -w0)" push "https://github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-3 2>&1 | tail -5
-          echo "=== variant 4: api create ref ==="
-          SHA=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/heads/${GITHUB_REF_NAME}" | python3 -c "import json,sys; print(json.load(sys.stdin)['object']['sha'])")
-          echo "base sha: $SHA"
+          git init -q -b tb . && git config user.name t && git config user.email t@t.com
+          git add -A && git commit -q -m test
+          P1=$(git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-1 2>&1 | tail -3 | tr '\n' ' ')
+          echo "::warning::DIAG4 push-xaccess: $P1"
+          P2=$(git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/test-branch-2 2>&1 | tail -3 | tr '\n' ' ')
+          echo "::warning::DIAG5 push-actor: $P2"
