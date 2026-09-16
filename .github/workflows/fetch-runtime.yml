@@ -1,6 +1,9 @@
 name: Fetch runtime assets
 
 on:
+  push:
+    branches: [arena/01a0a8c6-yashasavi-mlm]
+    paths: ['.github/workflows/fetch-runtime.yml']
   workflow_dispatch:
 
 permissions:
