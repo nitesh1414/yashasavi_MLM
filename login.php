@@ -31,7 +31,7 @@ require __DIR__ . '/includes/site_header.php';
 <div class="auth-wrap">
     <div class="auth-card">
         <div class="auth-logo">
-            <img src="<?= e(upload_url(setting('site_logo')) ?: placeholder('Logo')) ?>" alt="logo">
+            <img src="<?= e(upload_url(setting('site_logo')) ?: url('assets/img/logo.svg')) ?>" alt="logo">
             <h2 style="font-size:22px">Distributor Login</h2>
         </div>
         <div class="auth-tabs">

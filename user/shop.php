@@ -75,7 +75,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <div class="sc-meta"><?= e($p['size']) ?> · MRP <?= money($p['mrp']) ?> · Stock: <?= (int)$p['stock'] ?></div>
                 <div class="sc-row">
                     <span class="sc-price"><?= money($p['dp']) ?> <small>DP</small><br>
-                        <small style="color:#000;font-weight:600"><?= bv($p['bv']) ?></small></span>
+                        <small style="color:#000;font-weight:400"><?= bv($p['bv']) ?></small></span>
                     <form method="post" style="display:flex;gap:6px;align-items:center">
                         <?= csrf_field() ?>
                         <input type="hidden" name="action" value="add">

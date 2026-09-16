@@ -30,10 +30,11 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php if ((int)$rootUser['id'] !== (int)$u['id']): ?>
                 <a class="btn btn-light btn-sm" href="tree.php">⬅ Back to my tree</a>
             <?php endif; ?>
+            <a class="btn btn-primary btn-sm" href="add-member.php">➕ Add Member</a>
             <a class="btn btn-light btn-sm" href="tree.php?root=<?= (int)$rootUser['id'] ?>">🔄 Refresh</a>
         </span>
     </div>
-    <?= render_binary_tree($rootUser, 3, 'tree.php') ?>
+    <?= render_binary_tree($rootUser, 5, 'tree.php', 'add-member.php') ?>
 </div>
 
 <?php require __DIR__ . '/../includes/dash_footer.php'; ?>

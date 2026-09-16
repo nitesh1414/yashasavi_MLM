@@ -94,7 +94,7 @@ require __DIR__ . '/includes/site_header.php';
 <div class="auth-wrap">
     <div class="auth-card wide">
         <div class="auth-logo">
-            <img src="<?= e(upload_url(setting('site_logo')) ?: placeholder('Logo')) ?>" alt="logo">
+            <img src="<?= e(upload_url(setting('site_logo')) ?: url('assets/img/logo.svg')) ?>" alt="logo">
             <h2 style="font-size:22px">Register Your Account</h2>
             <p style="font-size:13px;color:var(--ink-soft)">Join <?= e(setting('site_name')) ?> as a distributor</p>
         </div>
@@ -118,7 +118,7 @@ require __DIR__ . '/includes/site_header.php';
                     <label>Sponsor ID <span class="req">*</span></label>
                     <input class="form-control" type="text" name="sponsor" id="sponsor" required
                            value="<?= e($f['sponsor'] ?: $prefill['sponsor']) ?>" placeholder="e.g. YSH100001">
-                    <div class="form-hint" id="sponsor_name" style="font-weight:600"></div>
+                    <div class="form-hint" id="sponsor_name" style="font-weight:400"></div>
                 </div>
                 <div class="form-group">
                     <label>Placement <span class="req">*</span></label>

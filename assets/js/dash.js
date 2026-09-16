@@ -44,4 +44,51 @@ document.addEventListener('DOMContentLoaded', function () {
             this.value = this.value.replace(/[^0-9.]/g, '');
         });
     });
+
+    /* sponsor lookup on panel add-member forms */
+    var spField = document.getElementById('sponsor');
+    var spName = document.getElementById('sponsor_name');
+    if (spField && spName && spField.dataset.sponsorApi) {
+        var debounce;
+        spField.addEventListener('input', function () {
+            clearTimeout(debounce);
+            var v = spField.value.trim();
+            if (v.length < 3) { spName.textContent = ''; return; }
+            debounce = setTimeout(function () {
+                fetch(spField.dataset.sponsorApi + '?action=sponsor&sid=' + encodeURIComponent(v))
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        spName.textContent = d.found ? ('✓ ' + d.name) : '✗ Sponsor not found';
+                    })
+                    .catch(function () { spName.textContent = ''; });
+            }, 350);
+        });
+    }
+
+    /* genealogy tree zoom (fit the 5-level tree in one window) */
+    document.querySelectorAll('[data-tree-zoom]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var tree = document.querySelector('.tree[data-tree-root]');
+            var wrap = document.querySelector('.tree-wrap');
+            if (!tree || !wrap) { return; }
+            var natural = parseFloat(tree.dataset.naturalWidth || '0');
+            if (!natural) {
+                tree.style.zoom = 1;
+                tree.dataset.naturalWidth = natural = tree.scrollWidth || tree.getBoundingClientRect().width;
+            }
+            var cur = parseFloat(tree.dataset.zoom || '1');
+            if (btn.dataset.treeZoom === 'in') { cur = Math.min(1.4, cur + 0.15); }
+            else if (btn.dataset.treeZoom === 'out') { cur = Math.max(0.2, cur - 0.15); }
+            else { cur = Math.min(1, (wrap.clientWidth - 16) / natural); }
+            tree.dataset.zoom = cur;
+            tree.style.zoom = cur;
+        });
+    });
+    /* auto-fit on load + resize */
+    var fitBtn = document.querySelector('[data-tree-zoom="fit"]');
+    if (fitBtn) {
+        var rz;
+        window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { fitBtn.click(); }, 150); });
+        fitBtn.click();
+    }
 });

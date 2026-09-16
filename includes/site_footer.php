@@ -4,7 +4,7 @@
     <div class="container">
         <div class="footer-grid">
             <div>
-                <img src="<?= e(upload_url(setting('site_logo')) ?: placeholder('Logo')) ?>" alt="logo">
+                <img src="<?= e(upload_url(setting('site_logo')) ?: url('assets/img/logo.svg')) ?>" alt="logo">
                 <p><?= e(setting('footer_about')) ?></p>
                 <div class="social-links">
                     <?php foreach (['facebook' => 'f', 'instagram' => '◎', 'youtube' => '▶', 'twitter' => '𝕏'] as $sk => $si): ?>

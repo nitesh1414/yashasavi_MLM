@@ -91,7 +91,7 @@ $CFG = [
     \'ALLOWED_IMG_EXT\'   => \'jpg,jpeg,png,webp,gif\',
     \'ALLOWED_DOC_EXT\'   => \'pdf\',
 
-    \'APP_VERSION\'    => \'1.0.0\',
+    \'APP_VERSION\'    => \'1.1.0\',
     \'APP_TIMEZONE\'   => \'Asia/Kolkata\',
     \'ITEMS_PER_PAGE\' => 12,
 ];
@@ -204,14 +204,14 @@ body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background
 h1{color:#000;font-size:26px;margin-bottom:6px}
 h2{color:#000;font-size:18px;margin:18px 0 10px}
 p.lead{color:#000;margin-bottom:18px}
-label{display:block;font-weight:600;font-size:13px;margin:12px 0 4px;color:#000}
+label{display:block;font-weight:400;font-size:13px;margin:12px 0 4px;color:#000}
 input[type=text],input[type=password]{width:100%;padding:10px 12px;border:1px solid #cfd8cf;border-radius:8px;font-size:14px}
 input:focus{outline:2px solid var(--green);border-color:var(--green)}
-button{margin-top:20px;background:var(--green);color:#fff;border:0;padding:12px 26px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
+button{margin-top:20px;background:var(--green);color:#fff;border:0;padding:12px 26px;border-radius:8px;font-size:15px;font-weight:400;cursor:pointer}
 button:hover{background:var(--dark)}
 table.req{width:100%;border-collapse:collapse;margin-top:8px}
 table.req td{padding:7px 4px;border-bottom:1px solid #edf1ed;font-size:14px}
-.ok{color:#000;font-weight:600}.warn{color:#000;font-weight:600}.bad{color:#000;font-weight:600}
+.ok{color:#000;font-weight:400}.warn{color:#000;font-weight:400}.bad{color:#000;font-weight:400}
 .creds{background:#f0f6ef;border:1px solid #cfe0cf;border-radius:10px;padding:16px 20px;margin-top:14px}
 .creds code{background:#fff;border:1px solid #dbe5db;padding:2px 8px;border-radius:6px;font-size:13px}
 .note{font-size:13px;color:#000;margin-top:10px}

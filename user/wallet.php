@@ -46,7 +46,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <tr>
                 <td><?= dmy($r['created_at'], true) ?></td>
                 <td><?= badge(ucfirst($r['type']), $r['type'] === 'credit' ? 'success' : 'danger') ?></td>
-                <td style="font-weight:600;color:#000">
+                <td style="font-weight:400;color:#000">
                     <?= $r['type'] === 'credit' ? '+' : '−' ?><?= money($r['amount']) ?></td>
                 <td><?= money($r['balance_after']) ?></td>
                 <td><?= badge(ucfirst($r['ref_type']), 'secondary') ?></td>

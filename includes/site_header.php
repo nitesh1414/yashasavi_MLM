@@ -2,7 +2,7 @@
 /** Public website header — expects optional: $pageTitle, $pageDesc, $bodyClass */
 $siteName = setting('site_name', 'Yashasavi Ayurveda');
 $siteTagline = setting('site_tagline', 'Health • Wealth • Wellness');
-$logo = upload_url(setting('site_logo')) ?: placeholder('Logo');
+$logo = upload_url(setting('site_logo')) ?: url('assets/img/logo.svg');
 $navPages = q_all("SELECT * FROM pages WHERE status='published' AND show_in_menu=1 ORDER BY menu_order ASC, title ASC");
 $currentScript = basename($_SERVER['SCRIPT_NAME'] ?? '');
 $currentSlug = get_str('slug');
@@ -33,7 +33,7 @@ $u = current_user();
 <meta name="description" content="<?= e($metaDesc) ?>">
 <link rel="icon" href="<?= e(upload_url(setting('site_favicon')) ?: placeholder('icon')) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/style.css') ?>?v=<?= APP_VERSION ?>">
 </head>
 <body<?= isset($bodyClass) ? ' class="' . e($bodyClass) . '"' : '' ?>>
@@ -53,17 +53,29 @@ $u = current_user();
 
 <nav class="navbar">
     <div class="container">
-        <a class="brand" href="<?= url('index.php') ?>">
-            <img src="<?= e($logo) ?>" alt="logo">
-            <span>
-                <span class="brand-name"><?= e($siteName) ?></span><br>
+        <a class="brand" href="<?= url('index.php') ?>" aria-label="<?= e($siteName) ?> — home">
+            <img src="<?= e($logo) ?>" alt="<?= e($siteName) ?> logo" width="46" height="46">
+            <span class="brand-text">
+                <span class="brand-name"><?= e($siteName) ?></span>
                 <span class="brand-tag"><?= e($siteTagline) ?></span>
             </span>
         </a>
         <ul class="nav-menu" id="navMenu">
+            <li class="nav-menu-head">
+                <span class="nav-menu-brand"><?= e($siteName) ?></span>
+                <button class="nav-close" aria-label="Close menu">✕</button>
+            </li>
             <?php foreach ($menu as $m): ?>
                 <li><a href="<?= e($m['href']) ?>" class="<?= $m['active'] ? 'active' : '' ?>"><?= e($m['label']) ?></a></li>
             <?php endforeach; ?>
+            <li class="nav-mobile-auth">
+                <?php if ($u): ?>
+                    <a class="btn btn-primary" href="<?= url('user/index.php') ?>">My Dashboard</a>
+                <?php else: ?>
+                    <a class="btn btn-outline" href="<?= url('login.php') ?>">Login</a>
+                    <a class="btn btn-primary" href="<?= url('register.php') ?>">Register</a>
+                <?php endif; ?>
+            </li>
         </ul>
         <div class="nav-actions">
             <?php if ($u): ?>
@@ -72,10 +84,11 @@ $u = current_user();
                 <a class="btn btn-outline btn-sm" href="<?= url('login.php') ?>">Login</a>
                 <a class="btn btn-primary btn-sm" href="<?= url('register.php') ?>">Register</a>
             <?php endif; ?>
-            <button class="nav-toggle" aria-label="Menu">☰</button>
+            <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
         </div>
     </div>
 </nav>
+<div class="nav-overlay" id="navOverlay"></div>
 
 <?php if (setting('announcement_bar')): ?>
 <div style="background:var(--gold-light);color:#000;text-align:center;font-size:13.5px;padding:8px 16px;">

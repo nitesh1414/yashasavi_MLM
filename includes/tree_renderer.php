@@ -1,14 +1,18 @@
 <?php
 /**
  * Binary genealogy tree renderer.
- * Renders $levels generations below $rootUser.
+ * Renders $levels generations below $rootUser (default 5).
  * $linkBase — URL for re-rooting (e.g. 'tree.php') with ?root=<id>
+ * $addBase  — URL of the PANEL registration page (e.g. 'add-member.php')
+ *             used by the empty-slot "add member" links.
  *
- * Empty positions render as "add member" links that open the registration
- * form with the sponsor ID (the parent of the empty slot) and the leg
- * pre-selected, so a new member can be placed exactly there.
+ * Empty positions render as "add member" links that open the panel
+ * registration form with the sponsor ID (the parent of the empty slot)
+ * and the leg pre-selected, so a new member can be placed exactly there.
+ * A zoom toolbar (fit / in / out) lets the full 5-level tree fit in a
+ * single window.
  */
-function render_binary_tree($rootUser, $levels = 3, $linkBase = 'tree.php')
+function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $addBase = 'add-member.php')
 {
     // preload descendants up to $levels via BFS
     $byParent = [];
@@ -35,11 +39,12 @@ function render_binary_tree($rootUser, $levels = 3, $linkBase = 'tree.php')
     }
 
     $node = function ($user, $isRoot, $parentUser = null, $leg = null)
-        use ($linkBase, $rankNames) {
+        use ($linkBase, $addBase, $rankNames) {
         if (!$user) {
-            // Empty slot — link to the registration form with sponsor + leg prefilled
+            // Slot directly below a REAL member — clickable "add member" link
+            // (sponsor = that member, leg = this side; spillover fills exactly here).
             if ($parentUser && $leg) {
-                $href = url('register.php?ref=' . urlencode($parentUser['username']) . '&leg=' . $leg);
+                $href = $addBase . '?ref=' . urlencode($parentUser['username']) . '&leg=' . $leg;
                 $legName = $leg === 'L' ? 'LEFT' : 'RIGHT';
                 return '<div class="t-node empty add">
                             <a href="' . e($href) . '" title="Register a new member in this position">
@@ -49,7 +54,8 @@ function render_binary_tree($rootUser, $levels = 3, $linkBase = 'tree.php')
                             </a>
                         </div>';
             }
-            return '<div class="t-node empty"><div class="t-empty-label">⚪ Empty</div></div>';
+            // Deeper position (its parent is still empty) — future spot placeholder
+            return '<div class="t-node vacant" title="Future position — opens once the slot above is filled"><span class="t-v-dot">·</span></div>';
         }
         $cls = 't-node' . ($isRoot ? ' root' : '');
         $status = (int)$user['is_active'] === 1 ? '🟢' : '🔴';
@@ -68,9 +74,11 @@ function render_binary_tree($rootUser, $levels = 3, $linkBase = 'tree.php')
     $renderLevel = function ($user, $depth, $isRoot, $parentUser = null, $leg = null)
         use (&$renderLevel, $byParent, $node, $levels) {
         $html = '<li>' . $node($user, $isRoot, $parentUser, $leg);
-        if ($user && $depth < $levels) {
+        /* Recurse through EMPTY slots too, so the full $levels-deep structure
+         * (and every addable position) is always visible. */
+        if ($depth < $levels) {
             $html .= '<ul>';
-            $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
+            $kids = ($user && isset($byParent[$user['id']])) ? $byParent[$user['id']] : [];
             $html .= '<li>' . $renderLevel(isset($kids['L']) ? $kids['L'] : null, $depth + 1, false, $user, 'L') . '</li>';
             $html .= '<li>' . $renderLevel(isset($kids['R']) ? $kids['R'] : null, $depth + 1, false, $user, 'R') . '</li>';
             $html .= '</ul>';
@@ -85,9 +93,18 @@ function render_binary_tree($rootUser, $levels = 3, $linkBase = 'tree.php')
                 <span class="lg"><span class="dot" style="background:#c62828"></span> Inactive</span>
                 <span class="lg">L:/R: = leg BV</span>
                 <span class="lg">Click "view" on a node to re-root the tree</span>
-                <span class="lg">Click an empty position to register a new member there</span>
+                <span class="lg">Click an empty position to add a new member there</span>
+                <span class="lg">Dotted · = future position (opens once the slot above is filled)</span>
             </div>
-            <div class="tree-wrap"><div class="tree"><ul>' .
-            str_replace('<li>', '<li style="padding-top:0">', $renderLevel($root, 0, true)) .
+            <div class="tree-toolbar">
+                <span class="tt-label">Showing ' . (int)$levels . ' levels below the root — use ➕/➖ to zoom, "Fit" to fit the whole tree in the window.</span>
+                <div class="tt-zoom">
+                    <button type="button" data-tree-zoom="out" title="Zoom out">➖</button>
+                    <button type="button" data-tree-zoom="fit" title="Fit to window">⛶ Fit</button>
+                    <button type="button" data-tree-zoom="in" title="Zoom in">➕</button>
+                </div>
+            </div>
+            <div class="tree-wrap"><div class="tree" data-tree-root="1"><ul>' .
+            preg_replace('~<li>~', '<li style="padding-top:0">', $renderLevel($root, 0, true), 1) .
             '</ul></div></div>';
 }

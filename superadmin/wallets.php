@@ -91,7 +91,7 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><?= dmy($r['created_at'], true) ?></td>
                     <td><a href="user_view.php?id=<?= (int)$r['user_id'] ?>"><b><?= e($r['username']) ?></b></a></td>
                     <td><?= badge(ucfirst($r['type']), $r['type'] === 'credit' ? 'success' : 'danger') ?></td>
-                    <td style="font-weight:600"><?= $r['type'] === 'credit' ? '+' : '−' ?><?= money($r['amount']) ?></td>
+                    <td style="font-weight:400"><?= $r['type'] === 'credit' ? '+' : '−' ?><?= money($r['amount']) ?></td>
                     <td><?= money($r['balance_after']) ?></td>
                     <td><small style="color:#000"><?= e($r['note']) ?></small></td>
                 </tr>

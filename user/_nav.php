@@ -5,6 +5,7 @@ $nav = [
     ['icon' => '🏠', 'label' => 'Dashboard', 'href' => 'index.php', 'active' => $activeKey === 'dashboard'],
     ['label2' => 'My Business'],
     ['icon' => '🌳', 'label' => 'Genealogy Tree', 'href' => 'tree.php', 'active' => $activeKey === 'tree'],
+    ['icon' => '➕', 'label' => 'Add Member', 'href' => 'add-member.php', 'active' => $activeKey === 'add-member'],
     ['icon' => '👥', 'label' => 'My Team', 'href' => 'team.php', 'active' => $activeKey === 'team'],
     ['icon' => '💠', 'label' => 'Marketing Plan', 'href' => 'plan.php', 'active' => $activeKey === 'plan'],
     ['icon' => '💰', 'label' => 'Earnings', 'href' => 'earnings.php', 'active' => $activeKey === 'earnings'],

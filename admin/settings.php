@@ -84,7 +84,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="form-group">
                 <label>Logo (PNG with transparent background)</label>
                 <input class="form-control" type="file" name="site_logo" accept=".jpg,.jpeg,.png,.webp">
-                <img class="upload-preview" src="<?= e(upload_url(setting('site_logo')) ?: placeholder('Logo')) ?>" alt="" style="height:70px;width:auto">
+                <img class="upload-preview" src="<?= e(upload_url(setting('site_logo')) ?: url('assets/img/logo.svg')) ?>" alt="" style="height:70px;width:auto">
             </div>
             <div class="form-group">
                 <label>Favicon</label>

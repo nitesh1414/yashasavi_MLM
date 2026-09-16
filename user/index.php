@@ -121,7 +121,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <?php foreach ($recentTx as $t): ?>
                 <tr>
                     <td><?= dmy($t['created_at']) ?><br><small style="color:#000"><?= e($t['note']) ?></small></td>
-                    <td style="text-align:right;color:#000;font-weight:600">
+                    <td style="text-align:right;color:#000;font-weight:400">
                         <?= $t['type'] === 'credit' ? '+' : '−' ?><?= money($t['amount']) ?>
                     </td>
                 </tr>

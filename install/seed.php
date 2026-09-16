@@ -82,7 +82,7 @@ function seed_database($fresh = false)
     $settings = [
         'site_name'        => 'Yashasavi Ayurveda',
         'site_tagline'     => 'Health • Wealth • Wellness',
-        'site_logo'        => 'site/logo.png',
+        'site_logo'        => '', /* empty = bundled assets/img/logo.svg emblem */
         'site_favicon'     => 'site/favicon.png',
         'contact_email'    => 'support@yashasaviayurveda.com',
         'contact_phone'    => '+91 98765 43210',

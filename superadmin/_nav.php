@@ -8,6 +8,7 @@ $nav = [
     ['label2' => 'Network'],
     ['icon' => '👥', 'label' => 'Distributors', 'href' => 'users.php', 'active' => $activeKey === 'users'],
     ['icon' => '🌳', 'label' => 'Network Tree', 'href' => 'tree.php', 'active' => $activeKey === 'tree'],
+    ['icon' => '➕', 'label' => 'Add Distributor', 'href' => 'add-member.php', 'active' => $activeKey === 'add-member'],
     ['icon' => '🏅', 'label' => 'Ranks', 'href' => 'ranks.php', 'active' => $activeKey === 'ranks'],
     ['label2' => 'Sales'],
     ['icon' => '📦', 'label' => 'Orders', 'href' => 'orders.php', 'active' => $activeKey === 'orders', 'count' => $pendingOrders],

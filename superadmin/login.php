@@ -20,7 +20,7 @@ if (is_post()) {
 }
 
 $siteName = setting('site_name', 'Yashasavi Ayurveda');
-$logo = upload_url(setting('site_logo')) ?: placeholder('Logo');
+$logo = upload_url(setting('site_logo')) ?: url('assets/img/logo.svg');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -28,7 +28,7 @@ $logo = upload_url(setting('site_logo')) ?: placeholder('Logo');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Super Admin Login — <?= e($siteName) ?></title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/dash.css') ?>?v=<?= APP_VERSION ?>">
 </head>
 <body class="dash-login-body">
