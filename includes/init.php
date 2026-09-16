@@ -4,8 +4,22 @@
  * Loads configuration, database, helpers and starts the session.
  */
 
+/* Optional local override (git-ignored) — must be loaded first */
+if (is_file(__DIR__ . '/../config.local.php')) {
+    require_once __DIR__ . '/../config.local.php';
+}
+require_once __DIR__ . '/../config.php';
+
+/* Turn the $CFG array (if used) into constants */
+$CFG = isset($CFG) && is_array($CFG) ? $CFG : [];
+foreach ($CFG as $k => $v) {
+    if (!defined($k)) {
+        define($k, $v);
+    }
+}
+
 if (!defined('APP_TIMEZONE')) {
-    die('Configuration missing. Copy/rename config.php and try again.');
+    die('Configuration missing. Please check config.php');
 }
 
 /* ------------------------------------------------------------------ */
@@ -23,9 +37,9 @@ if (APP_ENV === 'development') {
 date_default_timezone_set(APP_TIMEZONE);
 
 /* ------------------------------------------------------------------ */
-/*  Session                                                            */
+/*  Session (skipped for pure-CLI runs; the dev-server bridge keeps it) */
 /* ------------------------------------------------------------------ */
-if (session_status() === PHP_SESSION_NONE) {
+if (!defined('YASH_CLI') && session_status() === PHP_SESSION_NONE) {
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
     session_name(SESSION_NAME);
     session_set_cookie_params([
@@ -40,15 +54,25 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Small polyfills for older PHP (< 8.0) on shared hosting            */
+/* ------------------------------------------------------------------ */
+if (!function_exists('str_contains')) {
+    function str_contains($haystack, $needle)
+    {
+        return $needle === '' || strpos($haystack, $needle) !== false;
+    }
+}
+if (!function_exists('str_starts_with')) {
+    function str_starts_with($haystack, $needle)
+    {
+        return strncmp($haystack, $needle, strlen($needle)) === 0;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Core includes                                                      */
 /* ------------------------------------------------------------------ */
-require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/mlm.php';
-
-/* Optional local override file (git-ignored) */
-if (is_file(__DIR__ . '/../config.local.php')) {
-    require_once __DIR__ . '/../config.local.php';
-}

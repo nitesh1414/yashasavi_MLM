@@ -54,7 +54,7 @@ function require_user()
     $u = current_user();
     if (!$u) {
         flash('warning', 'Please login to continue.');
-        redirect('login.php');
+        redirect('/login.php');
     }
     return $u;
 }
@@ -105,7 +105,7 @@ function require_admin()
 {
     $a = current_admin('admin');
     if (!$a) {
-        redirect('admin/login.php');
+        redirect('/admin/login.php');
     }
     return $a;
 }
@@ -114,7 +114,7 @@ function require_superadmin()
 {
     $a = current_admin('superadmin');
     if (!$a) {
-        redirect('superadmin/login.php');
+        redirect('/superadmin/login.php');
     }
     return $a;
 }

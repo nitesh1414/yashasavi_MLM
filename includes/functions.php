@@ -104,7 +104,17 @@ function get_int($key, $default = 0)
 
 function redirect($path)
 {
-    $target = preg_match('~^https?://~i', $path) ? $path : url($path);
+    if (preg_match('~^https?://~i', $path)) {
+        $target = $path;                              // full URL, as-is
+    } elseif (isset($path[0]) && $path[0] === '/') {
+        $target = base_url() . $path;                 // absolute from app root
+    } else {                                          // relative to current script's directory
+        $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+        if ($dir === '/' || $dir === '.') {
+            $dir = '';
+        }
+        $target = base_url() . $dir . '/' . $path;
+    }
     header('Location: ' . $target);
     exit;
 }
@@ -283,7 +293,11 @@ function handle_upload($field, $subdir, $allowed = ALLOWED_IMG_EXT)
         mkdir($dir, 0755, true);
     }
     $name = date('Ymd') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-    if (!move_uploaded_file($f['tmp_name'], $dir . '/' . $name)) {
+    $dest = $dir . '/' . $name;
+    $moved = is_uploaded_file($f['tmp_name'])
+        ? move_uploaded_file($f['tmp_name'], $dest)
+        : @rename($f['tmp_name'], $dest); // dev-server bridge mode
+    if (!$moved) {
         flash('error', 'Could not save the uploaded file (check folder permissions).');
         return '';
     }
