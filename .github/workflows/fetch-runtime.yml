@@ -29,6 +29,14 @@ jobs:
           git init -q -b runtime-assets .
           git config user.name "arena-agent"
           git config user.email "arena-agent@users.noreply.github.com"
+          git config http.postBuffer 524288000
+          git config http.version HTTP/1.1
           git add -A
           git commit -q -m "runtime assets $(date +%s)"
-          git push -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" runtime-assets
+          echo "pushing $(du -sh .git | cut -f1) ..."
+          if ! git push --no-progress "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" runtime-assets > push.log 2>&1; then
+            echo "::error::PUSH FAILED: $(tail -c 600 push.log | tr '\n' ' ')"
+            cat push.log >&2
+            exit 1
+          fi
+          echo "push ok"
