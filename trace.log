@@ -1,0 +1,70 @@
++ curl -fSL -o /tmp/mysql.tar.gz https://downloads.mysql.com/archives/get/p/23/file/mysql-5.7.29-linux-glibc2.12-x86_64.tar.gz
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 22  633M   22  142M    0     0   107M      0  0:00:05  0:00:01  0:00:04  143M 51  633M   51  326M    0     0   140M      0  0:00:04  0:00:02  0:00:02  163M 78  633M   78  494M    0     0   148M      0  0:00:04  0:00:03  0:00:01  165M100  633M  100  633M    0     0   154M      0  0:00:04  0:00:04 --:--:--  167M
++ tar -xzf /tmp/mysql.tar.gz -C /tmp
+++ echo /tmp/mysql-5.7.29-linux-glibc2.12-x86_64
++ SRC=/tmp/mysql-5.7.29-linux-glibc2.12-x86_64
++ mkdir -p assets/mysql/bin assets/mysql/lib assets/mysql/share/english assets/mysql/share/charsets
++ cp /tmp/mysql-5.7.29-linux-glibc2.12-x86_64/bin/mysqld /tmp/mysql-5.7.29-linux-glibc2.12-x86_64/bin/mysql /tmp/mysql-5.7.29-linux-glibc2.12-x86_64/bin/mysqldump /tmp/mysql-5.7.29-linux-glibc2.12-x86_64/bin/mysqladmin assets/mysql/bin/
++ cp -r /tmp/mysql-5.7.29-linux-glibc2.12-x86_64/lib/. assets/mysql/lib/
++ cp -r /tmp/mysql-5.7.29-linux-glibc2.12-x86_64/share/english/. assets/mysql/share/english/
++ cp -r /tmp/mysql-5.7.29-linux-glibc2.12-x86_64/share/charsets/. assets/mysql/share/charsets/
++ rm -rf assets/mysql/lib/mecab assets/mysql/lib/plugin/debug assets/mysql/lib/pkgconfig
++ find assets/mysql/lib -maxdepth 1 -name '*.a' -delete
++ find assets/mysql/lib/plugin -maxdepth 1 -type f '!' -name mysqlx.so -delete
++ mkdir -p /tmp/lai
++ cd /tmp/lai
++ curl -fSL -o libaio1.deb https://deb.debian.org/debian/pool/main/liba/libaio/libaio1_0.3.113-4_amd64.deb
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 13360  100 13360    0     0   286k      0 --:--:-- --:--:-- --:--:--  289k
++ dpkg -x libaio1.deb out
++ find out -name 'libaio.so.1*' -exec cp '{}' /home/runner/work/yashasavi_MLM/yashasavi_MLM/assets/mysql/lib/ ';'
++ cd /home/runner/work/yashasavi_MLM/yashasavi_MLM
++ strip --strip-unneeded assets/mysql/bin/mysql assets/mysql/bin/mysqladmin assets/mysql/bin/mysqld assets/mysql/bin/mysqldump
++ find assets/mysql/lib -name '*.so*' -exec strip --strip-unneeded '{}' +
++ head -30
++ find assets -type f -printf '%s %p\n'
++ sort -rn
+27953440 assets/mysql/bin/mysqld
+6523544 assets/mysql/lib/libmysqlclient.so.20.3.16
+6490800 assets/mysql/bin/mysql
+6277360 assets/mysql/bin/mysqldump
+6204656 assets/mysql/bin/mysqladmin
+1802512 assets/mysql/lib/plugin/mysqlx.so
+79247 assets/mysql/share/english/errmsg.sys
+21305 assets/css/style.css
+19404 assets/mysql/share/charsets/Index.xml
+17696 assets/css/dash.css
+14184 assets/mysql/lib/libaio.so.1.0.2
+14184 assets/mysql/lib/libaio.so.1
+10233 assets/mysql/share/charsets/latin1.xml
+9319 assets/mysql/share/charsets/cp1257.xml
+8783 assets/mysql/share/charsets/cp1251.xml
+8658 assets/mysql/share/charsets/cp1250.xml
+8475 assets/mysql/share/charsets/macroman.xml
+8464 assets/mysql/share/charsets/macce.xml
+7855 assets/mysql/share/charsets/latin7.xml
+7655 assets/mysql/share/charsets/latin2.xml
+6949 assets/mysql/share/charsets/koi8u.xml
+6947 assets/mysql/share/charsets/swe7.xml
+6946 assets/mysql/share/charsets/dec8.xml
+6145 assets/mysql/share/charsets/greek.xml
+6030 assets/mysql/share/charsets/cp866.xml
+5986 assets/mysql/share/charsets/cp1256.xml
+5946 assets/mysql/share/charsets/keybcs2.xml
+5945 assets/mysql/share/charsets/cp852.xml
+5943 assets/mysql/share/charsets/armscii8.xml
+5934 assets/mysql/share/charsets/hebrew.xml
++ du -sh assets
+54M	assets
++ set +e
++ git config user.name runtime-bot
++ git config user.email runtime-bot@users.noreply.github.com
++ git config http.postBuffer 524288000
++ git checkout --orphan runtime-assets
+Switched to a new branch 'runtime-assets'
++ git rm -rf --quiet .
++ cp /tmp/trace.log trace.log
