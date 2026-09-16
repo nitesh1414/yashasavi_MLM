@@ -1,0 +1,31 @@
+name: Fetch runtime assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download assets
+        run: |
+          mkdir -p assets && cd assets
+          curl -fSL --retry 3 -o frankenphp https://github.com/dunglas/frankenphp/releases/download/v1.12.7/frankenphp-linux-x86_64
+          curl -fSL --retry 3 -o mysql-musl.tar.gz https://github.com/Sebastian-Webster/mysql-server-musl-binaries/releases/download/current/mysql-musl-8.4.11-x86_64.tar.gz
+          split -b 94M -d --additional-suffix=.part frankenphp frankenphp.
+          split -b 94M -d --additional-suffix=.part mysql-musl.tar.gz mysql-musl.tar.gz.
+          rm frankenphp mysql-musl.tar.gz
+          sha256sum ./* > SHA256SUMS
+          cat SHA256SUMS
+      - name: Push to runtime-assets branch
+        run: |
+          cd assets
+          git init -q -b runtime-assets .
+          git config user.name "arena-agent"
+          git config user.email "arena-agent@users.noreply.github.com"
+          git add -A
+          git commit -q -m "runtime assets $(date +%s)"
+          git push -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" runtime-assets
