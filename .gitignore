@@ -1,0 +1,17 @@
+# Runtime & uploaded media (never commit user uploads)
+/uploads/*
+!/uploads/index.html
+!/uploads/.htaccess
+
+# Local overrides
+/config.local.php
+
+# Installer lock (created after successful installation)
+/install/install.lock
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
