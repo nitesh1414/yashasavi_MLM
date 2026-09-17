@@ -112,8 +112,9 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
 
     $root = $all[$rootUser['id']];
     return '<div class="tree-legends">
-                <span class="lg"><span class="dot" style="background:#2e7d32"></span> Active</span>
-                <span class="lg"><span class="dot" style="background:#c62828"></span> Inactive</span>
+                <span class="lg"><span class="dot" style="background:#43a047"></span> Active member</span>
+                <span class="lg"><span class="dot" style="background:#e53935"></span> Inactive member</span>
+                <span class="lg"><span class="dot" style="background:#fff;box-shadow:0 0 0 2px #d6a83c inset"></span> Root</span>
                 <span class="lg">Hover / tap a member ID for details &amp; actions</span>
                 <span class="lg">Empty slots add a member at that exact position</span>
             </div>

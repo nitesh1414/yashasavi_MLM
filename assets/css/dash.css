@@ -190,29 +190,32 @@ select.form-control { appearance: auto; }
 .tree li { position: relative; list-style: none; padding: 30px 10px 0; display: flex; flex-direction: column; align-items: center; }
 .tree li:only-child { padding-top: 0; }
 
-/* member node = ID pill only (details on hover/tap) */
+/* member node = ID badge only (active green / inactive red); details open in a floating popup */
 .tree .t-node { position: relative; display: flex; flex-direction: column; align-items: center; outline: none; }
-.tree .t-pill { display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: 12px; color: #000; background: #eef3ec; border: 1.5px solid var(--accent); white-space: nowrap; cursor: default; box-shadow: 0 2px 6px rgba(22, 53, 26, .08); }
-.tree .t-pill:hover { box-shadow: 0 3px 10px rgba(22, 53, 26, .16); }
-.tree .t-pill.on { background: #e8f3e8; border-color: #2e7d32; }
-.tree .t-pill.off { background: #fdecec; border-color: #c62828; }
-.tree .t-node.root .t-pill { background: #f7ecd2; border-color: var(--dash-gold); }
+.tree .t-pill { display: inline-block; padding: 6px 15px; border-radius: 8px; font-size: 12px; color: #fff; background: #43a047; border: 1.5px solid #2e7d32; white-space: nowrap; cursor: pointer; box-shadow: 0 2px 5px rgba(0, 0, 0, .18); }
+.tree .t-pill:hover { box-shadow: 0 3px 10px rgba(0, 0, 0, .3); }
+.tree .t-pill.on { background: #43a047; border-color: #2e7d32; color: #fff; }
+.tree .t-pill.off { background: #e53935; border-color: #c62828; color: #fff; }
+.tree .t-node.root .t-pill { background: #43a047; border-color: var(--dash-gold); box-shadow: 0 0 0 2px rgba(214, 168, 60, .45), 0 2px 5px rgba(0, 0, 0, .18); }
 
-/* hover / tap tooltip with the remaining member information */
-.tree .t-tip { display: none; position: absolute; top: calc(100% + 12px); left: 50%; transform: translateX(-50%); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(22, 53, 26, .22); padding: 10px 12px; min-width: 190px; text-align: left; z-index: 40; font-size: 11.5px; line-height: 1.45; }
-.tree .t-tip::before { content: ''; position: absolute; top: -6px; left: 50%; margin-left: -6px; width: 10px; height: 10px; background: #fff; border-left: 1px solid var(--line); border-top: 1px solid var(--line); transform: rotate(45deg); }
-.tree .t-node:hover .t-tip, .tree .t-node:focus-within .t-tip, .tree .t-node.open .t-tip { display: block; }
-.tree .t-tip-head { font-size: 12.5px; color: #000; border-bottom: 1px solid var(--line); padding-bottom: 5px; margin-bottom: 6px; white-space: nowrap; }
-.tree .t-tip dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
-.tree .t-tip dt { color: var(--ink-soft); }
-.tree .t-tip dd { margin: 0; color: #000; text-align: right; white-space: nowrap; }
-.tree .t-tip-actions { display: flex; gap: 6px; border-top: 1px solid var(--line); margin-top: 7px; padding-top: 7px; flex-wrap: wrap; }
-.tree .t-tip-actions a { display: inline-block; font-size: 10.5px; color: #000; background: #eef3ec; border: 1px solid var(--line); border-radius: 10px; padding: 2px 9px; text-decoration: none; white-space: nowrap; }
-.tree .t-tip-actions a:hover { background: #e0ebdf; border-color: var(--accent); text-decoration: none; }
+/* data source for the popup (never rendered inside the tree, so the chart
+   layout is never disturbed or clipped) */
+.tree .t-tip { display: none; }
+
+/* floating member-info popup (appended to <body>, follows the pill) */
+.tree-popup { display: none; position: fixed; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 34px rgba(0, 0, 0, .28); padding: 10px 12px; min-width: 195px; max-width: 260px; text-align: left; z-index: 3000; font-size: 11.5px; line-height: 1.45; }
+.tree-popup.show { display: block; }
+.tree-popup .t-tip-head { font-size: 12.5px; color: #000; border-bottom: 1px solid var(--line); padding-bottom: 5px; margin-bottom: 6px; white-space: nowrap; }
+.tree-popup dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+.tree-popup dt { color: var(--ink-soft); }
+.tree-popup dd { margin: 0; color: #000; text-align: right; white-space: nowrap; }
+.tree-popup .t-tip-actions { display: flex; gap: 6px; border-top: 1px solid var(--line); margin-top: 7px; padding-top: 7px; flex-wrap: wrap; }
+.tree-popup .t-tip-actions a { display: inline-block; font-size: 10.5px; color: #000; background: #eef3ec; border: 1px solid var(--line); border-radius: 10px; padding: 2px 9px; text-decoration: none; white-space: nowrap; }
+.tree-popup .t-tip-actions a:hover { background: #e0ebdf; border-color: var(--accent); text-decoration: none; }
 
 /* add-member slot (dashed pill) */
 .tree .t-node.empty.add { padding: 0; }
-.tree .t-node.empty.add a { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 13px; color: #000; text-decoration: none; border: 1.5px dashed #a9c3ac; border-radius: 20px; background: #fbfdfb; white-space: nowrap; }
+.tree .t-node.empty.add a { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 13px; color: #000; text-decoration: none; border: 1.5px dashed #a9c3ac; border-radius: 8px; background: #fbfdfb; white-space: nowrap; }
 .tree .t-node.empty.add a:hover { background: #e8f3e8; border-color: var(--accent); }
 .tree .t-node.empty.add .t-add-plus { font-size: 13px; line-height: 1.15; }
 .tree .t-node.empty.add .t-add-text { font-size: 10.5px; font-weight: 400; }
@@ -226,9 +229,8 @@ select.form-control { appearance: auto; }
 @media (max-width: 820px) {
     .tree-wrap { padding: 24px 6px 12px; max-height: calc(100vh - 185px); }
     .tree li { padding: 26px 6px 0; }
-    .tree .t-pill { font-size: 11px; padding: 5px 11px; }
-    .tree .t-tip { position: fixed; top: auto; left: 50%; bottom: 14px; transform: translateX(-50%); min-width: 240px; }
-    .tree .t-tip::before { display: none; }
+    .tree .t-pill { font-size: 11px; padding: 5px 12px; }
+    .tree-popup { left: 50% !important; top: auto !important; bottom: 14px; transform: translateX(-50%); min-width: 240px; max-width: calc(100vw - 24px); }
 }
 
 /* ---------- misc components ---------- */

@@ -109,21 +109,72 @@ document.addEventListener('DOMContentLoaded', function () {
         svg.appendChild(frag);
     }
 
-    /* member pill tooltip: tap toggles on touch devices */
-    document.querySelectorAll('.tree .t-pill').forEach(function (pill) {
-        pill.addEventListener('click', function () {
-            if (!window.matchMedia('(hover: none)').matches) { return; }
-            var node = pill.closest('.t-node');
-            var wasOpen = node.classList.contains('open');
-            document.querySelectorAll('.tree .t-node.open').forEach(function (n) { n.classList.remove('open'); });
-            if (!wasOpen) { node.classList.add('open'); }
-        });
-    });
-    document.addEventListener('click', function (e) {
-        if (!e.target.closest('.t-node')) {
-            document.querySelectorAll('.tree .t-node.open').forEach(function (n) { n.classList.remove('open'); });
+    /* member pill info popup: one floating popup appended to <body> so it is
+       never clipped by the tree scroll area and never disturbs the layout */
+    var treePopup = null, popTimer = null, popNode = null;
+    function getTreePopup() {
+        if (!treePopup) {
+            treePopup = document.createElement('div');
+            treePopup.className = 'tree-popup';
+            treePopup.setAttribute('role', 'tooltip');
+            document.body.appendChild(treePopup);
+            treePopup.addEventListener('mouseenter', cancelPopHide);
+            treePopup.addEventListener('mouseleave', schedulePopHide);
+            treePopup.addEventListener('click', function (e) { if (e.target.closest('a')) { hideTreePopup(); } });
+        }
+        return treePopup;
+    }
+    function hideTreePopup() {
+        clearTimeout(popTimer);
+        if (treePopup) { treePopup.classList.remove('show'); }
+        popNode = null;
+    }
+    function schedulePopHide() { clearTimeout(popTimer); popTimer = setTimeout(hideTreePopup, 250); }
+    function cancelPopHide() { clearTimeout(popTimer); }
+    function showTreePopup(node) {
+        var pill = node.querySelector('.t-pill');
+        var tip = node.querySelector('.t-tip');
+        if (!pill || !tip) { return; }
+        var pop = getTreePopup();
+        pop.innerHTML = tip.innerHTML;
+        pop.classList.add('show');
+        pop.style.visibility = 'hidden';
+        var r = pill.getBoundingClientRect();
+        var pw = pop.offsetWidth, ph = pop.offsetHeight;
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var x = r.left + r.width / 2 - pw / 2;
+        x = Math.max(8, Math.min(x, vw - pw - 8));
+        var y = r.bottom + 10;
+        if (y + ph > vh - 8) { y = r.top - ph - 10; } /* flip above the pill */
+        if (y < 8) { y = Math.max(8, vh - ph - 8); }
+        pop.style.left = Math.round(x) + 'px';
+        pop.style.top = Math.round(y) + 'px';
+        pop.style.visibility = '';
+        popNode = node;
+    }
+    document.querySelectorAll('.tree .t-node:not(.empty)').forEach(function (node) {
+        var pill = node.querySelector('.t-pill');
+        node.addEventListener('mouseenter', function () { cancelPopHide(); showTreePopup(node); });
+        node.addEventListener('mouseleave', schedulePopHide);
+        node.addEventListener('focusin', function () { cancelPopHide(); showTreePopup(node); });
+        node.addEventListener('focusout', schedulePopHide);
+        if (pill) {
+            pill.addEventListener('click', function (e) {
+                e.preventDefault();
+                /* on touch devices the pill has no hover: tap toggles the popup.
+                   on desktop hover/focus already shows it, so click is a no-op. */
+                if (!window.matchMedia('(hover: none)').matches) { return; }
+                if (popNode === node && treePopup && treePopup.classList.contains('show')) { hideTreePopup(); }
+                else { cancelPopHide(); showTreePopup(node); }
+            });
         }
     });
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.t-node') && !e.target.closest('.tree-popup')) { hideTreePopup(); }
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { hideTreePopup(); } });
+    window.addEventListener('resize', hideTreePopup);
+    window.addEventListener('scroll', hideTreePopup, true);
 
     /* genealogy tree zoom (fit the tree in one window) */
     document.querySelectorAll('[data-tree-zoom]').forEach(function (btn) {
@@ -142,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function () {
             else { cur = Math.min(1, (wrap.clientWidth - 16) / natural); }
             tree.dataset.zoom = cur;
             tree.style.zoom = cur;
+            if (typeof hideTreePopup === 'function') { hideTreePopup(); }
             drawTreeLines();
         });
     });
