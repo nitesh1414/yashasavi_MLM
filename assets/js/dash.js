@@ -65,7 +65,67 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    /* genealogy tree zoom (fit the 5-level tree in one window) */
+    /* genealogy tree: straight SVG connector lines between parent & child pills */
+    function drawTreeLines() {
+        var tree = document.querySelector('.tree[data-tree-lines]');
+        if (!tree) { return; }
+        var svg = tree.querySelector('svg.tree-lines');
+        if (!svg) { return; }
+        function posIn(el, ancestor) {
+            var x = 0, y = 0, cur = el;
+            while (cur && cur !== ancestor) {
+                x += cur.offsetLeft;
+                y += cur.offsetTop;
+                cur = cur.offsetParent;
+            }
+            return { x: x, y: y };
+        }
+        var W = tree.offsetWidth, H = tree.offsetHeight;
+        svg.setAttribute('width', W);
+        svg.setAttribute('height', H);
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+        var NS = 'http://www.w3.org/2000/svg';
+        var frag = document.createDocumentFragment();
+        tree.querySelectorAll('li').forEach(function (li) {
+            var ul = li.querySelector(':scope > ul');
+            if (!ul) { return; }
+            var pn = li.querySelector(':scope > .t-node');
+            if (!pn) { return; }
+            var pp = posIn(pn, tree);
+            var px = pp.x + pn.offsetWidth / 2, py = pp.y + pn.offsetHeight;
+            ul.querySelectorAll(':scope > li').forEach(function (cli) {
+                var cn = cli.querySelector(':scope > .t-node');
+                if (!cn) { return; }
+                var cp = posIn(cn, tree);
+                var line = document.createElementNS(NS, 'line');
+                line.setAttribute('x1', px);
+                line.setAttribute('y1', py);
+                line.setAttribute('x2', cp.x + cn.offsetWidth / 2);
+                line.setAttribute('y2', cp.y);
+                frag.appendChild(line);
+            });
+        });
+        while (svg.firstChild) { svg.removeChild(svg.firstChild); }
+        svg.appendChild(frag);
+    }
+
+    /* member pill tooltip: tap toggles on touch devices */
+    document.querySelectorAll('.tree .t-pill').forEach(function (pill) {
+        pill.addEventListener('click', function () {
+            if (!window.matchMedia('(hover: none)').matches) { return; }
+            var node = pill.closest('.t-node');
+            var wasOpen = node.classList.contains('open');
+            document.querySelectorAll('.tree .t-node.open').forEach(function (n) { n.classList.remove('open'); });
+            if (!wasOpen) { node.classList.add('open'); }
+        });
+    });
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.t-node')) {
+            document.querySelectorAll('.tree .t-node.open').forEach(function (n) { n.classList.remove('open'); });
+        }
+    });
+
+    /* genealogy tree zoom (fit the tree in one window) */
     document.querySelectorAll('[data-tree-zoom]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var tree = document.querySelector('.tree[data-tree-root]');
@@ -82,13 +142,16 @@ document.addEventListener('DOMContentLoaded', function () {
             else { cur = Math.min(1, (wrap.clientWidth - 16) / natural); }
             tree.dataset.zoom = cur;
             tree.style.zoom = cur;
+            drawTreeLines();
         });
     });
-    /* auto-fit on load + resize */
+    /* auto-fit on load + resize, then draw the connector lines */
     var fitBtn = document.querySelector('[data-tree-zoom="fit"]');
     if (fitBtn) {
         var rz;
         window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { fitBtn.click(); }, 150); });
         fitBtn.click();
     }
+    drawTreeLines();
+    setTimeout(drawTreeLines, 350); /* once more after fonts settle */
 });
