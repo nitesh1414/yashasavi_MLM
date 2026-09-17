@@ -27,7 +27,7 @@ require __DIR__ . '/../includes/dash_header.php';
 <div class="card">
     <div class="card-title">
         ➕ Register New Distributor
-        <span class="right">Placement: pick any active sponsor and leg — the member takes the first free position in that leg.</span>
+        <span class="right">Pick any active sponsor and leg — or leave the sponsor empty to place the member under the company root.</span>
     </div>
     <?php member_register_render_form($f, $errors, $prefill, $opts); ?>
 </div>

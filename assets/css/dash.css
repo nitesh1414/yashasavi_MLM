@@ -191,20 +191,22 @@ select.form-control { appearance: auto; }
 .tree .t-node { background: #fff; border: 1.5px solid var(--line); border-radius: 10px; padding: 5px 8px; min-width: 116px; text-align: center; box-shadow: var(--shadow); position: relative; }
 .tree .t-node.root { border-color: #000; box-shadow: 0 6px 20px rgba(46,125,50,.16); }
 .tree .t-node.empty { border-style: dashed; color: #000; background: #fafcfa; min-width: 96px; }
-.tree .t-id { font-weight: 400; font-size: 11.5px; color: #000; }
+.tree .t-id { font-weight: 400; font-size: 11.5px; color: #000; white-space: nowrap; }
+.tree .t-id a { color: #000; text-decoration: none; }
+.tree .t-id a:hover { text-decoration: underline; }
+.tree .t-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+.tree .t-dot.on { background: #2e7d32; }
+.tree .t-dot.off { background: #c62828; }
+.tree .t-block { font-size: 10px; }
 .tree .t-name { font-size: 10px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 104px; }
-.tree .t-meta { font-size: 9px; color: #000; margin-top: 1px; white-space: nowrap; }
-.tree .t-empty-label { font-size: 10.5px; }
-.tree .t-node.vacant { min-width: 34px; padding: 3px 5px; border-style: dotted; opacity: .6; box-shadow: none; background: transparent; }
-.tree .t-node.vacant .t-v-dot { font-size: 12px; line-height: 1; }
+.tree .t-add-tag { display: inline-block; margin-top: 3px; font-size: 9.5px; color: #000; background: #eef3ec; border: 1px solid var(--line); border-radius: 10px; padding: 1px 8px; text-decoration: none; }
+.tree .t-add-tag:hover { background: #e0ebdf; border-color: var(--accent); text-decoration: none; }
 .tree .t-node.empty.add { min-width: 96px; padding: 0; overflow: hidden; }
 .tree .t-node.empty.add a { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 8px; color: #000; text-decoration: none; }
 .tree .t-node.empty.add a:hover { background: #e8f3e8; color: #000; }
 .tree .t-node.empty.add .t-add-plus { font-size: 13px; line-height: 1; }
 .tree .t-node.empty.add .t-add-text { font-size: 10.5px; font-weight: 400; }
 .tree .t-node.empty.add .t-add-leg { font-size: 8.5px; letter-spacing: 1px; opacity: .75; }
-.tree .t-actions { margin-top: 3px; font-size: 9.5px; }
-.tree .t-actions a { color: #000; font-weight: 400; }
 .tree-legends { display: flex; gap: 14px; justify-content: center; font-size: 11px; color: var(--ink-soft); margin-bottom: 4px; flex-wrap: wrap; }
 .tree-legends .lg { display: flex; align-items: center; gap: 5px; }
 .tree-legends .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }

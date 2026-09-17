@@ -35,7 +35,7 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
         <button class="btn btn-primary btn-sm" type="submit">Go</button>
     </form>
-    <?= render_binary_tree($rootUser, 5, 'tree.php', 'add-member.php') ?>
+    <?= render_binary_tree($rootUser, 10, 'tree.php', 'add-member.php') ?>
 </div>
 
 <?php require __DIR__ . '/../includes/dash_footer.php'; ?>

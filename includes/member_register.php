@@ -59,6 +59,7 @@ function member_register_handle($opts)
     $prefill = [
         'sponsor' => strtoupper(get_str('ref')),
         'leg' => (get_str('leg') === 'R') ? 'R' : 'L',
+        'from_tree' => get_str('ref') !== '',
     ];
 
     if ($prefill['sponsor'] !== '') {
@@ -82,7 +83,7 @@ function member_register_handle($opts)
 
         $STATES = member_register_states();
 
-        if ($f['sponsor'] === '') { $errors[] = 'Sponsor ID is required.'; }
+        if ($f['sponsor'] === '' && $opts['area'] !== 'superadmin') { $errors[] = 'Sponsor ID is required.'; }
         if (strlen($f['full_name']) < 3) { $errors[] = 'Please enter the full name.'; }
         if ($f['email'] !== '' && !is_email($f['email'])) { $errors[] = 'Please enter a valid email address.'; }
         if (!is_mobile($f['mobile'])) { $errors[] = 'Please enter a valid 10-digit mobile number.'; }
@@ -95,6 +96,17 @@ function member_register_handle($opts)
         if ($f['pan_no'] !== '' && !preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', strtoupper($f['pan_no']))) { $errors[] = 'PAN number looks invalid.'; }
         if ($e = strong_password_error($password)) { $errors[] = $e; }
         if ($password !== $password2) { $errors[] = 'Passwords do not match.'; }
+
+        /* Super admin may add a member WITHOUT a sponsor: the member is then
+         * placed under the company root (first free position of the leg). */
+        if (!$errors && $opts['area'] === 'superadmin' && $f['sponsor'] === '') {
+            $root = q_val("SELECT username FROM users WHERE sponsor_id IS NULL OR sponsor_id = 0 ORDER BY id ASC LIMIT 1");
+            if (!$root) {
+                $errors[] = 'No company root member found — please specify a sponsor.';
+            } else {
+                $f['sponsor'] = $root;
+            }
+        }
 
         /* placement guard (panel-specific) */
         if (!$errors) {
@@ -180,15 +192,15 @@ function member_register_render_form($f, $errors, $prefill, $opts)
         <h3 class="mf-section">1️⃣ Position in Network</h3>
         <div class="form-grid2">
             <div class="form-group">
-                <label>Sponsor / Parent ID <span class="req">*</span></label>
+                <label>Sponsor / Parent ID <?php if ($opts['area'] !== 'superadmin'): ?><span class="req">*</span><?php endif; ?></label>
                 <?php if ($lockSponsor): ?>
                     <input class="form-control" type="text" value="<?= e($f['sponsor']) ?>" readonly tabindex="-1">
                     <input type="hidden" name="sponsor" value="<?= e($f['sponsor']) ?>">
                     <div class="form-hint" id="sponsor_name"><?= $sponsorRow ? '✓ ' . e($sponsorRow['full_name']) : '' ?></div>
                 <?php else: ?>
-                    <input class="form-control" type="text" name="sponsor" id="sponsor" required
-                           value="<?= e($f['sponsor']) ?>" placeholder="e.g. YSH100001" data-sponsor-api="<?= e(url('api.php')) ?>">
-                    <div class="form-hint" id="sponsor_name"></div>
+                    <input class="form-control" type="text" name="sponsor" id="sponsor" <?= $opts['area'] === 'superadmin' ? '' : 'required' ?>
+                           value="<?= e($f['sponsor']) ?>" placeholder="<?= $opts['area'] === 'superadmin' ? 'Optional — empty places under company root' : 'e.g. YSH100001' ?>" data-sponsor-api="<?= e(url('api.php')) ?>">
+                    <div class="form-hint" id="sponsor_name"><?= $sponsorRow ? '✓ ' . e($sponsorRow['full_name']) : ($opts['area'] === 'superadmin' ? 'Leave empty to place the new member under the company root.' : '') ?></div>
                 <?php endif; ?>
             </div>
             <div class="form-group">
