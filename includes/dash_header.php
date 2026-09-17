@@ -81,5 +81,5 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
             </div>
         </div>
         <div class="content">
-            <div class="content-inner">
+            <div class="content-inner<?= !empty($wideContent) ? ' content-fluid' : '' ?>">
                 <?= render_flashes() ?>

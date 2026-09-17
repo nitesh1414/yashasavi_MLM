@@ -170,46 +170,65 @@ select.form-control { appearance: auto; }
 .member-form .mf-section:first-child { margin-top: 0; }
 .member-form .btn { margin-top: 6px; }
 
-/* ---------- genealogy tree ---------- */
-.tree-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+/* ---------- genealogy tree (full-page centered chart) ---------- */
+.content-inner.content-fluid { max-width: none; }
+
+.tree-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
 .tree-toolbar .tt-label { font-size: 12px; color: var(--ink-soft); }
 .tree-toolbar .tt-zoom { display: flex; gap: 6px; margin-left: auto; }
-.tree-toolbar .tt-zoom button { border: 1px solid var(--line); background: #fff; color: #000; border-radius: 8px; font-size: 12.5px; padding: 4px 12px; cursor: pointer; font-family: var(--font); }
+.tree-toolbar .tt-zoom button { border: 1px solid var(--line); background: #fff; color: #000; border-radius: 8px; font-size: 13px; min-width: 38px; min-height: 30px; padding: 3px 12px; cursor: pointer; font-family: var(--font); }
 .tree-toolbar .tt-zoom button:hover { background: #f0f3ee; }
-.tree-wrap { overflow: auto; padding: 10px 6px; max-height: calc(100vh - 250px); }
-.tree { display: flex; justify-content: center; min-width: max-content; }
-.tree ul { position: relative; padding-top: 14px; display: flex; justify-content: center; }
-.tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid #b9cbb8; height: 14px; }
-.tree li { position: relative; list-style: none; padding: 14px 6px 0; display: flex; flex-direction: column; align-items: center; }
-.tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid #b9cbb8; width: 50%; height: 14px; }
-.tree li::after { right: auto; left: 50%; border-left: 2px solid #b9cbb8; }
+
+/* the chart uses the complete page width and centers on the root */
+.tree-wrap { overflow: auto; -webkit-overflow-scrolling: touch; padding: 26px 10px 16px; max-height: calc(100vh - 215px); }
+.tree { display: flex; justify-content: center; min-width: max-content; margin: 0 auto; }
+.tree ul { position: relative; padding-top: 24px; display: flex; justify-content: center; }
+.tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid #b9cbb8; height: 24px; }
+.tree li { position: relative; list-style: none; padding: 24px 8px 0; display: flex; flex-direction: column; align-items: center; }
+/* rounded elbow connectors */
+.tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid #b9cbb8; width: 50%; height: 24px; }
+.tree li::after { right: auto; left: 50%; border-left: 2px solid #b9cbb8; border-top-left-radius: 12px; }
 .tree li:only-child::after, .tree li:only-child::before { display: none; }
 .tree li:only-child { padding-top: 0; }
 .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
-.tree li:last-child::before { border-right: 2px solid #b9cbb8; border-radius: 0 6px 0 0; }
-.tree li:first-child::after { border-radius: 6px 0 0 0; }
-.tree .t-node { background: #fff; border: 1.5px solid var(--line); border-radius: 10px; padding: 5px 8px; min-width: 116px; text-align: center; box-shadow: var(--shadow); position: relative; }
-.tree .t-node.root { border-color: #000; box-shadow: 0 6px 20px rgba(46,125,50,.16); }
-.tree .t-node.empty { border-style: dashed; color: #000; background: #fafcfa; min-width: 96px; }
+.tree li:last-child::before { border-right: 2px solid #b9cbb8; border-radius: 0 12px 0 0; }
+.tree li:first-child::after { border-radius: 12px 0 0 0; }
+
+/* member card with avatar bubble overlapping the top edge */
+.tree .t-node { background: #fff; border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 10px 9px; min-width: 138px; text-align: center; box-shadow: 0 3px 12px rgba(22, 53, 26, .09); position: relative; display: flex; flex-direction: column; align-items: center; }
+.tree .t-node.root { border-color: var(--dash-gold); box-shadow: 0 6px 20px rgba(201, 154, 46, .22); }
+.tree .t-avatar { width: 38px; height: 38px; border-radius: 50%; background: #e8f3e8; border: 2.5px solid var(--accent); color: #000; display: flex; align-items: center; justify-content: center; font-size: 12.5px; margin: -31px 0 4px; box-shadow: 0 0 0 3px #fff; position: relative; z-index: 2; }
+.tree .t-avatar.off { border-color: #c62828; background: #fdecec; }
+.tree .t-node.root .t-avatar { border-color: var(--dash-gold); background: #f7ecd2; }
 .tree .t-id { font-weight: 400; font-size: 11.5px; color: #000; white-space: nowrap; }
 .tree .t-id a { color: #000; text-decoration: none; }
 .tree .t-id a:hover { text-decoration: underline; }
-.tree .t-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
-.tree .t-dot.on { background: #2e7d32; }
-.tree .t-dot.off { background: #c62828; }
 .tree .t-block { font-size: 10px; }
-.tree .t-name { font-size: 10px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 104px; }
-.tree .t-add-tag { display: inline-block; margin-top: 3px; font-size: 9.5px; color: #000; background: #eef3ec; border: 1px solid var(--line); border-radius: 10px; padding: 1px 8px; text-decoration: none; }
+.tree .t-name { font-size: 10.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 118px; margin-top: 1px; }
+.tree .t-add-tag { display: inline-block; margin-top: 5px; font-size: 9.5px; color: #000; background: #eef3ec; border: 1px solid var(--line); border-radius: 10px; padding: 1.5px 9px; text-decoration: none; }
 .tree .t-add-tag:hover { background: #e0ebdf; border-color: var(--accent); text-decoration: none; }
-.tree .t-node.empty.add { min-width: 96px; padding: 0; overflow: hidden; }
-.tree .t-node.empty.add a { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 8px; color: #000; text-decoration: none; }
+
+/* add-member slot */
+.tree .t-node.empty { border-style: dashed; color: #000; background: #fbfdfb; }
+.tree .t-node.empty.add { min-width: 112px; padding: 0; overflow: hidden; }
+.tree .t-node.empty.add a { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 11px 10px; color: #000; text-decoration: none; }
 .tree .t-node.empty.add a:hover { background: #e8f3e8; color: #000; }
-.tree .t-node.empty.add .t-add-plus { font-size: 13px; line-height: 1; }
+.tree .t-node.empty.add .t-add-plus { font-size: 15px; line-height: 1; }
 .tree .t-node.empty.add .t-add-text { font-size: 10.5px; font-weight: 400; }
 .tree .t-node.empty.add .t-add-leg { font-size: 8.5px; letter-spacing: 1px; opacity: .75; }
+
 .tree-legends { display: flex; gap: 14px; justify-content: center; font-size: 11px; color: var(--ink-soft); margin-bottom: 4px; flex-wrap: wrap; }
 .tree-legends .lg { display: flex; align-items: center; gap: 5px; }
 .tree-legends .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* mobile: compact chart, roomy touch targets */
+@media (max-width: 820px) {
+    .tree-wrap { padding: 22px 6px 12px; max-height: calc(100vh - 185px); }
+    .tree li { padding: 20px 5px 0; }
+    .tree ul { padding-top: 20px; }
+    .tree ul ul::before, .tree li::before, .tree li::after { height: 20px; }
+    .tree .t-node { min-width: 126px; }
+}
 
 /* ---------- misc components ---------- */
 .profile-grid { display: grid; grid-template-columns: 180px 1fr; gap: 26px; }

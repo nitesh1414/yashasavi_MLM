@@ -6,15 +6,14 @@
  * $addBase  — URL of the PANEL registration page (e.g. 'add-member.php')
  *             used by the "add member" links.
  *
- * The tree shows exactly two kinds of nodes:
- *   • member nodes  — compact card: status dot + ID (click to re-root),
- *                     name and an "➕ Add" tag that opens the panel
- *                     registration form with that member as sponsor;
- *   • add-member slots — an empty position directly below a member,
- *                     linking to the registration form with the sponsor
- *                     (the parent) and leg prefilled.
- * No extra placeholder rows are rendered — the tree grows as members join.
- * A zoom toolbar (fit / in / out) keeps deep trees in a single window.
+ * Design: classic centered binary genealogy chart — the tree uses the full
+ * page width, the root sits at the top center, each parent is centered above
+ * its two children, and every branch is drawn with rounded elbow connectors.
+ * Member cards carry an avatar bubble (initials, ring = status), the member
+ * ID (click to re-root), the name and an "➕ Add" tag. Empty positions below
+ * a member render as dashed "Add Member" slots. A zoom toolbar (fit / in /
+ * out, auto-fit on load + resize) keeps deep trees readable and makes the
+ * chart mobile friendly together with touch scrolling.
  */
 function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $addBase = 'add-member.php')
 {
@@ -55,16 +54,18 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
             return '';
         }
 
-        // Member node — compact: status dot + ID, name, add-member tag
+        // Member node — avatar bubble (initials, ring = status), ID, name, add tag
         $on = (int)$user['is_active'] === 1;
         $blocked = $user['status'] === 'blocked' ? ' <span class="t-block" title="blocked">⛔</span>' : '';
+        $parts = preg_split('/\s+/', trim($user['full_name']));
+        $initials = strtoupper(substr($parts[0] ?? 'U', 0, 1) . substr($parts[1] ?? '', 0, 1));
         $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
         // first free leg under this member (for the add tag); spillover if full
         $tagLeg = !isset($kids['L']) ? 'L' : (!isset($kids['R']) ? 'R' : 'L');
         $addHref = $addBase . '?ref=' . urlencode($user['username']) . '&leg=' . $tagLeg;
         return '<div class="t-node' . ($isRoot ? ' root' : '') . '">'
-            . '<div class="t-id"><span class="t-dot ' . ($on ? 'on' : 'off') . '" title="' . ($on ? 'Active' : 'Inactive') . '"></span>'
-            . '<a href="' . e($linkBase) . '?root=' . (int)$user['id'] . '" title="Re-root the tree at this member">' . e($user['username']) . '</a>' . $blocked . '</div>'
+            . '<span class="t-avatar' . ($on ? '' : ' off') . '" title="' . ($on ? 'Active' : 'Inactive') . '">' . e($initials) . '</span>'
+            . '<div class="t-id"><a href="' . e($linkBase) . '?root=' . (int)$user['id'] . '" title="Re-root the tree at this member">' . e($user['username']) . '</a>' . $blocked . '</div>'
             . '<div class="t-name">' . e($user['full_name']) . '</div>'
             . '<a class="t-add-tag" href="' . e($addHref) . '" title="Add a new member under ' . e($user['username']) . '">➕ Add</a>'
             . '</div>';

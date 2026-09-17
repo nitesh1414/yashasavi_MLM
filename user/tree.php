@@ -19,6 +19,7 @@ if ($rootId !== (int)$u['id']) {
 
 $activeKey = 'tree';
 $pageTitle = 'Genealogy Tree';
+$wideContent = true; // tree chart uses the complete page width
 require __DIR__ . '/_nav.php';
 require __DIR__ . '/../includes/dash_header.php';
 ?>
