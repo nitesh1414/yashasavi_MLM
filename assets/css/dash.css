@@ -184,7 +184,8 @@ select.form-control { appearance: auto; }
 .tree-wrap { overflow: auto; -webkit-overflow-scrolling: touch; padding: 30px 12px 18px; max-height: calc(100vh - 215px); }
 .tree { position: relative; display: flex; justify-content: center; min-width: max-content; margin: 0 auto; }
 .tree svg.tree-lines { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; overflow: visible; }
-.tree svg.tree-lines line { stroke: #94b098; stroke-width: 2; stroke-linecap: round; }
+.tree svg.tree-lines line, .tree svg.tree-lines path { stroke: #94b098; stroke-width: 2; stroke-linecap: round; }
+.tree svg.tree-lines path { fill: none; }
 .tree > ul { position: relative; z-index: 1; }
 .tree ul { display: flex; justify-content: center; }
 .tree li { position: relative; list-style: none; padding: 30px 10px 0; display: flex; flex-direction: column; align-items: center; }
@@ -196,7 +197,7 @@ select.form-control { appearance: auto; }
 .tree .t-pill:hover { box-shadow: 0 3px 10px rgba(0, 0, 0, .3); }
 .tree .t-pill.on { background: #43a047; border-color: #2e7d32; color: #fff; }
 .tree .t-pill.off { background: #e53935; border-color: #c62828; color: #fff; }
-.tree .t-node.root .t-pill { background: #43a047; border-color: var(--dash-gold); box-shadow: 0 0 0 2px rgba(214, 168, 60, .45), 0 2px 5px rgba(0, 0, 0, .18); }
+.tree .t-node.root .t-pill { box-shadow: 0 0 0 2px rgba(214, 168, 60, .55), 0 2px 5px rgba(0, 0, 0, .18); }
 
 /* data source for the popup (never rendered inside the tree, so the chart
    layout is never disturbed or clipped) */

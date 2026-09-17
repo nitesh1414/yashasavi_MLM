@@ -65,7 +65,23 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    /* genealogy tree: straight SVG connector lines between parent & child pills */
+    /* genealogy tree: elbow connectors — straight vertical drop from the
+       parent, a straight horizontal bus line, then curved corners into each
+       child node (classic org-chart routing) */
+    function elbowPath(px, py, cx, cy) {
+        var dx = cx - px;
+        var my = py + (cy - py) / 2; /* horizontal bus sits midway between levels */
+        if (Math.abs(dx) < 2) { return 'M' + px + ',' + py + ' L' + cx + ',' + cy; }
+        var r = Math.max(4, Math.min(12, (cy - py) / 2, Math.abs(dx) / 2));
+        var s = dx > 0 ? 1 : -1;
+        return 'M' + px + ',' + py +
+            ' V' + (my - r) +
+            ' Q' + px + ',' + my + ' ' + (px + r * s) + ',' + my +
+            ' H' + (cx - r * s) +
+            ' Q' + cx + ',' + my + ' ' + cx + ',' + (my + r) +
+            ' V' + cy;
+    }
+
     function drawTreeLines() {
         var tree = document.querySelector('.tree[data-tree-lines]');
         if (!tree) { return; }
@@ -97,12 +113,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 var cn = cli.querySelector(':scope > .t-node');
                 if (!cn) { return; }
                 var cp = posIn(cn, tree);
-                var line = document.createElementNS(NS, 'line');
-                line.setAttribute('x1', px);
-                line.setAttribute('y1', py);
-                line.setAttribute('x2', cp.x + cn.offsetWidth / 2);
-                line.setAttribute('y2', cp.y);
-                frag.appendChild(line);
+                var path = document.createElementNS(NS, 'path');
+                path.setAttribute('d', elbowPath(px, py, cp.x + cn.offsetWidth / 2, cp.y));
+                frag.appendChild(path);
             });
         });
         while (svg.firstChild) { svg.removeChild(svg.firstChild); }
