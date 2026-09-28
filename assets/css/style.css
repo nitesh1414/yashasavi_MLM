@@ -36,7 +36,7 @@ a { color: #000; text-decoration: none; }
 a:hover { color: #000; text-decoration: underline; }
 ul { list-style: none; }
 h1, h2, h3, h4 { line-height: 1.25; color: #000; }
-.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+.container { max-width: none; width: 100%; margin: 0 auto; padding: 0 20px; }
 
 /* ---------- alerts / flash ---------- */
 .alert { padding: 12px 40px 12px 16px; border-radius: 10px; margin: 14px 0; font-size: 14px; position: relative; border: 1px solid transparent; }
@@ -179,7 +179,7 @@ h1, h2, h3, h4 { line-height: 1.25; color: #000; }
 
 /* ---------- content page ---------- */
 .content-page { padding: 60px 0; }
-.content-wrap { max-width: 900px; margin: 0 auto; background: #fff; }
+.content-wrap { max-width: none; width: 100%; margin: 0 auto; background: #fff; }
 .content-wrap h2 { margin: 26px 0 12px; font-size: 26px; }
 .content-wrap h3 { margin: 22px 0 10px; font-size: 21px; }
 .content-wrap p { margin-bottom: 14px; color: #000; }
