@@ -7,7 +7,7 @@
  *   $pageTitle — string
  */
 $dashUser = $area === 'user' ? current_user() : current_admin($area);
-$siteName = setting('site_name', 'Yashasavi Ayurveda');
+$siteName = setting('site_name', 'Yashasavi Veda Herbals Private Limited');
 $logo = upload_url(setting('site_logo')) ?: url('assets/img/logo.svg');
 $initials = '';
 $dashName = '';

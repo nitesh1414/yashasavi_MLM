@@ -19,7 +19,7 @@ if (is_post()) {
     $error = ($r === 'blocked') ? 'Account blocked. Contact super admin.' : 'Invalid username or password.';
 }
 
-$siteName = setting('site_name', 'Yashasavi Ayurveda');
+$siteName = setting('site_name', 'Yashasavi Veda Herbals Private Limited');
 $logo = upload_url(setting('site_logo')) ?: url('assets/img/logo.svg');
 ?>
 <!DOCTYPE html>

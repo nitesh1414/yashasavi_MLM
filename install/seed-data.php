@@ -55,7 +55,7 @@ function seed_data()
 
     /* Site settings (key => value) */
     'settings' => [
-        'site_name'        => 'Yashasavi Ayurveda',
+        'site_name'        => 'Yashasavi Veda Herbals Private Limited',
         'site_tagline'     => 'Health • Wealth • Wellness',
         'site_slogan'      => 'Your Dream Your Better',
         'company_name'     => 'Yashasavi Veda Herbal Private Limited',
@@ -69,7 +69,7 @@ function seed_data()
         'social_instagram' => 'https://instagram.com/',
         'social_youtube'   => 'https://youtube.com/',
         'social_twitter'   => 'https://twitter.com/',
-        'seo_meta_title'   => 'Yashasavi Ayurveda — Health • Wealth • Wellness',
+        'seo_meta_title'   => 'Yashasavi Veda Herbals Private Limited — Health • Wealth • Wellness',
         'seo_meta_desc'    => 'Yashasavi Veda Herbal Private Limited — 100% Ayurvedic products and a genuine direct selling business opportunity. Your Dream, Your Better.',
         'how_works_1_title' => 'Register',
         'how_works_1_text'  => 'Register yourself as a distributor with a sponsor ID — registration is free.',
@@ -81,7 +81,7 @@ function seed_data()
         'stats_products'   => '16+',
         'stats_distributors' => '1000+',
         'stats_states'     => '12+',
-        'announcement_bar' => 'Welcome to Yashasavi Ayurveda — Your Dream, Your Better! Become a distributor today and build multiple sources of income.',
+        'announcement_bar' => 'Welcome to Yashasavi Veda Herbals Private Limited — Your Dream, Your Better! Become a distributor today and build multiple sources of income.',
         'currency_symbol'  => '₹',
     ],
 
@@ -201,7 +201,7 @@ function seed_data()
         [
             'title' => 'Opportunity', 'slug' => 'opportunity', 'menu_order' => 2, 'show_in_menu' => 1,
             'content' => '<h2>Better Earnings. Better Lifestyle.</h2>
-<p>Time to take action! Becoming a distributor of Yashasavi Ayurveda is simple — and with our proven plan you can build <strong>multiple sources of income</strong>. See the complete plan with live rank and reward tables on our <a href="opportunity.php">Business Opportunity</a> page.</p>
+<p>Time to take action! Becoming a distributor of Yashasavi Veda Herbals Private Limited is simple — and with our proven plan you can build <strong>multiple sources of income</strong>. See the complete plan with live rank and reward tables on our <a href="opportunity.php">Business Opportunity</a> page.</p>
 <div class="steps-grid">
 <div class="step-card"><h4>1. Register</h4><p>Register yourself as a distributor using a sponsor ID. Registration is free.</p></div>
 <div class="step-card"><h4>2. Buy &amp; Sell</h4><p>Purchase products at the special distributor price (DP) and sell at MRP — keep 30% to 45% retail income.</p></div>
@@ -221,7 +221,7 @@ function seed_data()
         [
             'title' => 'Terms & Conditions', 'slug' => 'terms-and-conditions', 'menu_order' => 90, 'show_in_menu' => 0,
             'content' => '<h2>Terms &amp; Conditions</h2>
-<p>By using this website and participating in the Yashasavi Ayurveda business opportunity, you agree to the following terms:</p>
+<p>By using this website and participating in the Yashasavi Veda Herbals Private Limited business opportunity, you agree to the following terms:</p>
 <ol>
 <li>Distributorship is open to individuals of 18 years of age and above.</li>
 <li>The company may modify the marketing plan, product prices and BV values at any time.</li>
@@ -245,7 +245,7 @@ function seed_data()
         [
             'title' => 'Disclaimer', 'slug' => 'disclaimer', 'menu_order' => 93, 'show_in_menu' => 0,
             'content' => '<h2>Disclaimer</h2>
-<p>Yashasavi Ayurveda products are Ayurvedic / wellness formulations and are not intended to diagnose, treat, cure or prevent any disease. Results may vary from person to person. Consult your healthcare professional before use if you are pregnant, nursing, taking medication or have a medical condition. Income examples shown in the marketing plan are potential earnings only and depend on individual effort, team building and product sales — the company does not guarantee any income.</p>',
+<p>Yashasavi Veda Herbals Private Limited products are Ayurvedic / wellness formulations and are not intended to diagnose, treat, cure or prevent any disease. Results may vary from person to person. Consult your healthcare professional before use if you are pregnant, nursing, taking medication or have a medical condition. Income examples shown in the marketing plan are potential earnings only and depend on individual effort, team building and product sales — the company does not guarantee any income.</p>',
         ],
     ],
     ];

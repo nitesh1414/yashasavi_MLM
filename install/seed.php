@@ -159,7 +159,7 @@ function seed_database($fresh = false)
     foreach ($D['pages'] as $p) {
         q("INSERT INTO pages (title, slug, content, meta_title, meta_description, show_in_menu, menu_order, status, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, 'published', ?, ?)",
-          [$p['title'], $p['slug'], $p['content'], $p['title'] . ' — Yashasavi Ayurveda', substr(strip_tags($p['content']), 0, 200),
+          [$p['title'], $p['slug'], $p['content'], $p['title'] . ' — Yashasavi Veda Herbals Private Limited', substr(strip_tags($p['content']), 0, 200),
            $p['show_in_menu'], $p['menu_order'], $now, $now]);
     }
 
@@ -168,7 +168,7 @@ function seed_database($fresh = false)
     /* ---------------------------------------------------------------- */
     q("INSERT INTO announcements (title, content, status, created_by, created_at) VALUES
        (?, ?, 'active', 1, ?)",
-      ['Welcome to Yashasavi Ayurveda — Your Dream, Your Better!',
+      ['Welcome to Yashasavi Veda Herbals Private Limited — Your Dream, Your Better!',
        'Dear Distributors, welcome to the new Yashasavi Veda Herbal Private Limited portal. Complete your profile and KYC details to receive fast payouts and become eligible for rewards. For any help, contact customer care: 9529512562.', $now]);
 }
 

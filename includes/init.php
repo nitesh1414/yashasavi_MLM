@@ -83,7 +83,7 @@ set_exception_handler(function (Throwable $e) {
     $upgradeUrl = $base . '/install/upgrade.php';
     echo '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        . '<title>Site maintenance — Yashasavi Ayurveda</title><style>'
+        . '<title>Site maintenance — Yashasavi Veda Herbals Private Limited</title><style>'
         . 'body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f7f4;'
         . 'color:#1b3a1f;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}'
         . '.card{background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(27,58,31,.08);'

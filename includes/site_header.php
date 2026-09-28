@@ -1,6 +1,6 @@
 <?php
 /** Public website header — expects optional: $pageTitle, $pageDesc, $bodyClass */
-$siteName = setting('site_name', 'Yashasavi Ayurveda');
+$siteName = setting('site_name', 'Yashasavi Veda Herbals Private Limited');
 $siteTagline = setting('site_tagline', 'Health • Wealth • Wellness');
 $logo = upload_url(setting('site_logo')) ?: url('assets/img/logo.png');
 $siteSlogan = setting('site_slogan', 'Your Dream Your Better');

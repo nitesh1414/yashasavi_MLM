@@ -1,5 +1,5 @@
 /* =====================================================================
-   Yashasavi Ayurveda — Public website theme
+   Yashasavi Veda Herbals Private Limited — Public website theme
    ===================================================================== */
 
 :root {
@@ -70,7 +70,7 @@ h1, h2, h3, h4 { line-height: 1.25; color: #000; }
 .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .brand img { height: 100px; width: 100px; object-fit: contain; border-radius: 12px; flex-shrink: 0; }
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
-.brand .brand-name { font-size: 25px; font-weight: 400; color: #000; line-height: 1.15; max-width: clamp(150px, 19vw, 340px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand .brand-name { font-size: 25px; font-weight: 400; color: #000; line-height: 1.15; max-width: clamp(150px, 19vw, 360px); overflow: hidden; }
 .brand .brand-tag { font-size: 10.5px; color: #000; letter-spacing: 2.2px; text-transform: uppercase; white-space: nowrap; max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
 .nav-menu { display: flex; flex-wrap: nowrap; align-items: center; gap: 2px; }
 .nav-menu > li { position: relative; }
@@ -304,14 +304,14 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 @media (max-width: 1200px) {
     .brand img { height: 62px; width: 62px; }
     .brand { gap: 9px; }
-    .brand .brand-name { font-size: 18px; max-width: 220px; }
+    .brand .brand-name { font-size: 18px; max-width: 260px; }
     .brand .brand-tag { font-size: 9px; letter-spacing: 1.6px; max-width: 220px; }
     .nav-menu > li > a { padding: 8px 8px; font-size: 13px; }
     .navbar .container { gap: 10px; }
 }
 @media (max-width: 1000px) {
     .brand img { height: 52px; width: 52px; }
-    .brand .brand-name { font-size: 15.5px; max-width: 170px; }
+    .brand .brand-name { font-size: 15.5px; max-width: 230px; }
     .brand .brand-tag { display: none; }
     .nav-menu > li > a { padding: 8px 7px; font-size: 12.5px; }
     .nav-actions .btn-sm { padding: 7px 10px; font-size: 12.5px; }

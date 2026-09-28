@@ -347,12 +347,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($ex === null || $ex === false) {
                 q("INSERT INTO pages (title, slug, content, meta_title, meta_description, show_in_menu, menu_order, status, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, 'published', NOW(), NOW())",
-                  [$p['title'], $p['slug'], $p['content'], $p['title'] . ' — Yashasavi Ayurveda',
+                  [$p['title'], $p['slug'], $p['content'], $p['title'] . ' — Yashasavi Veda Herbals Private Limited',
                    substr(strip_tags($p['content']), 0, 200), $p['show_in_menu'], $p['menu_order']]);
                 $pageInserts++;
             } elseif ($refreshContent && $ex !== $p['content']) {
                 q("UPDATE pages SET title = ?, content = ?, meta_title = ?, meta_description = ?, show_in_menu = ?, menu_order = ?, updated_at = NOW() WHERE slug = ?",
-                  [$p['title'], $p['content'], $p['title'] . ' — Yashasavi Ayurveda',
+                  [$p['title'], $p['content'], $p['title'] . ' — Yashasavi Veda Herbals Private Limited',
                    substr(strip_tags($p['content']), 0, 200), $p['show_in_menu'], $p['menu_order'], $p['slug']]);
                 $pageUpdates++;
             }
@@ -378,7 +378,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!(int)q_val("SELECT COUNT(*) FROM announcements")) {
             q("INSERT INTO announcements (title, content, status, created_by, created_at) VALUES
                (?, ?, 'active', 1, NOW())",
-              ['Welcome to Yashasavi Ayurveda — Your Dream, Your Better!',
+              ['Welcome to Yashasavi Veda Herbals Private Limited — Your Dream, Your Better!',
                'Dear Distributors, welcome to the new Yashasavi Veda Herbal Private Limited portal. Complete your profile and KYC details to receive fast payouts and become eligible for rewards. For any help, contact customer care: 9529512562.']);
             $log[] = 'Welcome announcement added.';
         }
@@ -473,7 +473,7 @@ code{background:#f0f6ef;border:1px solid #dbe5db;padding:1px 6px;border-radius:6
                 <label class="chk">
                     <input type="checkbox" name="refresh_content" checked>
                     <span><strong>Refresh website content</strong> — update CMS pages and branding (company name,
-                    tagline, contact details) to the current Yashasavi Ayurveda content. Uncheck to keep your edited pages.</span>
+                    tagline, contact details) to the current Yashasavi Veda Herbals Private Limited content. Uncheck to keep your edited pages.</span>
                 </label>
                 <label class="chk">
                     <input type="checkbox" name="replace_catalog" checked>
