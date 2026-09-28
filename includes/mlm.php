@@ -505,6 +505,9 @@ function approve_order($orderId, $adminId)
         if ($order['status'] !== 'pending') {
             return [false, 'Order is not pending (current status: ' . $order['status'] . ').'];
         }
+        if ($order['payment_mode'] === 'cash' && $order['payment_status'] !== 'paid') {
+            return [false, 'Cash payment has not been authorized yet — use the “Authorize Payment” button first.'];
+        }
 
         $totalBv = (float)$order['total_bv'];
         $buyer = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$order['user_id']]);

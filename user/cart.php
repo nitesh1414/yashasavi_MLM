@@ -4,6 +4,11 @@ require_once __DIR__ . '/../includes/init.php';
 $u = require_user();
 
 $cart = $_SESSION['cart'] ?? [];
+$removed = cart_cleanup();
+if ($removed) {
+    flash('error', 'Removed from your cart (no longer available): ' . implode(', ', $removed));
+    $cart = $_SESSION['cart'];
+}
 
 if (is_post()) {
     verify_csrf();
@@ -39,7 +44,7 @@ if (is_post()) {
             redirect('shop.php');
         }
         $paymentMode = post_str('payment_mode');
-        if (!in_array($paymentMode, ['wallet', 'bank_transfer'], true)) {
+        if (!in_array($paymentMode, ['wallet', 'bank_transfer', 'cash'], true)) {
             $paymentMode = 'bank_transfer';
         }
         // shipping details
@@ -61,8 +66,13 @@ if (is_post()) {
         $totalDp = 0.0; $totalMrp = 0.0; $totalBv = 0.0;
         foreach ($cart as $pid => $qty) {
             $p = q_row("SELECT * FROM products WHERE id = ? AND status='active'", [$pid]);
-            if (!$p) { $errors[] = 'A product in your cart is no longer available.'; continue; }
-            if ($p['stock'] < $qty) { $errors[] = e($p['name']) . ' has only ' . (int)$p['stock'] . ' unit(s) in stock.'; continue; }
+            if (!$p) {
+                $name = q_val("SELECT name FROM products WHERE id = ?", [$pid]);
+                $errors[] = ($name ?: 'A product') . ' in your cart is no longer available — it has been removed from your cart.';
+                unset($_SESSION['cart'][(int)$pid]);
+                continue;
+            }
+            if ((int)$p['stock'] < $qty) { $errors[] = e($p['name']) . ' has only ' . (int)$p['stock'] . ' unit(s) in stock.'; continue; }
             $items[] = ['p' => $p, 'qty' => $qty];
             $totalDp += (float)$p['dp'] * $qty;
             $totalMrp += (float)$p['mrp'] * $qty;
@@ -71,7 +81,7 @@ if (is_post()) {
         if (!$items) { $errors[] = 'Your cart is empty.'; }
 
         if ($paymentMode === 'wallet' && (float)$u['wallet_balance'] < $totalDp) {
-            $errors[] = 'Insufficient wallet balance (' . money($u['wallet_balance']) . '). Choose bank transfer or add funds.';
+            $errors[] = 'Insufficient wallet balance (' . money($u['wallet_balance']) . '). Choose cash or bank transfer.';
         }
 
         if ($errors) {
@@ -102,7 +112,11 @@ if (is_post()) {
         });
 
         $_SESSION['cart'] = [];
-        flash('success', 'Order ' . $orderNo . ' placed successfully! It will be processed after verification by the company.');
+        if ($paymentMode === 'cash') {
+            flash('success', 'Order ' . $orderNo . ' placed successfully! Pay the cash amount to the company / your distributor — the order is processed once the company authorizes your payment.');
+        } else {
+            flash('success', 'Order ' . $orderNo . ' placed successfully! It will be processed after verification by the company.');
+        }
         redirect('orders.php');
     }
 }
@@ -200,8 +214,10 @@ require __DIR__ . '/../includes/dash_header.php';
                 <input class="form-control" name="ship_pincode" value="<?= e($u['pincode']) ?>"></div>
 
             <h4 style="font-size:14px;margin:14px 0 10px">Payment Method</h4>
-            <label class="form-check"><input type="radio" name="payment_mode" value="bank_transfer" checked>
-                <span><b>Bank Transfer / UPI</b> — transfer <?= money($totalDp) ?> to the company account, then enter your transaction reference. Order is verified by the company.</span></label>
+            <label class="form-check"><input type="radio" name="payment_mode" value="cash" checked>
+                <span><b>💵 Cash</b> — pay cash to the company / your distributor on delivery or pickup. The company will <b>authorize your payment</b>, after which the order is processed.</span></label>
+            <label class="form-check"><input type="radio" name="payment_mode" value="bank_transfer">
+                <span><b>🏦 Bank Transfer / UPI</b> — transfer <?= money($totalDp) ?> to the company account, then enter your transaction reference. Order is verified by the company.</span></label>
             <label class="form-check"><input type="radio" name="payment_mode" value="wallet">
                 <span><b>E-Wallet</b> — pay instantly from your wallet balance (<?= money($u['wallet_balance']) ?>)</span></label>
             <div class="form-group" style="margin-top:10px">

@@ -43,7 +43,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <tr><th>Order No.</th><th>Date</th><th>Items</th><th>DP Total</th><th>BV</th><th>Payment</th><th>Status</th><th></th></tr>
             <?php foreach ($orders as $o):
                 $items = q_val("SELECT COUNT(*) FROM order_items WHERE order_id = ?", [$o['id']]);
-                $pmLabel = ['wallet' => 'Wallet', 'bank_transfer' => 'Bank/UPI', 'online' => 'Online'][$o['payment_mode']] ?? $o['payment_mode'];
+                $pmLabel = ['wallet' => 'Wallet', 'bank_transfer' => 'Bank/UPI', 'online' => 'Online', 'cash' => 'Cash'][$o['payment_mode']] ?? $o['payment_mode'];
             ?>
             <tr>
                 <td><b><?= e($o['order_no']) ?></b></td>
@@ -51,7 +51,10 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= (int)$items ?></td>
                 <td><?= money($o['total_dp']) ?></td>
                 <td><?= bv($o['total_bv']) ?></td>
-                <td><?= e($pmLabel) ?><br><small style="color:#000"><?= status_badge($o['payment_status']) ?></small></td>
+                <td><?= e($pmLabel) ?><br><small style="color:#000"><?= status_badge($o['payment_status']) ?></small>
+                    <?php if ($o['payment_mode'] === 'cash' && $o['payment_status'] === 'pending' && $o['status'] === 'pending'): ?>
+                    <br><small style="color:#a67c00">awaiting company authorization</small>
+                    <?php endif; ?></td>
                 <td><?= status_badge($o['status']) ?></td>
                 <td><a class="btn btn-outline btn-sm" href="order_view.php?id=<?= (int)$o['id'] ?>">View</a></td>
             </tr>

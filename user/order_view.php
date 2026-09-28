@@ -54,8 +54,11 @@ require __DIR__ . '/../includes/dash_header.php';
             <table class="kv-table" style="width:100%">
                 <tr><td>Order No.</td><td><b><?= e($order['order_no']) ?></b></td></tr>
                 <tr><td>Placed On</td><td><?= dmy($order['created_at'], true) ?></td></tr>
-                <tr><td>Payment Mode</td><td><?= e(ucfirst(str_replace('_', ' ', $order['payment_mode']))) ?></td></tr>
-                <tr><td>Payment Status</td><td><?= status_badge($order['payment_status']) ?></td></tr>
+                <tr><td>Payment Mode</td><td><?= e(['wallet' => 'Wallet', 'bank_transfer' => 'Bank Transfer / UPI', 'online' => 'Online', 'cash' => 'Cash'][$order['payment_mode']] ?? ucfirst(str_replace('_', ' ', $order['payment_mode']))) ?></td></tr>
+                <tr><td>Payment Status</td><td><?= status_badge($order['payment_status']) ?>
+                    <?php if ($order['payment_mode'] === 'cash' && $order['payment_status'] === 'pending' && $order['status'] === 'pending'): ?>
+                    <br><small style="color:#a67c00">Pay the cash amount to the company / your distributor — the order is processed after the company authorizes your payment.</small>
+                    <?php endif; ?></td></tr>
                 <tr><td>Txn Reference</td><td><?= e($order['txn_ref'] ?: '—') ?></td></tr>
                 <tr><td>Status</td><td><?= status_badge($order['status']) ?></td></tr>
                 <?php if ($order['approved_at']): ?>

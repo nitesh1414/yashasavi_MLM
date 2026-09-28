@@ -191,7 +191,7 @@ return [
     total_mrp DECIMAL(12,2) NOT NULL DEFAULT 0,
     total_dp DECIMAL(12,2) NOT NULL DEFAULT 0,
     total_bv DECIMAL(12,2) NOT NULL DEFAULT 0,
-    payment_mode ENUM('wallet','bank_transfer','online') NOT NULL DEFAULT 'bank_transfer',
+    payment_mode ENUM('wallet','bank_transfer','online','cash') NOT NULL DEFAULT 'bank_transfer',
     payment_status ENUM('pending','paid','refunded') NOT NULL DEFAULT 'pending',
     txn_ref VARCHAR(120) NULL,
     status ENUM('pending','approved','rejected','cancelled') NOT NULL DEFAULT 'pending',

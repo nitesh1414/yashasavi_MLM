@@ -38,7 +38,7 @@ $total = (int)q_val("SELECT COUNT(*) FROM products p WHERE $where", $params);
 $products = q_all("SELECT p.*, c.name AS cat_name FROM products p
                    LEFT JOIN categories c ON c.id = p.category_id
                    WHERE $where ORDER BY p.sort_order, p.id LIMIT $per OFFSET $offset", $params);
-$cartCount = array_sum($_SESSION['cart'] ?? []);
+$cartCount = cart_count();
 
 $activeKey = 'shop';
 $pageTitle = 'Shop — Distributor Prices';

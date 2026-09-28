@@ -182,6 +182,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->exec('ALTER TABLE commissions ' . ug_commission_types_ddl());
         $log[] = 'Commission income types extended (sponsor matching, car fund, award, retail).';
 
+        /* 3b — allow the cash payment mode on orders */
+        if (ug_table_exists('orders')) {
+            $pm = q_val("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'payment_mode'");
+            if ($pm && stripos($pm, 'cash') === false) {
+                $pdo->exec("ALTER TABLE orders MODIFY `payment_mode` ENUM('wallet','bank_transfer','online','cash') NOT NULL DEFAULT 'bank_transfer'");
+                $log[] = 'Orders: cash payment mode enabled.';
+            }
+        }
+
         /* 4 — MLM plan settings */
         $plan = $D['plan'];
         if (!(int)q_val("SELECT COUNT(*) FROM plan_settings WHERE id = 1")) {

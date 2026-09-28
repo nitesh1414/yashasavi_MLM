@@ -210,6 +210,56 @@ function verify_csrf()
 }
 
 /* ------------------------------------------------------------------ */
+/*  Shopping cart (session)                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Remove products from the session cart that are no longer purchasable
+ * (deleted or deactivated). Without this, a deactivated product kept the
+ * cart badge showing a count while the cart page looked empty and
+ * checkout failed with "no longer available".
+ *
+ * Returns the names of the removed products (for a flash notice).
+ */
+function cart_cleanup()
+{
+    $cart = $_SESSION['cart'] ?? [];
+    if (!$cart) {
+        return [];
+    }
+    $ids = [];
+    foreach ($cart as $pid => $qty) {
+        $ids[(int)$pid] = true;
+    }
+    $in = implode(',', array_map('intval', array_keys($ids)));
+    $rows = q_all("SELECT id, name, status FROM products WHERE id IN ($in)");
+
+    $byId = [];
+    foreach ($rows as $r) {
+        $byId[(int)$r['id']] = $r;
+    }
+    $removed = [];
+    foreach ($cart as $pid => $qty) {
+        $pid = (int)$pid;
+        if (!isset($byId[$pid]) || $byId[$pid]['status'] !== 'active') {
+            $removed[] = isset($byId[$pid]) ? $byId[$pid]['name'] : ('Product #' . $pid);
+            unset($cart[$pid]);
+        }
+    }
+    if ($removed) {
+        $_SESSION['cart'] = $cart;
+    }
+    return $removed;
+}
+
+/** Number of items currently in the cart (validated against the catalogue). */
+function cart_count()
+{
+    cart_cleanup();
+    return array_sum($_SESSION['cart'] ?? []);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Flash messages                                                     */
 /* ------------------------------------------------------------------ */
 
