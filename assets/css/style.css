@@ -60,13 +60,13 @@ h1, h2, h3, h4 { line-height: 1.25; color: #000; }
 
 /* ---------- top bar ---------- */
 .topbar { background: var(--green-deep); color: #cfe3cf; font-size: 13px; }
-.topbar .container { display: flex; justify-content: space-between; align-items: center; min-height: 38px; gap: 10px; flex-wrap: wrap; }
+.topbar .container { display: flex; justify-content: space-between; align-items: center; min-height: 38px; gap: 10px; flex-wrap: wrap; max-width: none; }
 .topbar a { color: #e8f3e8; margin-left: 14px; }
 .topbar .topbar-right { display: flex; align-items: center; }
 
 /* ---------- navbar ---------- */
 .navbar { background: #fff; box-shadow: 0 2px 14px rgba(27,58,31,.06); position: sticky; top: 0; z-index: 500; border-bottom: 1px solid var(--line); }
-.navbar .container { display: flex; align-items: center; justify-content: space-between; min-height: 72px; gap: 14px; }
+.navbar .container { display: flex; align-items: center; justify-content: space-between; min-height: 72px; gap: 14px; max-width: none; width: 100%; }
 .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .brand img { height: 100px; width: 100px; object-fit: contain; border-radius: 12px; flex-shrink: 0; }
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
