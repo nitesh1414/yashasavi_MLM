@@ -148,3 +148,39 @@ document.addEventListener('DOMContentLoaded', function () {
         onScroll();
     }
 });
+
+/* ---- motion layer: scroll progress bar + back-to-top ---- */
+document.addEventListener('DOMContentLoaded', function () {
+    /* gold progress line at the very top of the page */
+    var bar = document.createElement('div');
+    bar.id = 'scrollProgress';
+    bar.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(bar);
+
+    /* floating back-to-top button */
+    var top = document.createElement('button');
+    top.id = 'toTop';
+    top.type = 'button';
+    top.setAttribute('aria-label', 'Back to top');
+    top.innerHTML = '&#9650;';
+    document.body.appendChild(top);
+    top.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    var queued = false;
+    function onScroll() {
+        if (queued) { return; }
+        queued = true;
+        requestAnimationFrame(function () {
+            var h = document.documentElement;
+            var max = h.scrollHeight - h.clientHeight;
+            var y = window.scrollY || h.scrollTop || 0;
+            bar.style.width = (max > 0 ? Math.min(100, (y / max) * 100) : 0) + '%';
+            top.classList.toggle('show', y > 420);
+            queued = false;
+        });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+});
