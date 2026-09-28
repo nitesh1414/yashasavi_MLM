@@ -673,3 +673,27 @@ body { animation: pageFade .55s ease both; }
     .wa-float svg { width: 25px; height: 25px; }
     .wa-tip { display: none; }
 }
+
+/* --- topbar social icons --- */
+.topbar-right { gap: 4px; }
+.topbar-soc { display: inline-flex; align-items: center; gap: 6px; }
+.topbar-soc a {
+    width: 26px; height: 26px; margin-left: 0; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.1); color: #e8f3e8;
+    transition: transform .22s ease, background .22s ease, color .22s ease;
+}
+.topbar-soc a svg { width: 13px; height: 13px; }
+.topbar-soc a:hover { transform: translateY(-2px) scale(1.12); background: #fff; color: var(--soc, var(--gold)); }
+.topbar-soc a.soc-whatsapp  { --soc: #25d366; }
+.topbar-soc a.soc-facebook  { --soc: #1877f2; }
+.topbar-soc a.soc-instagram { --soc: #e1306c; }
+.topbar-soc a.soc-youtube   { --soc: #ff0000; }
+.topbar-soc a.soc-twitter   { --soc: #14171a; }
+.topbar-soc a.soc-telegram  { --soc: #229ed9; }
+.topbar .topbar-join {
+    background: var(--gold); color: var(--green-deep); font-weight: 500;
+    padding: 3px 12px; border-radius: 999px; margin-left: 10px;
+    transition: background .2s ease, transform .2s ease;
+}
+.topbar .topbar-join:hover { background: #fff; transform: translateY(-1px); }

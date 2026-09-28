@@ -26,6 +26,7 @@ $menu[] = ['label' => 'Contact Us', 'href' => url('contact.php'), 'active' => $c
 $metaTitle = isset($pageTitle) ? $pageTitle . ' — ' . $siteName : setting('seo_meta_title', $siteName);
 $metaDesc = isset($pageDesc) ? $pageDesc : setting('seo_meta_desc', '');
 $u = current_user();
+require_once __DIR__ . '/social_icons.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -50,9 +51,17 @@ $u = current_user();
             <span>📞 <?= e(setting('contact_phone')) ?></span>
         </div>
         <div class="topbar-right">
-            <?php if (setting('social_facebook')): ?><a href="<?= e(setting('social_facebook')) ?>" target="_blank" rel="noopener">Facebook</a><?php endif; ?>
-            <?php if (setting('social_instagram')): ?><a href="<?= e(setting('social_instagram')) ?>" target="_blank" rel="noopener">Instagram</a><?php endif; ?>
-            <?php if (setting('social_youtube')): ?><a href="<?= e(setting('social_youtube')) ?>" target="_blank" rel="noopener">YouTube</a><?php endif; ?>
+            <span class="topbar-soc">
+                <?php foreach (['whatsapp', 'facebook', 'instagram', 'youtube', 'twitter', 'telegram'] as $sk): ?>
+                    <?php if (setting('social_' . $sk)): ?>
+                        <a class="soc-<?= $sk ?>" href="<?= e(setting('social_' . $sk)) ?>" target="_blank" rel="noopener"
+                           aria-label="<?= e(ucfirst($sk)) ?>" title="<?= e(ucfirst($sk)) ?>"><?= social_icon_svg($sk) ?></a>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </span>
+            <span class="topbar-sep">|</span>
+            <a href="<?= url('login.php') ?>">Distributor Login</a>
+            <a class="topbar-join" href="<?= url('register.php') ?>">Join Now</a>
         </div>
     </div>
 </div>
