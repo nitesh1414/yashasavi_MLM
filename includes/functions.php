@@ -60,13 +60,20 @@ function bv($n)
 function base_url()
 {
     if (defined('APP_URL') && APP_URL !== '') {
-        return rtrim(APP_URL, '/');
+        $u = rtrim(APP_URL, '/');
+        if (preg_match('~^https?://~i', $u)) {
+            return $u;
+        }
+        /* scheme-less APP_URL (e.g. "localhost/yashasavi_MLM") — use the
+           current request's scheme so links stay absolute */
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        return $scheme . '://' . $u;
     }
     // auto-detect
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host   = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
     $dir    = isset($_SERVER['SCRIPT_NAME']) ? str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])) : '/';
-    $dir    = rtrim(str_replace(['/admin', '/superadmin', '/user'], '', $dir), '/');
+    $dir    = rtrim(str_replace(['/admin', '/superadmin', '/user', '/install'], '', $dir), '/');
     return $scheme . '://' . $host . $dir;
 }
 
@@ -122,20 +129,47 @@ function get_int($key, $default = 0)
     return isset($_GET[$key]) ? (int)$_GET[$key] : $default;
 }
 
-function redirect($path)
+/**
+ * Compute the absolute URL a redirect should go to.
+ *
+ *  - full URLs (http://…) are returned unchanged;
+ *  - paths starting with '/' are resolved from the APP ROOT (base_url);
+ *  - bare relative paths are resolved against the CURRENT SCRIPT's
+ *    directory — built from the request origin + script path, never from
+ *    base_url() (which already contains the app folder: prefixing it here
+ *    too duplicated the folder in sub-directory installs, e.g.
+ *    /live/yashasavi_MLM/live/yashasavi_MLM/superadmin/…).
+ */
+function redirect_target($path)
 {
     if (preg_match('~^https?://~i', $path)) {
-        $target = $path;                              // full URL, as-is
-    } elseif (isset($path[0]) && $path[0] === '/') {
-        $target = base_url() . $path;                 // absolute from app root
-    } else {                                          // relative to current script's directory
-        $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
-        if ($dir === '/' || $dir === '.') {
-            $dir = '';
-        }
-        $target = base_url() . $dir . '/' . $path;
+        return $path;                                 // full URL, as-is
     }
-    header('Location: ' . $target);
+    if (isset($path[0]) && $path[0] === '/') {
+        return base_url() . $path;                    // absolute from app root
+    }
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+    $origin = $scheme . '://' . $host;
+
+    $dir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+    if ($dir === '/' || $dir === '.') {
+        $dir = '';
+    }
+    $target = $origin . $dir . '/' . $path;
+
+    /* normalise any ../ segments so the Location header is clean */
+    $schemeSlashes = substr($target, 0, strpos($target, '://') + 3);
+    $rest = substr($target, strlen($schemeSlashes));
+    while (preg_match('~/[^/]+/\.\.(/|$)~', $rest)) {
+        $rest = preg_replace('~/[^/]+/\.\.(/|$)~', '$1', $rest, 1);
+    }
+    return $schemeSlashes . $rest;
+}
+
+function redirect($path)
+{
+    header('Location: ' . redirect_target($path));
     exit;
 }
 
