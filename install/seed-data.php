@@ -6,7 +6,7 @@
  *   - install/seed.php     (fresh installs — inserts everything)
  *   - install/upgrade.php  (upgrades existing installs — inserts only what is missing)
  *
- * Plan figures follow the official Yashasavi Veda Herbal Private Limited
+ * Plan figures follow the official Yashasavi Veda Herbals Private Limited
  * marketing plan document.
  */
 
@@ -58,19 +58,19 @@ function seed_data()
         'site_name'        => 'Yashasavi Veda Herbals Private Limited',
         'site_tagline'     => 'Health • Wealth • Wellness',
         'site_slogan'      => 'Your Dream Your Better',
-        'company_name'     => 'Yashasavi Veda Herbal Private Limited',
+        'company_name'     => 'Yashasavi Veda Herbals Private Limited',
         'site_logo'        => '', /* empty = bundled assets/img/logo.png */
         'site_favicon'     => '',
         'contact_email'    => 'support@yashasaviveda.in',
         'contact_phone'    => '+91 95295 12562',
         'contact_address'  => 'Plot No. 6, T. M. I. D. C. Road, Tukum, Chandrapur, Maharashtra - 442401',
-        'footer_about'     => 'Yashasavi Veda Herbal Private Limited is a legally registered direct selling company offering 100% Ayurvedic products for health, personal care, home care and agriculture — with a proven business opportunity that lets everyone build multiple sources of income.',
+        'footer_about'     => 'Yashasavi Veda Herbals Private Limited is a legally registered direct selling company offering 100% Ayurvedic products for health, personal care, home care and agriculture — with a proven business opportunity that lets everyone build multiple sources of income.',
         'social_facebook'  => 'https://facebook.com/',
         'social_instagram' => 'https://instagram.com/',
         'social_youtube'   => 'https://youtube.com/',
         'social_twitter'   => 'https://twitter.com/',
         'seo_meta_title'   => 'Yashasavi Veda Herbals Private Limited — Health • Wealth • Wellness',
-        'seo_meta_desc'    => 'Yashasavi Veda Herbal Private Limited — 100% Ayurvedic products and a genuine direct selling business opportunity. Your Dream, Your Better.',
+        'seo_meta_desc'    => 'Yashasavi Veda Herbals Private Limited — 100% Ayurvedic products and a genuine direct selling business opportunity. Your Dream, Your Better.',
         'how_works_1_title' => 'Register',
         'how_works_1_text'  => 'Register yourself as a distributor with a sponsor ID — registration is free.',
         'how_works_2_title' => 'Buy Product',
@@ -166,7 +166,7 @@ function seed_data()
     /* Legal documents & downloads */
     'legalDocs' => [
         // title, image, description, sort
-        ['PAN Card', 'documents/pan-card.jpg', 'Permanent Account Number card of Yashasavi Veda Herbal Private Limited (PAN: AACCZ2307Q).', 1],
+        ['PAN Card', 'documents/pan-card.jpg', 'Permanent Account Number card of Yashasavi Veda Herbals Private Limited (PAN: AACCZ2307Q).', 1],
         ['Udyam Registration Certificate', 'documents/udyam-registration.jpg', 'MSME Udyam registration certificate issued by the Government of India.', 2],
         ['Bank Account Details', 'documents/bank-details.jpg', 'Company bank account details — HDFC Bank, Chandrapur Branch.', 3],
         ['Certificate of Incorporation', 'documents/certificate-of-incorporation.jpg', 'Certificate of Incorporation under the Companies Act, 2013 — registered June 2023.', 4],
@@ -178,9 +178,9 @@ function seed_data()
     'pages' => [
         [
             'title' => 'About Us', 'slug' => 'about-us', 'menu_order' => 1, 'show_in_menu' => 1,
-            'content' => '<h2>Yashasavi Veda Herbal Private Limited</h2>
+            'content' => '<h2>Yashasavi Veda Herbals Private Limited</h2>
 <p><strong>Ayurveda for a Healthy Life, Wellness for a Better Tomorrow.</strong></p>
-<p>Yashasavi Veda Herbal Private Limited is a legally registered and compliant direct selling company from Chandrapur, Maharashtra. We offer a growing range of 100% Ayurvedic and natural products for health care, personal care, home care and agriculture — formulated with pure herbs, no harmful chemicals and no unnecessary preservatives.</p>
+<p>Yashasavi Veda Herbals Private Limited is a legally registered and compliant direct selling company from Chandrapur, Maharashtra. We offer a growing range of 100% Ayurvedic and natural products for health care, personal care, home care and agriculture — formulated with pure herbs, no harmful chemicals and no unnecessary preservatives.</p>
 <p>All our operations are conducted with transparency, integrity and in full compliance with applicable laws and regulations. Our statutory documents — PAN card, Udyam registration, bank details, Certificate of Incorporation, FSSAI license and GST registration — are available on our <a href="page.php?slug=legals">Legals</a> page.</p>
 <h3>Our Goal</h3>
 <p>To make people aware of complete unity and support for each other, and to provide them good health — the backbone of society and the nation.</p>
@@ -211,7 +211,7 @@ function seed_data()
         [
             'title' => 'Legals', 'slug' => 'legals', 'menu_order' => 3, 'show_in_menu' => 1,
             'content' => '<h2>Legals</h2>
-<p>Yashasavi Veda Herbal Private Limited is a legally registered and compliant organization. All our operations are conducted with transparency, integrity and in full compliance with applicable laws and regulations. These documents reflect our commitment to quality, safety and ethical business practices.</p>',
+<p>Yashasavi Veda Herbals Private Limited is a legally registered and compliant organization. All our operations are conducted with transparency, integrity and in full compliance with applicable laws and regulations. These documents reflect our commitment to quality, safety and ethical business practices.</p>',
         ],
         [
             'title' => 'Promotion', 'slug' => 'promotion', 'menu_order' => 4, 'show_in_menu' => 1,

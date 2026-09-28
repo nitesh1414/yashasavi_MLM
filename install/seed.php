@@ -53,7 +53,7 @@ function seed_database($fresh = false)
        status, kyc_status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 'L', '/', 0, 1, ?, 'active', 'verified', ?)",
       ['YSH100001', password_hash('User@123', PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]),
-       'Yashasavi Veda Herbal Private Limited', 'support@yashasaviveda.in', '9529512562', 'Indian',
+       'Yashasavi Veda Herbals Private Limited', 'support@yashasaviveda.in', '9529512562', 'Indian',
        'Plot No. 6, T. M. I. D. C. Road, Tukum, Chandrapur, Maharashtra - 442401', 'Chandrapur',
        'Maharashtra', $now, $now]);
     q("UPDATE users SET path = CONCAT('/', id, '/') WHERE id = LAST_INSERT_ID()");
@@ -169,7 +169,7 @@ function seed_database($fresh = false)
     q("INSERT INTO announcements (title, content, status, created_by, created_at) VALUES
        (?, ?, 'active', 1, ?)",
       ['Welcome to Yashasavi Veda Herbals Private Limited — Your Dream, Your Better!',
-       'Dear Distributors, welcome to the new Yashasavi Veda Herbal Private Limited portal. Complete your profile and KYC details to receive fast payouts and become eligible for rewards. For any help, contact customer care: 9529512562.', $now]);
+       'Dear Distributors, welcome to the new Yashasavi Veda Herbals Private Limited portal. Complete your profile and KYC details to receive fast payouts and become eligible for rewards. For any help, contact customer care: 9529512562.', $now]);
 }
 
 /** helper used by the installer */

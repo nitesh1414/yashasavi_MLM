@@ -379,7 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             q("INSERT INTO announcements (title, content, status, created_by, created_at) VALUES
                (?, ?, 'active', 1, NOW())",
               ['Welcome to Yashasavi Veda Herbals Private Limited — Your Dream, Your Better!',
-               'Dear Distributors, welcome to the new Yashasavi Veda Herbal Private Limited portal. Complete your profile and KYC details to receive fast payouts and become eligible for rewards. For any help, contact customer care: 9529512562.']);
+               'Dear Distributors, welcome to the new Yashasavi Veda Herbals Private Limited portal. Complete your profile and KYC details to receive fast payouts and become eligible for rewards. For any help, contact customer care: 9529512562.']);
             $log[] = 'Welcome announcement added.';
         }
 
