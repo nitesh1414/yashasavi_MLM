@@ -68,9 +68,9 @@ h1, h2, h3, h4 { line-height: 1.25; color: #000; }
 .navbar { background: #fff; box-shadow: 0 2px 14px rgba(27,58,31,.06); position: sticky; top: 0; z-index: 500; border-bottom: 1px solid var(--line); }
 .navbar .container { display: flex; align-items: center; justify-content: space-between; min-height: 72px; gap: 14px; }
 .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
-.brand img { height: 46px; width: 46px; object-fit: contain; border-radius: 12px; flex-shrink: 0; }
+.brand img { height: 100px; width: 100px; object-fit: contain; border-radius: 12px; flex-shrink: 0; }
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
-.brand .brand-name { font-size: 20px; font-weight: 400; color: #000; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand .brand-name { font-size: 25px; font-weight: 400; color: #000; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; }
 .brand .brand-tag { font-size: 10.5px; color: #000; letter-spacing: 2.2px; text-transform: uppercase; white-space: nowrap; }
 .nav-menu { display: flex; align-items: center; gap: 2px; }
 .nav-menu > li { position: relative; }
