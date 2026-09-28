@@ -624,3 +624,52 @@ body { animation: pageFade .55s ease both; }
     }
     .reveal { opacity: 1 !important; transform: none !important; }
 }
+
+/* ================================================================== */
+/*  Social media icons + floating WhatsApp chat button                 */
+/* ================================================================== */
+
+/* --- footer brand icons --- */
+.social-links a { color: #fff; position: relative; overflow: hidden; }
+.social-links a svg { width: 18px; height: 18px; }
+.social-links a { transition: transform .25s ease, background .25s ease, color .25s ease; }
+.social-links a:hover { transform: translateY(-4px) scale(1.08); background: #fff; color: var(--soc, var(--gold)); }
+.social-links a.soc-whatsapp  { --soc: #25d366; }
+.social-links a.soc-facebook  { --soc: #1877f2; }
+.social-links a.soc-instagram { --soc: #e1306c; }
+.social-links a.soc-youtube   { --soc: #ff0000; }
+.social-links a.soc-twitter   { --soc: #14171a; }
+.social-links a.soc-telegram  { --soc: #229ed9; }
+
+/* --- floating WhatsApp button: right middle, always visible (desktop + mobile) --- */
+.wa-float {
+    position: fixed; right: 16px; top: 50%; transform: translateY(-50%);
+    z-index: 950; width: 54px; height: 54px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #25d366, #128c7e); color: #fff;
+    box-shadow: 0 10px 26px rgba(18, 140, 126, .45);
+    animation: waPulse 2.4s ease-out infinite;
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+.wa-float svg { width: 28px; height: 28px; }
+.wa-float:hover { transform: translateY(-50%) scale(1.1); box-shadow: 0 14px 34px rgba(18, 140, 126, .6); }
+@keyframes waPulse {
+    0% { box-shadow: 0 10px 26px rgba(18,140,126,.45), 0 0 0 0 rgba(37, 211, 102, .55); }
+    70% { box-shadow: 0 10px 26px rgba(18,140,126,.45), 0 0 0 18px rgba(37, 211, 102, 0); }
+    100% { box-shadow: 0 10px 26px rgba(18,140,126,.45), 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+/* label slides out on hover (desktop) */
+.wa-tip {
+    position: absolute; right: 64px; top: 50%; transform: translateY(-50%) translateX(8px);
+    background: var(--green-deep); color: #fff; font-size: 12.5px; font-weight: 500;
+    padding: 7px 12px; border-radius: 8px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease;
+    box-shadow: 0 8px 20px rgba(0,0,0,.25);
+}
+.wa-float:hover .wa-tip { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+@media (max-width: 600px) {
+    .wa-float { width: 48px; height: 48px; right: 12px; }
+    .wa-float svg { width: 25px; height: 25px; }
+    .wa-tip { display: none; }
+}

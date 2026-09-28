@@ -26,7 +26,8 @@ if (is_post()) {
         flash('success', 'General settings saved.');
     } elseif ($tab === 'contact') {
         foreach (['contact_email', 'contact_phone', 'contact_address', 'footer_about',
-                  'social_facebook', 'social_instagram', 'social_youtube', 'social_twitter'] as $k) {
+                  'social_whatsapp', 'social_facebook', 'social_instagram', 'social_youtube',
+                  'social_twitter', 'social_telegram'] as $k) {
             save_setting($k, post_str($k));
         }
         flash('success', 'Contact & social settings saved.');
@@ -118,12 +119,15 @@ require __DIR__ . '/../includes/dash_header.php';
             <textarea class="form-control" name="footer_about"><?= e(setting('footer_about')) ?></textarea>
         </div>
         <div class="form-grid2">
-            <?php foreach (['facebook', 'instagram', 'youtube', 'twitter'] as $s): ?>
+            <?php foreach (['whatsapp' => 'WhatsApp', 'facebook' => 'Facebook', 'instagram' => 'Instagram',
+                             'youtube' => 'YouTube', 'twitter' => 'X (Twitter)', 'telegram' => 'Telegram'] as $s => $label): ?>
                 <div class="form-group">
-                    <label><?= ucfirst($s) ?> URL</label>
-                    <input class="form-control" name="social_<?= $s ?>" value="<?= e(setting('social_' . $s)) ?>" placeholder="https://...">
+                    <label><?= $label ?> URL<?= $s === 'whatsapp' ? ' <small>(also powers the floating chat button)</small>' : '' ?></label>
+                    <input class="form-control" name="social_<?= $s ?>" value="<?= e(setting('social_' . $s)) ?>"
+                           placeholder="<?= $s === 'whatsapp' ? 'https://wa.me/91XXXXXXXXXX' : 'https://...' ?>">
                 </div>
             <?php endforeach; ?>
+            <p class="hint" style="grid-column:1/-1;color:#666;font-size:12.5px;margin:0">Leave a field empty to hide that icon on the website.</p>
         </div>
         <button class="btn btn-primary" type="submit">Save Settings</button>
     </form>

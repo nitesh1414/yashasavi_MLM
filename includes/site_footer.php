@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/social_icons.php'; ?>
 </main>
 
 <footer class="site-footer">
@@ -7,9 +8,10 @@
                 <img src="<?= e(upload_url(setting('site_logo')) ?: url('assets/img/logo.png')) ?>" alt="logo">
                 <p><?= e(setting('footer_about')) ?></p>
                 <div class="social-links">
-                    <?php foreach (['facebook' => 'f', 'instagram' => '◎', 'youtube' => '▶', 'twitter' => '𝕏'] as $sk => $si): ?>
+                    <?php foreach (['whatsapp', 'facebook', 'instagram', 'youtube', 'twitter', 'telegram'] as $sk): ?>
                         <?php if (setting('social_' . $sk)): ?>
-                            <a href="<?= e(setting('social_' . $sk)) ?>" target="_blank" rel="noopener" title="<?= e(ucfirst($sk)) ?>"><?= $si ?></a>
+                            <a class="soc-<?= $sk ?>" href="<?= e(setting('social_' . $sk)) ?>" target="_blank" rel="noopener"
+                               aria-label="<?= e(ucfirst($sk)) ?>" title="<?= e(ucfirst($sk)) ?>"><?= social_icon_svg($sk) ?></a>
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
@@ -50,6 +52,13 @@
         </div>
     </div>
 </footer>
+
+<?php if (setting('social_whatsapp')): ?>
+<a class="wa-float" href="<?= e(setting('social_whatsapp')) ?>" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <?= social_icon_svg('whatsapp') ?>
+    <span class="wa-tip">Chat on WhatsApp</span>
+</a>
+<?php endif; ?>
 
 <script src="<?= url('assets/js/app.js') ?>?v=<?= APP_VERSION ?>"></script>
 </body>

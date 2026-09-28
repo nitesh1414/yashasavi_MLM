@@ -69,6 +69,8 @@ function seed_data()
         'social_instagram' => 'https://instagram.com/',
         'social_youtube'   => 'https://youtube.com/',
         'social_twitter'   => 'https://twitter.com/',
+        'social_whatsapp'  => 'https://wa.me/919529512562',
+        'social_telegram'  => '',
         'seo_meta_title'   => 'Yashasavi Veda Herbals Private Limited — Health • Wealth • Wellness',
         'seo_meta_desc'    => 'Yashasavi Veda Herbals Private Limited — 100% Ayurvedic products and a genuine direct selling business opportunity. Your Dream, Your Better.',
         'how_works_1_title' => 'Register',
