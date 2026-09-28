@@ -2,7 +2,8 @@
 /** Public website header — expects optional: $pageTitle, $pageDesc, $bodyClass */
 $siteName = setting('site_name', 'Yashasavi Ayurveda');
 $siteTagline = setting('site_tagline', 'Health • Wealth • Wellness');
-$logo = upload_url(setting('site_logo')) ?: url('assets/img/logo.svg');
+$logo = upload_url(setting('site_logo')) ?: url('assets/img/logo.png');
+$siteSlogan = setting('site_slogan', 'Your Dream Your Better');
 $navPages = q_all("SELECT * FROM pages WHERE status='published' AND show_in_menu=1 ORDER BY menu_order ASC, title ASC");
 $currentScript = basename($_SERVER['SCRIPT_NAME'] ?? '');
 $currentSlug = get_str('slug');
@@ -13,10 +14,12 @@ $menu = [
 ];
 foreach ($navPages as $p) {
     if (in_array($p['slug'], ['about-us'])) { continue; }
+    /* the Opportunity menu entry opens the live plan page (ranks & rewards from DB) */
     $menu[] = [
         'label' => $p['title'],
-        'href' => url('page.php?slug=' . $p['slug']),
-        'active' => $currentScript === 'page.php' && $currentSlug === $p['slug'],
+        'href' => $p['slug'] === 'opportunity' ? url('opportunity.php') : url('page.php?slug=' . $p['slug']),
+        'active' => ($currentScript === 'page.php' && $currentSlug === $p['slug'])
+            || ($p['slug'] === 'opportunity' && $currentScript === 'opportunity.php'),
     ];
 }
 $menu[] = ['label' => 'Contact Us', 'href' => url('contact.php'), 'active' => $currentScript === 'contact.php'];
@@ -31,7 +34,8 @@ $u = current_user();
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($metaTitle) ?></title>
 <meta name="description" content="<?= e($metaDesc) ?>">
-<link rel="icon" href="<?= e(upload_url(setting('site_favicon')) ?: placeholder('icon')) ?>">
+<link rel="icon" type="image/png" href="<?= e(upload_url(setting('site_favicon')) ?: url('assets/img/favicon.png')) ?>">
+    <link rel="apple-touch-icon" href="<?= e(url('assets/img/apple-touch-icon.png')) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/style.css') ?>?v=<?= APP_VERSION ?>">
@@ -42,6 +46,8 @@ $u = current_user();
     <div class="container">
         <div>
             <span>📧 <a href="mailto:<?= e(setting('contact_email')) ?>"><?= e(setting('contact_email')) ?></a></span>
+            <span class="topbar-sep">|</span>
+            <span>📞 <?= e(setting('contact_phone')) ?></span>
         </div>
         <div class="topbar-right">
             <?php if (setting('social_facebook')): ?><a href="<?= e(setting('social_facebook')) ?>" target="_blank" rel="noopener">Facebook</a><?php endif; ?>

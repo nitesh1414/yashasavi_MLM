@@ -108,6 +108,11 @@ require __DIR__ . '/includes/site_header.php';
                         <span class="mrp"><small>MRP </small><?= money($p['mrp']) ?></span>
                         <a class="btn btn-outline btn-sm" href="<?= url('product.php?id=' . $p['id']) ?>">Read More</a>
                     </div>
+                    <div class="p-plan">
+                        <span>DP <b><?= money($p['dp']) ?></b></span>
+                        <span>BV <b><?= e(number_format((float)$p['bv'], 0)) ?></b></span>
+                        <span class="retail-badge"><?= $p['mrp'] > 0 ? round((($p['mrp'] - $p['dp']) / $p['mrp']) * 100) : 0 ?>% retail</span>
+                    </div>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -137,6 +142,41 @@ require __DIR__ . '/includes/site_header.php';
     </div>
 </section>
 <?php endif; ?>
+
+<!-- income types -->
+<section class="section">
+    <div class="container">
+        <div class="sec-head">
+            <span class="sec-kicker">Better Earnings. Better Lifestyle.</span>
+            <h2>11 Types of Income</h2>
+            <p>Build multiple sources of income — no level limit, carry forward business.</p>
+        </div>
+        <div class="income-grid">
+            <div class="income-card"><div class="i-ico">🛍️</div><h3>Retail Income</h3><p>30% to 45% margin between DP and MRP.</p></div>
+            <div class="income-card"><div class="i-ico">🤝</div><h3>Direct Sponsor Income</h3><p>10% of BV on every purchase by your directs.</p></div>
+            <div class="income-card"><div class="i-ico">🔁</div><h3>Binary Matching Income</h3><p>₹450 per 3000:3000 BV pair, with carry forward.</p></div>
+            <div class="income-card"><div class="i-ico">⚖️</div><h3>Sponsor Matching Income</h3><p>50% of the matching income earned by your directs.</p></div>
+            <div class="income-card"><div class="i-ico">🏅</div><h3>Cash Rewards</h3><p>15 ranks — from Silver Star to Chairman (₹25 crore).</p></div>
+            <div class="income-card"><div class="i-ico">🚗</div><h3>Car Fund</h3><p>₹1,50,000 car fund at 500 points.</p></div>
+            <div class="income-card"><div class="i-ico">🏆</div><h3>Award Rewards</h3><p>Dinner set, mixer grinder, cash funds and more.</p></div>
+            <div class="income-card"><div class="i-ico">👑</div><h3>Royalty &amp; Funds</h3><p>Royalty, house fund, tours and education system.</p></div>
+        </div>
+        <p class="text-center mt-3">
+            <a class="btn btn-primary" href="<?= url('opportunity.php') ?>">View the Complete Plan →</a>
+        </p>
+    </div>
+</section>
+
+<!-- slogan band -->
+<section class="slogan-band">
+    <div class="container">
+        <img src="<?= e(url('assets/img/logo-large.png')) ?>" alt="<?= e(setting('site_name')) ?>">
+        <div>
+            <h2><?= e(setting('site_slogan', 'Your Dream Your Better')) ?></h2>
+            <p><?= e(setting('company_name')) ?> — Ayurveda for a Healthy Life, Wellness for a Better Tomorrow.</p>
+        </div>
+    </div>
+</section>
 
 <!-- stats -->
 <section class="stats-band">

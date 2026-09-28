@@ -229,7 +229,7 @@ return [
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id INT UNSIGNED NOT NULL,
     order_id INT UNSIGNED NULL,
-    type ENUM('sponsor','binary','level','rank','other') NOT NULL,
+    type ENUM('sponsor','binary','level','rank','sponsor_matching','car_fund','award','retail','other') NOT NULL,
     amount DECIMAL(12,2) NOT NULL DEFAULT 0,
     bv DECIMAL(12,2) NOT NULL DEFAULT 0,
     level TINYINT UNSIGNED NULL,
@@ -287,13 +287,30 @@ return [
     binary_value DECIMAL(10,2) NOT NULL DEFAULT 10,
     level_depth TINYINT UNSIGNED NOT NULL DEFAULT 5,
     daily_cap DECIMAL(12,2) NOT NULL DEFAULT 5000,
+    monthly_cap DECIMAL(12,2) NOT NULL DEFAULT 0,
     carry_forward TINYINT(1) NOT NULL DEFAULT 1,
     matching_requires_active TINYINT(1) NOT NULL DEFAULT 1,
     level_requires_active TINYINT(1) NOT NULL DEFAULT 1,
+    sponsor_matching_percent DECIMAL(6,2) NOT NULL DEFAULT 0,
+    point_bv DECIMAL(10,2) NOT NULL DEFAULT 400,
+    car_fund_points INT UNSIGNED NOT NULL DEFAULT 500,
+    car_fund_amount DECIMAL(12,2) NOT NULL DEFAULT 150000,
     tds_percent DECIMAL(6,2) NOT NULL DEFAULT 5,
     admin_charge_percent DECIMAL(6,2) NOT NULL DEFAULT 5,
     payout_min DECIMAL(12,2) NOT NULL DEFAULT 500,
     updated_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS award_rewards (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    points INT UNSIGNED NOT NULL DEFAULT 0,
+    reward_title VARCHAR(180) NOT NULL,
+    reward_type ENUM('item','cash') NOT NULL DEFAULT 'item',
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    description VARCHAR(500) NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
 "CREATE TABLE IF NOT EXISTS plan_levels (

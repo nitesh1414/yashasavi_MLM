@@ -14,11 +14,16 @@ if (is_post()) {
             'pair_unit_bv' => 'float_pos',
             'binary_type' => 'enum:percent,fixed',
             'binary_value' => 'float_pos',
-            'level_depth' => 'int:1:10',
+            'level_depth' => 'int:0:10',
             'daily_cap' => 'float',
+            'monthly_cap' => 'float',
             'carry_forward' => 'bool',
             'matching_requires_active' => 'bool',
             'level_requires_active' => 'bool',
+            'sponsor_matching_percent' => 'float',
+            'point_bv' => 'float_pos',
+            'car_fund_points' => 'int:0:100000000',
+            'car_fund_amount' => 'float',
             'tds_percent' => 'float',
             'admin_charge_percent' => 'float',
             'payout_min' => 'float_pos',
@@ -59,7 +64,7 @@ if (is_post()) {
             $sets[] = 'updated_at = ?';
             $params[] = now();
             $params[] = 1;
-            q("UPDATE plan_settings SET " . implode(', ', $sets) . " WHERE id = 1", $params);
+            q("UPDATE plan_settings SET " . implode(', ', $sets) . " WHERE id = ?", $params);
             flash('success', 'MLM plan settings saved.');
         }
         redirect('plan.php');
@@ -111,11 +116,15 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">Direct Sponsor Bonus</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">Direct Sponsor Income</h4>
         <div class="form-grid2">
             <div class="form-group">
-                <label>Sponsor Bonus (% of order BV)</label>
+                <label>Sponsor Income (% of order BV)</label>
                 <input class="form-control" type="number" step="0.01" name="sponsor_percent" value="<?= e($plan['sponsor_percent']) ?>">
+            </div>
+            <div class="form-group">
+                <label>Direct Sponsor Matching Income (% of matching income earned by your directs)</label>
+                <input class="form-control" type="number" step="0.01" name="sponsor_matching_percent" value="<?= e($plan['sponsor_matching_percent']) ?>">
             </div>
         </div>
 
@@ -139,8 +148,12 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
         <div class="form-grid3">
             <div class="form-group">
-                <label>Daily Cap (₹, 0 = no cap)</label>
+                <label>Daily Capping (₹, 0 = no cap)</label>
                 <input class="form-control" type="number" step="0.01" name="daily_cap" value="<?= e($plan['daily_cap']) ?>">
+            </div>
+            <div class="form-group">
+                <label>Monthly Capping (₹, 0 = no cap)</label>
+                <input class="form-control" type="number" step="0.01" name="monthly_cap" value="<?= e($plan['monthly_cap']) ?>">
             </div>
             <div class="form-group">
                 <label>Carry forward unmatched BV / pairs</label>
@@ -170,6 +183,22 @@ require __DIR__ . '/../includes/dash_header.php';
                     <option value="1" <?= (int)$plan['level_requires_active'] === 1 ? 'selected' : '' ?>>Yes</option>
                     <option value="0" <?= (int)$plan['level_requires_active'] === 0 ? 'selected' : '' ?>>No</option>
                 </select>
+            </div>
+        </div>
+
+        <h4 style="font-size:14px;margin:16px 0 12px">Points, Rewards &amp; Car Fund</h4>
+        <div class="form-grid3">
+            <div class="form-group">
+                <label>BV per Point (1 Point = ? BV)</label>
+                <input class="form-control" type="number" step="0.01" name="point_bv" value="<?= e($plan['point_bv']) ?>">
+            </div>
+            <div class="form-group">
+                <label>Car Fund — points required</label>
+                <input class="form-control" type="number" min="0" name="car_fund_points" value="<?= e($plan['car_fund_points']) ?>">
+            </div>
+            <div class="form-group">
+                <label>Car Fund amount (₹, one time)</label>
+                <input class="form-control" type="number" step="0.01" name="car_fund_amount" value="<?= e($plan['car_fund_amount']) ?>">
             </div>
         </div>
 

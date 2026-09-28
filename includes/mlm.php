@@ -28,11 +28,14 @@ function get_plan()
         $plan = q_row("SELECT * FROM plan_settings WHERE id = 1");
         if (!$plan) {
             $plan = [
-                'id' => 1, 'activation_bv' => 100, 'sponsor_percent' => 5,
-                'pair_unit_bv' => 100, 'binary_type' => 'percent', 'binary_value' => 10,
-                'level_depth' => 5, 'daily_cap' => 5000, 'carry_forward' => 1,
+                'id' => 1, 'activation_bv' => 500, 'sponsor_percent' => 10,
+                'pair_unit_bv' => 3000, 'binary_type' => 'fixed', 'binary_value' => 450,
+                'level_depth' => 0, 'daily_cap' => 320000, 'monthly_cap' => 800000,
+                'carry_forward' => 1,
                 'matching_requires_active' => 1, 'level_requires_active' => 1,
-                'tds_percent' => 5, 'admin_charge_percent' => 5, 'payout_min' => 500,
+                'sponsor_matching_percent' => 50, 'point_bv' => 400,
+                'car_fund_points' => 500, 'car_fund_amount' => 150000,
+                'tds_percent' => 5, 'admin_charge_percent' => 7, 'payout_min' => 500,
             ];
         }
     }
@@ -305,13 +308,63 @@ function add_commission($userId, $orderId, $type, $amount, $bvAmount, $level = n
  * Recompute the rank of a user. Awards the reward when a new rank is
  * reached. Returns the (possibly new) rank row or null.
  */
+/**
+ * One-time special rewards for a user, checked after their team BV grows:
+ *  - Car fund   : team points >= car_fund_points  -> car_fund_amount (once)
+ *  - Award rewards: every award_rewards row whose points threshold is
+ *    reached (once per reward; tracked via commissions.level = reward id).
+ * Team points = (left_bv + right_bv + self_bv) / point_bv.
+ */
+function check_special_rewards($userId, $orderId = null)
+{
+    $plan = get_plan();
+    $pointBv = max(1, (float)(isset($plan['point_bv']) ? $plan['point_bv'] : 400));
+    $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
+    if (!$u || $u['status'] !== 'active') {
+        return;
+    }
+    $teamBv = (float)$u['left_bv'] + (float)$u['right_bv'] + (float)$u['self_bv'];
+    $points = (int)floor($teamBv / $pointBv);
+
+    /* car fund — once per member */
+    $carPoints = (int)(isset($plan['car_fund_points']) ? $plan['car_fund_points'] : 0);
+    $carAmount = (float)(isset($plan['car_fund_amount']) ? $plan['car_fund_amount'] : 0);
+    if ($carPoints > 0 && $carAmount > 0 && $points >= $carPoints) {
+        $already = (int)q_val(
+            "SELECT COUNT(*) FROM commissions WHERE user_id = ? AND type = 'car_fund' AND status = 'credited'",
+            [$userId]
+        );
+        if (!$already) {
+            add_commission($userId, $orderId, 'car_fund', $carAmount, 0, null,
+                'Car fund achieved with ' . $points . ' points');
+        }
+    }
+
+    /* award & rewards (next-to-next matching rewards) */
+    foreach (q_all("SELECT * FROM award_rewards WHERE status = 'active' ORDER BY points ASC") as $a) {
+        if ($points < (int)$a['points']) {
+            continue;
+        }
+        $already = (int)q_val(
+            "SELECT COUNT(*) FROM commissions WHERE user_id = ? AND type = 'award' AND level = ? AND status = 'credited'",
+            [$userId, (int)$a['id']]
+        );
+        if ($already) {
+            continue;
+        }
+        $amt = $a['reward_type'] === 'cash' ? (float)$a['amount'] : 0.0;
+        add_commission($userId, $orderId, 'award', $amt, $points, (int)$a['id'],
+            'Award reward: ' . $a['reward_title'] . ' (' . (int)$a['points'] . ' points)');
+    }
+}
+
 function check_rank($userId, $orderId = null)
 {
     $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
     if (!$u) {
         return null;
     }
-    $teamBv   = (float)$u['left_bv'] + (float)$u['right_bv'];
+    $teamBv   = (float)$u['left_bv'] + (float)$u['right_bv'] + (float)$u['self_bv'];
     $directs  = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ? AND is_active = 1", [$userId]);
     $best = null;
     foreach (get_ranks() as $r) {
@@ -327,8 +380,10 @@ function check_rank($userId, $orderId = null)
     }
     q("UPDATE users SET rank_id = ? WHERE id = ?", [$best['id'], $userId]);
     if ((float)$best['reward_amount'] > 0) {
-        add_commission($userId, $orderId, 'rank', $best['reward_amount'], 0, null,
-            'Rank achievement: ' . $best['name']);
+        $pointBv = max(1, (float)(isset(get_plan()['point_bv']) ? get_plan()['point_bv'] : 400));
+        $pts = (int)floor($teamBv / $pointBv);
+        add_commission($userId, $orderId, 'rank', $best['reward_amount'], $teamBv, null,
+            'Rank achievement: ' . $best['name'] . ' (' . $pts . ' points)');
     }
     return $best;
 }
@@ -365,18 +420,30 @@ function run_binary_matching($user, $orderId)
         $perUnit = $unit * ((float)$plan['binary_value'] / 100);
     }
 
-    // daily cap
+    // daily + monthly caps
     $cap = (float)$plan['daily_cap'];
-    $payableUnits = $newUnits;
-    if ($cap > 0) {
-        $todayStart = date('Y-m-d 00:00:00');
+    $monthCap = isset($plan['monthly_cap']) ? (float)$plan['monthly_cap'] : 0.0;
+    $capLeft = null;
+    if ($cap > 0 || $monthCap > 0) {
         $paidToday = (float)q_val(
             "SELECT COALESCE(SUM(amount),0) FROM commissions
              WHERE user_id = ? AND type = 'binary' AND status = 'credited' AND created_at >= ?",
-            [$user['id'], $todayStart]
+            [$user['id'], date('Y-m-d 00:00:00')]
         );
-        $capLeft = $cap - $paidToday;
-        if ($perUnit > 0) {
+        $paidThisMonth = (float)q_val(
+            "SELECT COALESCE(SUM(amount),0) FROM commissions
+             WHERE user_id = ? AND type = 'binary' AND status = 'credited' AND created_at >= ?",
+            [$user['id'], date('Y-m-01 00:00:00')]
+        );
+        if ($cap > 0) { $capLeft = $cap - $paidToday; }
+        if ($monthCap > 0) {
+            $monthLeft = $monthCap - $paidThisMonth;
+            $capLeft = $capLeft === null ? $monthLeft : min($capLeft, $monthLeft);
+        }
+    }
+    $payableUnits = $newUnits;
+    if ($capLeft !== null) {
+        if ($perUnit > 0 && $capLeft > 0) {
             $payableUnits = min($newUnits, (int)floor($capLeft / $perUnit));
         } else {
             $payableUnits = 0;
@@ -384,10 +451,25 @@ function run_binary_matching($user, $orderId)
     }
 
     $paidUnits = max(0, $payableUnits);
+    $income = 0.0;
     if ($paidUnits > 0 && $perUnit > 0) {
         $income = round($paidUnits * $perUnit, 2);
         add_commission($user['id'], $orderId, 'binary', $income, $paidUnits * $unit, null,
             $paidUnits . ' pair(s) matched @ ' . bv($unit));
+
+        /* direct sponsor matching income: the sponsor of the member who just
+           earned matching income receives a percentage of it (no level limit) */
+        $smPct = isset($plan['sponsor_matching_percent']) ? (float)$plan['sponsor_matching_percent'] : 0.0;
+        if ($smPct > 0 && $user['sponsor_id']) {
+            $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$user['sponsor_id']]);
+            if ($sponsor && $sponsor['status'] === 'active' && (int)$sponsor['is_active'] === 1) {
+                $smAmt = round($income * $smPct / 100, 2);
+                if ($smAmt > 0) {
+                    add_commission($sponsor['id'], $orderId, 'sponsor_matching', $smAmt, 0, null,
+                        $smPct . '% of matching income of direct ' . $user['username']);
+                }
+            }
+        }
     }
 
     // update matched pairs: paid units always count; if carry forward is
@@ -489,10 +571,12 @@ function approve_order($orderId, $adminId)
             $leg = $anc['leg']; // leg of this ancestor relative to its own parent
         }
 
-        /* 5) rank check for buyer and every ancestor */
+        /* 5) rank check + special rewards (car fund, award rewards) for buyer and ancestors */
         check_rank($buyer['id'], $order['id']);
+        check_special_rewards($buyer['id'], $order['id']);
         foreach ($chain as $anc) {
             check_rank($anc['id'], $order['id']);
+            check_special_rewards($anc['id'], $order['id']);
         }
 
         /* 6) finalize order + stock */
@@ -597,10 +681,21 @@ function process_payout($payoutId, $action, $adminId, $reason = '')
 
 function user_earnings_breakdown($userId)
 {
-    $out = ['sponsor' => 0.0, 'binary' => 0.0, 'level' => 0.0, 'rank' => 0.0, 'total' => 0.0];
+    $out = [
+        'sponsor' => 0.0, 'binary' => 0.0, 'level' => 0.0, 'rank' => 0.0,
+        'sponsor_matching' => 0.0, 'car_fund' => 0.0, 'award' => 0.0, 'retail' => 0.0,
+        'other' => 0.0, 'total' => 0.0, 'award_by_id' => [],
+    ];
     foreach (q_all("SELECT type, SUM(amount) amt FROM commissions WHERE user_id = ? AND status='credited' GROUP BY type", [$userId]) as $r) {
         $out[$r['type']] = (float)$r['amt'];
     }
-    $out['total'] = $out['sponsor'] + $out['binary'] + $out['level'] + $out['rank'];
+    /* which award_rewards rows were already received (commissions.level holds the award id) */
+    foreach (q_all("SELECT level, SUM(amount) amt FROM commissions WHERE user_id = ? AND type = 'award' AND status='credited' AND level IS NOT NULL GROUP BY level", [$userId]) as $r) {
+        $out['award_by_id'][(int)$r['level']] = (float)$r['amt'];
+    }
+    $out['total'] = 0.0;
+    foreach ($out as $k => $v) {
+        if ($k !== 'total' && is_float($v)) { $out['total'] += $v; }
+    }
     return $out;
 }

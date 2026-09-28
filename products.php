@@ -73,6 +73,11 @@ require __DIR__ . '/includes/site_header.php';
                         <span class="mrp"><small>MRP </small><?= money($p['mrp']) ?></span>
                         <a class="btn btn-outline btn-sm" href="<?= url('product.php?id=' . $p['id']) ?>">Read More</a>
                     </div>
+                    <div class="p-plan">
+                        <span>DP <b><?= money($p['dp']) ?></b></span>
+                        <span>BV <b><?= e(number_format((float)$p['bv'], 0)) ?></b></span>
+                        <span class="retail-badge"><?= $p['mrp'] > 0 ? round((($p['mrp'] - $p['dp']) / $p['mrp']) * 100) : 0 ?>% retail</span>
+                    </div>
                 </div>
             </div>
             <?php endforeach; ?>

@@ -4,7 +4,7 @@
     <div class="container">
         <div class="footer-grid">
             <div>
-                <img src="<?= e(upload_url(setting('site_logo')) ?: url('assets/img/logo.svg')) ?>" alt="logo">
+                <img src="<?= e(upload_url(setting('site_logo')) ?: url('assets/img/logo.png')) ?>" alt="logo">
                 <p><?= e(setting('footer_about')) ?></p>
                 <div class="social-links">
                     <?php foreach (['facebook' => 'f', 'instagram' => '◎', 'youtube' => '▶', 'twitter' => '𝕏'] as $sk => $si): ?>
@@ -19,6 +19,7 @@
                 <ul>
                     <li><a href="<?= url('index.php') ?>">Home</a></li>
                     <li><a href="<?= url('products.php') ?>">Products</a></li>
+                    <li><a href="<?= url('opportunity.php') ?>">Business Opportunity</a></li>
                     <li><a href="<?= url('register.php') ?>">Become a Distributor</a></li>
                     <li><a href="<?= url('login.php') ?>">Distributor Login</a></li>
                 </ul>
@@ -41,7 +42,7 @@
             </div>
         </div>
         <div class="footer-bar">
-            <span>© <?= date('Y') ?> <?= e(setting('site_name')) ?>. All rights reserved.</span>
+            <span>© <?= date('Y') ?> <?= e(setting('company_name', setting('site_name'))) ?>. All rights reserved.</span>
             <span>
                 <a href="<?= url('admin/login.php') ?>">Admin</a> &nbsp;|&nbsp;
                 <a href="<?= url('superadmin/login.php') ?>">Super Admin</a>

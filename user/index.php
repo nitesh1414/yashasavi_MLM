@@ -104,10 +104,13 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="card">
             <div class="card-title">💹 Income Breakdown</div>
             <table class="kv-table" style="width:100%">
-                <tr><td>Direct Sponsor Bonus</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
-                <tr><td>Binary Matching</td><td><b><?= money($earn['binary']) ?></b></td></tr>
+                <tr><td>Direct Sponsor Income</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
+                <tr><td>Binary Matching Income</td><td><b><?= money($earn['binary']) ?></b></td></tr>
+                <tr><td>Sponsor Matching Income</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
                 <tr><td>Level Income</td><td><b><?= money($earn['level']) ?></b></td></tr>
-                <tr><td>Rank Rewards</td><td><b><?= money($earn['rank']) ?></b></td></tr>
+                <tr><td>Cash Rewards (Rank)</td><td><b><?= money($earn['rank']) ?></b></td></tr>
+                <tr><td>Car Fund</td><td><b><?= money($earn['car_fund']) ?></b></td></tr>
+                <tr><td>Award Rewards</td><td><b><?= money($earn['award']) ?></b></td></tr>
             </table>
             <a class="btn btn-outline btn-sm mt-2" href="earnings.php">Full Statement →</a>
         </div>

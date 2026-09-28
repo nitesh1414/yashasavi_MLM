@@ -6,7 +6,7 @@ $u = require_user();
 $type = get_str('type');
 $where = "c.user_id = ?";
 $params = [$u['id']];
-if ($type !== '' && in_array($type, ['sponsor', 'binary', 'level', 'rank'], true)) {
+if ($type !== '' && in_array($type, ['sponsor', 'binary', 'level', 'rank', 'sponsor_matching', 'car_fund', 'award', 'retail', 'other'], true)) {
     $where .= " AND c.type = ?";
     $params[] = $type;
 }
@@ -36,7 +36,7 @@ require __DIR__ . '/../includes/dash_header.php';
         💰 Commission Statement
         <span class="right">
             <a class="btn <?= $type === '' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="earnings.php">All</a>
-            <?php foreach (['sponsor', 'binary', 'level', 'rank'] as $t): ?>
+            <?php foreach (['sponsor', 'binary', 'level', 'rank', 'sponsor_matching', 'car_fund', 'award', 'retail', 'other'] as $t): ?>
                 <a class="btn <?= $type === $t ? 'btn-primary' : 'btn-light' ?> btn-sm" href="earnings.php?type=<?= $t ?>"><?= ucfirst($t) ?></a>
             <?php endforeach; ?>
         </span>
@@ -51,7 +51,8 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php foreach ($rows as $r): ?>
             <tr>
                 <td><?= dmy($r['created_at'], true) ?></td>
-                <td><?= badge(ucfirst($r['type']), $r['type'] === 'binary' ? 'info' : ($r['type'] === 'rank' ? 'warning' : 'primary')) ?></td>
+                <td><?php $tLabels = ['sponsor' => 'Direct Sponsor', 'binary' => 'Matching', 'level' => 'Level', 'rank' => 'Cash Reward', 'sponsor_matching' => 'Sponsor Matching', 'car_fund' => 'Car Fund', 'award' => 'Award Reward', 'retail' => 'Retail', 'other' => 'Other']; ?>
+                    <?= badge($tLabels[$r['type']] ?? ucfirst($r['type']), $r['type'] === 'binary' ? 'info' : ($r['type'] === 'rank' || $r['type'] === 'car_fund' || $r['type'] === 'award' ? 'warning' : 'primary')) ?></td>
                 <td><?= e($r['order_no'] ?: '—') ?></td>
                 <td><?= $r['level'] ? 'L' . (int)$r['level'] : '—' ?></td>
                 <td><?= e($r['bv']) ?></td>

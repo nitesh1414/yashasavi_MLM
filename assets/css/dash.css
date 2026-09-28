@@ -297,3 +297,7 @@ select.form-control { appearance: auto; }
 h1, h2, h3, h4, h5, h6 { font-weight: 400; }
 b, strong { font-weight: 400; }
 th { font-weight: 400; }
+
+/* generic status text colors */
+.text-ok { color: #1d8a3e; font-weight: 400; }
+.text-danger { color: #c62828; font-weight: 400; }

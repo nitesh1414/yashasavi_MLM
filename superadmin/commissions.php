@@ -10,7 +10,7 @@ $q = get_str('q');
 
 $where = "1=1";
 $params = [];
-if ($type !== '' && in_array($type, ['sponsor', 'binary', 'level', 'rank'], true)) {
+if ($type !== '' && in_array($type, ['sponsor', 'binary', 'level', 'rank', 'sponsor_matching', 'car_fund', 'award', 'retail', 'other'], true)) {
     $where .= " AND c.type = ?";
     $params[] = $type;
 }
@@ -50,7 +50,7 @@ require __DIR__ . '/../includes/dash_header.php';
             $base = '?' . http_build_query($qs);
             ?>
             <a class="btn <?= $type === '' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="<?= e($base) ?>">All</a>
-            <?php foreach (['sponsor', 'binary', 'level', 'rank'] as $t): ?>
+            <?php foreach (['sponsor', 'binary', 'level', 'rank', 'sponsor_matching', 'car_fund', 'award', 'retail', 'other'] as $t): ?>
                 <a class="btn <?= $type === $t ? 'btn-primary' : 'btn-light' ?> btn-sm" href="<?= e($base) ?>&type=<?= $t ?>"><?= ucfirst($t) ?></a>
             <?php endforeach; ?>
         </span>
@@ -81,7 +81,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= dmy($r['created_at'], true) ?></td>
                 <td><a href="user_view.php?id=<?= (int)$r['user_id'] ?>"><b><?= e($r['username']) ?></b></a><br>
                     <small style="color:#000"><?= e($r['full_name']) ?></small></td>
-                <td><?= badge(ucfirst($r['type']), $r['type'] === 'binary' ? 'info' : 'primary') ?><?= $r['level'] ? ' L' . (int)$r['level'] : '' ?></td>
+                <td><?php $tLabels = ['sponsor' => 'Direct Sponsor', 'binary' => 'Matching', 'level' => 'Level', 'rank' => 'Cash Reward', 'sponsor_matching' => 'Sponsor Matching', 'car_fund' => 'Car Fund', 'award' => 'Award Reward', 'retail' => 'Retail', 'other' => 'Other']; ?>
+                    <?= badge($tLabels[$r['type']] ?? ucfirst($r['type']), $r['type'] === 'binary' ? 'info' : 'primary') ?><?= $r['level'] && $r['type'] === 'level' ? ' L' . (int)$r['level'] : '' ?></td>
                 <td><?= e($r['order_no'] ?: '—') ?></td>
                 <td><?= e($r['bv']) ?></td>
                 <td><b><?= money($r['amount']) ?></b></td>

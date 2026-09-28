@@ -20,16 +20,36 @@ function rich_text($html)
     return $html; // content is authored by trusted admins through the editor
 }
 
-/** Format money in INR. */
+/** Format money in INR (Indian lakh / crore digit grouping). */
 function money($n, $symbol = '₹')
 {
-    return $symbol . number_format((float)$n, 2);
+    $num = (float)$n;
+    $neg = $num < 0;
+    $num = abs($num);
+    $s = number_format($num, 2, '.', '');
+    $parts = explode('.', $s);
+    $int = $parts[0];
+    if (strlen($int) > 3) {
+        $last3 = substr($int, -3);
+        $rest = substr($int, 0, -3);
+        $rest = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $rest);
+        $int = $rest . ',' . $last3;
+    }
+    return ($neg ? '-' : '') . $symbol . $int . '.' . $parts[1];
 }
 
-/** Format BV / PV points. */
+/** Format BV / PV points (Indian grouping). */
 function bv($n)
 {
-    return number_format((float)$n, 2) . ' BV';
+    $num = (float)$n;
+    $s = number_format($num, 0, '.', '');
+    if (strlen($s) > 3) {
+        $last3 = substr($s, -3);
+        $rest = substr($s, 0, -3);
+        $rest = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $rest);
+        $s = $rest . ',' . $last3;
+    }
+    return $s . ' BV';
 }
 
 /* ------------------------------------------------------------------ */

@@ -50,6 +50,11 @@ require __DIR__ . '/includes/site_header.php';
                     <span class="pd-mrp"><small style="font-size:13px;color:var(--ink-soft)">MRP </small><?= money($product['mrp']) ?></span>
                     <span class="pd-dp">Size: <b><?= e($product['size']) ?></b></span>
                 </div>
+                <div class="pd-plan-row">
+                    <span>Member Price (DP) <b><?= money($product['dp']) ?></b></span>
+                    <span>BV <b><?= e(number_format((float)$product['bv'], 0)) ?></b></span>
+                    <span class="retail-badge">Retail Income <?= $product['mrp'] > 0 ? round((($product['mrp'] - $product['dp']) / $product['mrp']) * 100) : 0 ?>%</span>
+                </div>
                 <?php if ($product['stock'] > 0): ?>
                     <p><span class="badge badge-success">In Stock</span></p>
                 <?php else: ?>

@@ -364,3 +364,97 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 h1, h2, h3, h4, h5, h6 { font-weight:400; }
 b, strong { font-weight:400; }
 th { font-weight:400; }
+
+/* ===================================================================== */
+/*  Corporate modern layer — income plan, reveal animations, brand       */
+/* ===================================================================== */
+
+.topbar-sep { opacity: .4; margin: 0 10px; }
+.topbar span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* glass sticky navbar */
+.navbar { position: sticky; top: 0; z-index: 500; backdrop-filter: blur(10px); background: rgba(255, 255, 255, .88); box-shadow: 0 2px 18px rgba(27, 58, 31, .06); transition: box-shadow .3s; }
+.navbar.scrolled { box-shadow: 0 8px 26px rgba(27, 58, 31, .14); }
+.brand img { border-radius: 10px; }
+
+/* income types grid */
+.income-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.income-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 20px; transition: transform .25s, box-shadow .25s, border-color .25s; }
+.income-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); border-color: var(--green); }
+.income-card .i-ico { font-size: 30px; line-height: 1; margin-bottom: 10px; }
+.income-card h3 { font-size: 15.5px; color: var(--green-dark); margin-bottom: 6px; }
+.income-card p { font-size: 13px; color: var(--ink-soft); line-height: 1.55; }
+
+/* slogan band */
+.slogan-band { background: linear-gradient(120deg, var(--green-deep), var(--green-dark) 55%, var(--green)); color: #fff; padding: 44px 0; }
+.slogan-band .container { display: flex; align-items: center; gap: 30px; flex-wrap: wrap; }
+.slogan-band img { width: 108px; height: 108px; border-radius: 22px; background: #fff; padding: 8px; box-shadow: 0 12px 30px rgba(0, 0, 0, .25); }
+.slogan-band h2 { font-size: 30px; color: #fff; }
+.slogan-band p { color: rgba(255, 255, 255, .85); margin-top: 6px; font-size: 14.5px; }
+
+/* product plan row (DP / BV / retail) */
+.p-plan { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--ink-soft); flex-wrap: wrap; }
+.p-plan b { color: var(--green-dark); }
+.retail-badge { background: var(--gold-light); color: #7a5b12; border-radius: 20px; padding: 2px 9px; font-size: 11px; white-space: nowrap; }
+.pd-plan-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 12px 0 4px; padding: 12px 14px; background: var(--green-soft); border: 1px solid var(--line); border-radius: 12px; font-size: 13.5px; color: var(--ink-soft); }
+.pd-plan-row b { color: var(--green-dark); }
+
+/* opportunity plan page */
+.plan-hero { background: linear-gradient(120deg, var(--green-deep), var(--green-dark) 60%, var(--green)); color: #fff; text-align: center; }
+.plan-hero h1 { color: #fff; }
+.plan-hero p { color: rgba(255, 255, 255, .85); max-width: 720px; margin: 12px auto 0; }
+.plan-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.plan-box { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-sm); }
+.plan-box h3 { color: var(--green-dark); font-size: 17px; margin-bottom: 12px; }
+.plan-table { width: 100%; border-collapse: collapse; margin: 14px 0; }
+.plan-table th, .plan-table td { padding: 9px 10px; font-size: 13.5px; text-align: center; border-bottom: 1px solid var(--line); }
+.plan-table th { color: var(--ink-soft); font-weight: 400; font-size: 12px; }
+.plan-list { list-style: none; }
+.plan-list li { padding: 8px 0 8px 26px; position: relative; font-size: 14px; color: var(--ink-soft); border-bottom: 1px dashed var(--line); }
+.plan-list li:last-child { border-bottom: 0; }
+.plan-list li::before { content: '✓'; position: absolute; left: 2px; color: var(--green); }
+.plan-table-wrap { overflow-x: auto; border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+.plan-rank-table { width: 100%; border-collapse: collapse; background: #fff; min-width: 560px; }
+.plan-rank-table th, .plan-rank-table td { padding: 12px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--line); }
+.plan-rank-table thead th { background: var(--green-deep); color: #fff; font-weight: 400; }
+.plan-rank-table tr:nth-child(even) td { background: var(--green-soft); }
+.plan-rank-table td.gold { color: #9c7514; }
+
+/* award rewards */
+.award-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.award-card { position: relative; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 26px 22px 22px; text-align: center; transition: transform .25s, box-shadow .25s; }
+.award-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); }
+.award-card .a-points { position: absolute; top: 12px; right: 12px; background: var(--green-light); color: var(--green-dark); border-radius: 20px; padding: 3px 11px; font-size: 11.5px; }
+.award-card .a-ico { font-size: 38px; margin-bottom: 8px; }
+.award-card h3 { font-size: 16px; color: var(--green-dark); margin-bottom: 6px; }
+.award-card p { font-size: 13px; color: var(--ink-soft); }
+
+/* car fund band */
+.car-fund-band { display: flex; align-items: center; gap: 26px; background: linear-gradient(120deg, var(--gold-light), #fdf6e4); border: 1px solid #ecd9a8; border-radius: var(--radius); padding: 30px 34px; }
+.car-fund-band .car-emoji { font-size: 56px; }
+.car-fund-band h2 { font-size: 25px; color: var(--green-dark); }
+.car-fund-band p { color: var(--ink-soft); margin-top: 6px; font-size: 14px; }
+
+/* scroll reveal */
+.reveal { opacity: 0; transform: translateY(26px); transition: opacity .6s ease, transform .6s ease; }
+.reveal.in { opacity: 1; transform: none; }
+.reveal.d1 { transition-delay: .08s; } .reveal.d2 { transition-delay: .16s; } .reveal.d3 { transition-delay: .24s; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+
+/* animated stat counters */
+.stats-grid b { display: inline-block; }
+
+/* doc grid hover zoom */
+.doc-card img { transition: transform .3s; }
+.doc-card:hover img { transform: scale(1.04); }
+
+@media (max-width: 1024px) {
+    .income-grid { grid-template-columns: repeat(2, 1fr); }
+    .plan-cols { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+    .income-grid { grid-template-columns: 1fr; }
+    .award-grid { grid-template-columns: 1fr; }
+    .slogan-band .container { justify-content: center; text-align: center; }
+    .car-fund-band { flex-direction: column; text-align: center; }
+}
