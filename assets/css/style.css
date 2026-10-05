@@ -324,12 +324,17 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 @media (max-width: 860px) {
     .topbar { display: none; }
+    /* solid navbar on mobile — no frosted glass / backdrop-filter (unreliable + breaks fixed drawer) */
+    .navbar { background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; }
     .nav-menu {
         position: fixed; top: 0; right: -300px; width: 286px; height: 100vh; height: 100dvh;
         background: #fff; flex-direction: column; align-items: stretch; padding: 0 16px 24px;
         box-shadow: -10px 0 40px rgba(0,0,0,.18); transition: right .28s ease; z-index: 900; overflow-y: auto;
+        backdrop-filter: none; -webkit-backdrop-filter: none;
     }
     .nav-menu.open { right: 0; }
+    /* belt & braces: drawer background is always fully opaque */
+    .navbar .nav-menu { background: #ffffff; background-image: none; }
     .nav-menu-head {
         display: flex; align-items: center; justify-content: space-between;
         padding: 16px 2px 12px; border-bottom: 1px solid var(--line); margin-bottom: 10px;
@@ -342,7 +347,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
     .nav-menu > li > a { padding: 11px 12px; font-size: 15px; }
     .nav-mobile-auth { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; padding-top: 16px; border-top: 1px solid var(--line); }
     .nav-mobile-auth .btn { text-align: center; }
-    .nav-overlay { display: block; position: fixed; inset: 0; background: rgba(16,58,20,.5); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 850; }
+    .nav-overlay { display: block; position: fixed; inset: 0; background: rgba(16,58,20,.62); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 850; }
     .nav-overlay.open { opacity: 1; pointer-events: auto; }
     body.nav-open { overflow: hidden; }
     .nav-toggle { display: block; }
