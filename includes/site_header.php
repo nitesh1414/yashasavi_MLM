@@ -32,7 +32,7 @@ require_once __DIR__ . '/social_icons.php';
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= e($metaTitle) ?></title>
 <meta name="description" content="<?= e($metaDesc) ?>">
 <link rel="icon" type="image/png" href="<?= e(upload_url(setting('site_favicon')) ?: url('assets/img/favicon.png')) ?>">

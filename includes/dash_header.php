@@ -30,7 +30,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= e($pageTitle ?? 'Dashboard') ?> — <?= e($siteName) ?></title>
 <link rel="icon" href="<?= e(upload_url(setting('site_favicon')) ?: placeholder('i')) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
