@@ -53,6 +53,15 @@
     </div>
 </footer>
 
+<?php $tbCur = basename($_SERVER['SCRIPT_NAME'] ?? ''); ?>
+<nav class="app-tabbar" aria-label="Mobile quick navigation">
+    <a href="<?= url('index.php') ?>" class="<?= $tbCur === 'index.php' ? 'active' : '' ?>"><span class="t-ico">🏠</span>Home</a>
+    <a href="<?= url('products.php') ?>" class="<?= in_array($tbCur, ['products.php', 'product.php']) ? 'active' : '' ?>"><span class="t-ico">🛍️</span>Products</a>
+    <a href="<?= url('opportunity.php') ?>" class="<?= $tbCur === 'opportunity.php' ? 'active' : '' ?>"><span class="t-ico">💼</span>Business</a>
+    <a href="<?= url('contact.php') ?>" class="<?= $tbCur === 'contact.php' ? 'active' : '' ?>"><span class="t-ico">📞</span>Contact</a>
+    <a href="<?= url('login.php') ?>"><span class="t-ico">🔐</span>Login</a>
+</nav>
+
 <?php if (setting('social_whatsapp')): ?>
 <a class="wa-float" href="<?= e(setting('social_whatsapp')) ?>" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
     <?= social_icon_svg('whatsapp') ?>

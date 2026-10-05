@@ -778,3 +778,33 @@ a, button, .btn, input, select, textarea, label { touch-action: manipulation; }
     .wa-float:active { transform: translateY(-50%) scale(.94); }
     .footer-grid a:active { color: var(--gold); }
 }
+
+/* ================================================================== */
+/*  2026 mobile app layer — public site bottom tab bar                 */
+/* ================================================================== */
+
+html { overflow-x: hidden; }
+
+.app-tabbar { display: none; }
+@media (max-width: 860px) {
+    .app-tabbar {
+        display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 880;
+        background: #fff; border-top: 1px solid var(--line);
+        padding: 5px 6px calc(5px + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -8px 28px rgba(27, 58, 31, .12);
+    }
+    .app-tabbar a {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+        min-height: 54px; padding: 6px 2px; border-radius: 14px;
+        font-size: 10.5px; color: #444; text-decoration: none;
+        transition: color .15s ease, background .15s ease;
+    }
+    .app-tabbar a .t-ico { font-size: 21px; line-height: 1; }
+    .app-tabbar a.active { color: var(--green); background: var(--green-soft); font-weight: 500; }
+    .app-tabbar a:active { transform: scale(.95); }
+    /* keep the footer clear of the bar */
+    .site-footer { padding-bottom: calc(34px + 76px); }
+    /* back-to-top floats above the tab bar */
+    #toTop { bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+}

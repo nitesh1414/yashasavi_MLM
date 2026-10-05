@@ -6,6 +6,11 @@
  *   $nav       — [ [icon, label, href, active(bool)|null, count?] ]
  *   $pageTitle — string
  */
+/* auto-detect the panel area from the URL directory (user / admin / superadmin) */
+if (!isset($area) || !in_array($area, ['user', 'admin', 'superadmin'], true)) {
+    $area = basename(dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (!in_array($area, ['user', 'admin', 'superadmin'], true)) { $area = 'user'; }
+}
 $dashUser = $area === 'user' ? current_user() : current_admin($area);
 $siteName = setting('site_name', 'Yashasavi Veda Herbals Private Limited');
 $logo = upload_url(setting('site_logo')) ?: url('assets/img/logo.svg');

@@ -56,7 +56,7 @@ require __DIR__ . '/../includes/dash_header.php';
         Sell at MRP to earn retail profit of <b>MRP − DP</b> per unit.
     </p>
 
-    <div class="filter-form" style="gap:8px;flex-wrap:wrap">
+    <div class="chip-row">
         <a class="btn <?= !$cat ? 'btn-primary' : 'btn-light' ?> btn-sm" href="shop.php">All</a>
         <?php foreach ($categories as $c): ?>
             <a class="btn <?= ($cat && $cat['id'] == $c['id']) ? 'btn-primary' : 'btn-light' ?> btn-sm" href="shop.php?cat=<?= e($c['slug']) ?>"><?= e($c['name']) ?></a>
