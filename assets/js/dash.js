@@ -1,26 +1,67 @@
 /* Yashasavi — dashboard JS (user/admin/superadmin) */
 document.addEventListener('DOMContentLoaded', function () {
 
-    /* sidebar toggle (mobile) */
+    /* sidebar toggle (mobile) — with dim overlay, closes on nav click / overlay tap */
     var mt = document.querySelector('.menu-toggle');
     var sb = document.querySelector('.sidebar');
+    var so = document.querySelector('.side-overlay');
+    function closeSidebar() {
+        if (sb) { sb.classList.remove('open'); }
+        if (so) { so.classList.remove('open'); }
+        document.body.classList.remove('side-open');
+    }
+    function openSidebar() {
+        if (sb) { sb.classList.add('open'); }
+        if (so) { so.classList.add('open'); }
+        document.body.classList.add('side-open');
+    }
     if (mt && sb) {
-        mt.addEventListener('click', function (e) { e.stopPropagation(); sb.classList.toggle('open'); });
+        mt.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (sb.classList.contains('open')) { closeSidebar(); } else { openSidebar(); }
+        });
+        if (so) { so.addEventListener('click', closeSidebar); }
+        /* tapping a menu item closes the drawer, then the browser follows the link */
+        sb.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeSidebar); });
         document.addEventListener('click', function (e) {
-            if (sb.classList.contains('open') && !sb.contains(e.target) && e.target !== mt) {
-                sb.classList.remove('open');
+            if (sb.classList.contains('open') && !sb.contains(e.target) && e.target !== mt && !(so && so.contains(e.target))) {
+                closeSidebar();
             }
         });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeSidebar(); } });
     }
 
-    /* confirm dialogs */
-    document.querySelectorAll('[data-confirm]').forEach(function (el) {
-        el.addEventListener('click', function (e) {
-            if (!window.confirm(el.dataset.confirm || 'Are you sure?')) {
-                e.preventDefault();
-            }
-        });
+    /* confirm dialogs — delegated so it also covers dynamically added elements */
+    document.addEventListener('click', function (e) {
+        var el = e.target.closest('[data-confirm]');
+        if (el && !window.confirm(el.dataset.confirm || 'Are you sure?')) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        /* logout links without an explicit message */
+        var a = e.target.closest('a[href]');
+        if (a && !a.dataset.confirm && /logout/i.test(a.getAttribute('href')) &&
+            !window.confirm('Logout from your account?')) {
+            e.preventDefault();
+        }
     });
+    /* safety net: destructive POST forms (delete / reject / block / wallet adjust…)
+       that don't carry their own data-confirm message */
+    var CONFIRM_ACTIONS = { delete: 'Delete this item? This cannot be undone.', remove: 'Remove this item?',
+        reject: 'Reject this? This cannot be undone.', cancel: 'Cancel this?',
+        block: 'Block this account?', unblock: 'Unblock this account?',
+        kyc_reject: 'Reject this KYC submission?', adjust: 'Adjust the wallet balance? Double-check the amount.',
+        deactivate: 'Deactivate this?', toggle: 'Change the status?' };
+    document.addEventListener('submit', function (e) {
+        var f = e.target;
+        if (f.dataset.confirm) { return; } /* already confirmed by the click handler */
+        var btn = e.submitter;
+        if (btn && btn.dataset.confirm) { return; }
+        var act = f.querySelector('input[type=hidden][name=action]');
+        var val = act ? act.value : (btn ? (btn.value || '') : '');
+        var msg = CONFIRM_ACTIONS[val];
+        if (msg && !window.confirm(msg)) { e.preventDefault(); }
+    }, true);
 
     /* flash auto-dismiss */
     document.querySelectorAll('.alert').forEach(function (a) {

@@ -37,6 +37,12 @@ require_once __DIR__ . '/social_icons.php';
 <meta name="description" content="<?= e($metaDesc) ?>">
 <link rel="icon" type="image/png" href="<?= e(upload_url(setting('site_favicon')) ?: url('assets/img/favicon.png')) ?>">
     <link rel="apple-touch-icon" href="<?= e(url('assets/img/apple-touch-icon.png')) ?>">
+<link rel="manifest" href="<?= e(url('manifest.php')) ?>">
+<meta name="theme-color" content="#103a14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Yashasavi">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/style.css') ?>?v=<?= APP_VERSION ?>">

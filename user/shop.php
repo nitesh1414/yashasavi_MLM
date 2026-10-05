@@ -66,7 +66,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <?php if (!$products): ?>
         <div class="empty-state"><span class="es-ico">📦</span>No products in this category.</div>
     <?php else: ?>
-    <div class="three-col" style="grid-template-columns:repeat(4,1fr);gap:16px">
+    <div class="shop-grid">
         <?php foreach ($products as $p): ?>
         <div class="shop-card">
             <div class="sc-img"><img src="<?= e(upload_url($p['image']) ?: placeholder('Product')) ?>" alt=""></div>

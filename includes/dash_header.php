@@ -36,6 +36,12 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/dash.css') ?>?v=<?= APP_VERSION ?>">
+<link rel="manifest" href="<?= e(url('manifest.php')) ?>">
+<meta name="theme-color" content="#103a14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Yashasavi">
 </head>
 <body class="dash-body area-<?= e($area) ?>">
 
@@ -64,6 +70,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
         </nav>
         <div class="side-foot"><?= e($siteName) ?> • v<?= APP_VERSION ?></div>
     </aside>
+    <div class="side-overlay" id="sideOverlay"></div>
 
     <div class="main">
         <div class="topbar">
@@ -77,7 +84,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
                         <div class="tb-role"><?= e($dashRole) ?></div>
                     </div>
                 </div>
-                <a class="btn-logout" href="<?= e($area === 'user' ? 'logout.php' : 'logout.php') ?>">Logout</a>
+                <a class="btn-logout" href="<?= e(url($area . '/logout.php')) ?>" data-confirm="Logout from your account?">Logout</a>
             </div>
         </div>
         <div class="content">

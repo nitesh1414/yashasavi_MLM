@@ -360,13 +360,31 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
     .doc-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
-    .product-grid { grid-template-columns: repeat(2, 1fr); }
+    .product-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    /* product cards: all details visible + comfortably tappable on phones */
+    .p-card .p-img { height: 150px; }
+    .p-body { padding: 12px; }
+    .p-body h3 { font-size: 13px; line-height: 1.35; }
+    .p-size { font-size: 11.5px; }
+    .p-price { flex-wrap: wrap; gap: 8px; padding-top: 10px; }
+    .p-price .mrp { font-size: 15.5px; }
+    .p-price .btn { padding: 8px 14px; font-size: 12.5px; }
+    .p-plan { flex-wrap: wrap; gap: 5px 10px; font-size: 11.5px; margin-top: 10px; padding-top: 10px; }
     .cat-grid { grid-template-columns: repeat(2, 1fr); }
     .features { grid-template-columns: 1fr; }
     .footer-grid { grid-template-columns: 1fr; }
     .search-form { margin: 0; width: 100%; }
     .search-form input { min-width: 0; flex: 1; }
     .footer-bar { flex-direction: column; gap: 6px; text-align: center; }
+    /* comfortable touch targets site-wide on phones */
+    .btn { min-height: 42px; }
+    .nav-mobile-auth .btn { min-height: 46px; }
+}
+@media (max-width: 380px) {
+    /* smallest phones: one product per row so nothing is crammed */
+    .product-grid { grid-template-columns: 1fr; }
+    .p-card .p-img { height: 190px; }
+    .p-price .btn { flex: 1; }
 }
 @media (max-width: 480px) {
     .container { padding: 0 14px; }

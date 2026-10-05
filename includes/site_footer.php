@@ -61,5 +61,12 @@
 <?php endif; ?>
 
 <script src="<?= url('assets/js/app.js') ?>?v=<?= APP_VERSION ?>"></script>
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('<?= e(url('sw.js')) ?>').catch(function () {});
+    });
+}
+</script>
 </body>
 </html>
