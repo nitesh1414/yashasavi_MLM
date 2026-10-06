@@ -16,7 +16,7 @@ $opts = [
     'back_url'     => 'tree.php',
     'lock_sponsor' => false,
 ];
-[$errors, $f, $prefill] = member_register_handle($opts);
+[$errors, $f, $prefill, $regSuccess] = member_register_handle($opts);
 
 $activeKey = 'add-member';
 $pageTitle = 'Add Distributor';
@@ -29,6 +29,9 @@ require __DIR__ . '/../includes/dash_header.php';
         ➕ Register New Distributor
         <span class="right">Pick any active sponsor and leg — or leave the sponsor empty to place the member under the company root.</span>
     </div>
+    <?php if ($regSuccess): ?>
+        <?= registration_success_popup($regSuccess['member'], redirect_target($regSuccess['redirect']), false) ?>
+    <?php endif; ?>
     <?php member_register_render_form($f, $errors, $prefill, $opts); ?>
 </div>
 

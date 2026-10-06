@@ -527,3 +527,126 @@ function output_csv($filename, $header, $rows)
     fclose($out);
     exit;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Registration success popup                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Renders the "Registration Successful" popup with the member's login
+ * details and a welcome message. Self-contained (inline CSS + JS) so it
+ * works unchanged on the public site and inside the dashboards.
+ *
+ * Closing the popup (button, ✕, backdrop or Escape) redirects to
+ * $targetUrl — the "respective flow" (login page for self-registration,
+ * the panel success page when a member was added from a dashboard).
+ *
+ * @param array  $member       full users row of the new member
+ * @param string $targetUrl    absolute URL to continue to on close
+ * @param bool   $selfRegister true = member registered themselves (public form)
+ * @return string HTML
+ */
+function registration_success_popup(array $member, $targetUrl, $selfRegister = true)
+{
+    $site = setting('site_name');
+    $sponsorTxt = 'Company Root';
+    if (!empty($member['sponsor_id'])) {
+        $sp = q_row("SELECT username, full_name FROM users WHERE id = ?", [(int)$member['sponsor_id']]);
+        if ($sp) {
+            $sponsorTxt = $sp['username'] . ' — ' . $sp['full_name'];
+        }
+    }
+    $uid = (string)$member['username'];
+    $joined = !empty($member['created_at']) ? date('d M Y', strtotime($member['created_at'])) : date('d M Y');
+    $target = (string)$targetUrl;
+
+    ob_start();
+    ?>
+<style>
+.regpop-overlay{position:fixed;inset:0;background:rgba(16,34,19,.66);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;animation:regpop-fade .2s ease-out}
+@keyframes regpop-fade{from{opacity:0}to{opacity:1}}
+@keyframes regpop-pop{from{opacity:0;transform:scale(.92) translateY(14px)}to{opacity:1;transform:none}}
+.regpop{position:relative;background:#fff;border-radius:18px;width:min(440px,94vw);max-height:90vh;overflow-y:auto;padding:28px 22px 22px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.35);animation:regpop-pop .28s cubic-bezier(.2,.9,.3,1.2);font-family:inherit}
+.regpop-x{position:absolute;top:8px;right:10px;background:none;border:0;font-size:26px;line-height:1;color:#9aa79b;cursor:pointer;padding:6px}
+.regpop-x:hover{color:#000}
+.regpop-emoji{font-size:46px;line-height:1}
+.regpop h2{margin:10px 0 4px;font-size:22px;color:#1b3a1f;font-weight:700}
+.regpop-welcome{font-size:13.5px;color:#4a5a4d;margin:0 0 14px;line-height:1.55}
+.regpop-box{background:#f4f8f3;border:1px solid #dfe9dc;border-radius:12px;padding:4px 14px;margin:0 0 12px;text-align:left}
+.regpop-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed #dfe8dc;font-size:13px}
+.regpop-row:last-child{border-bottom:0}
+.regpop-row>span{color:#68786b;flex-shrink:0}
+.regpop-row>b{color:#000;font-weight:600;text-align:right;overflow-wrap:anywhere}
+.regpop-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;background:#fff;border:1px solid #c8dcc6;border-radius:8px;padding:3px 10px;cursor:pointer;user-select:all;white-space:nowrap}
+.regpop-code:hover{border-color:#2e7d32;background:#f0f7ee}
+.regpop-note{font-size:12.5px;background:#fdf3d7;border:1px solid #efe0a8;color:#000;border-radius:10px;padding:9px 12px;margin:0 0 8px;text-align:left;line-height:1.5}
+.regpop-btn{display:block;background:#2e7d32;color:#fff !important;text-decoration:none;font-size:15px;font-weight:600;padding:13px 16px;border-radius:12px;margin-top:14px}
+.regpop-btn:hover{background:#256c29}
+@media (max-width:540px){.regpop{padding:22px 14px 16px}.regpop h2{font-size:19px}.regpop-row{font-size:12.5px;flex-direction:column;align-items:flex-start;gap:2px}.regpop-row>b{text-align:left}}
+</style>
+<div class="regpop-overlay" id="regpop-overlay">
+    <div class="regpop" role="dialog" aria-modal="true" aria-labelledby="regpop-title">
+        <button type="button" class="regpop-x" id="regpop-close" aria-label="Close">&times;</button>
+        <div class="regpop-emoji"><?= $selfRegister ? '🎉' : '✅' ?></div>
+        <h2 id="regpop-title"><?= $selfRegister ? 'Registration Successful!' : 'Member Registered!' ?></h2>
+        <p class="regpop-welcome">
+            <?php if ($selfRegister): ?>
+                Welcome to <b><?= e($site) ?></b>, <?= e($member['full_name']) ?>! 🌿<br>
+                Your distributor account has been created successfully.
+            <?php else: ?>
+                <b><?= e($member['full_name']) ?></b> has been added to the network.<br>
+                Share these login details with the member — they are shown only once.
+            <?php endif; ?>
+        </p>
+        <div class="regpop-box">
+            <div class="regpop-row"><span>Member Name</span><b><?= e($member['full_name']) ?></b></div>
+            <div class="regpop-row"><span>User ID</span><b class="regpop-code" data-copy="<?= e($uid) ?>" title="Click to copy"><?= e($uid) ?> 📋</b></div>
+            <div class="regpop-row"><span>First-time Password</span><b class="regpop-code" data-copy="<?= e($uid) ?>" title="Click to copy"><?= e($uid) ?> 📋</b></div>
+            <div class="regpop-row"><span>Sponsor</span><b><?= e($sponsorTxt) ?></b></div>
+            <div class="regpop-row"><span>Joined On</span><b><?= e($joined) ?></b></div>
+        </div>
+        <p class="regpop-note">🔐 <b>First login:</b> the password is the User ID itself — it must be changed
+            immediately after logging in for the first time.</p>
+        <?php if ($selfRegister): ?>
+            <p class="regpop-note">📄 You can upload your PAN &amp; Aadhaar card images anytime from your
+                dashboard — <b>Account → Upload KYC</b>.</p>
+        <?php endif; ?>
+        <a class="regpop-btn" id="regpop-go" href="<?= e($target) ?>">
+            <?= $selfRegister ? '🔐 Continue to Login' : '✅ Continue' ?>
+        </a>
+    </div>
+</div>
+<script>
+(function () {
+    var target = <?= json_encode($target) ?>;
+    var overlay = document.getElementById('regpop-overlay');
+    if (!overlay) { return; }
+    function go() { window.location.href = target; }
+    document.getElementById('regpop-close').addEventListener('click', go);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) { go(); } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { go(); } });
+    var btn = document.getElementById('regpop-go');
+    if (btn) { btn.focus(); }
+    overlay.querySelectorAll('.regpop-code').forEach(function (el) {
+        el.addEventListener('click', function () {
+            var t = el.getAttribute('data-copy') || '';
+            var done = function () {
+                var old = el.innerHTML;
+                el.innerHTML = '✓ Copied';
+                setTimeout(function () { el.innerHTML = old; }, 1200);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(t).then(done, done);
+            } else {
+                var i = document.createElement('textarea');
+                i.value = t; document.body.appendChild(i); i.select();
+                try { document.execCommand('copy'); } catch (err) {}
+                document.body.removeChild(i); done();
+            }
+        });
+    });
+})();
+</script>
+    <?php
+    return ob_get_clean();
+}

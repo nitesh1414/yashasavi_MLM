@@ -43,7 +43,7 @@ require __DIR__ . '/includes/site_header.php';
             <?= csrf_field() ?>
             <div class="form-group">
                 <label>User ID / Email</label>
-                <input class="form-control" type="text" name="login" required autofocus value="<?= e(post_str('login')) ?>" placeholder="e.g. YSH100001">
+                <input class="form-control" type="text" name="login" required autofocus value="<?= e(post_str('login') ?: get_str('login')) ?>" placeholder="e.g. YSH100001">
             </div>
             <div class="form-group">
                 <label>Password</label>

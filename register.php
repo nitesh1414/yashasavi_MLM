@@ -71,17 +71,31 @@ if (is_post()) {
             /* first-time password = the User ID; must be changed after first login */
             q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
               [password_hash($u['username'], PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
-            flash('success', 'Registration successful! Your User ID is ' . $u['username'] .
-                '. Your first-time password is your User ID (' . $u['username'] . ') — you must change it after logging in.');
-            redirect('login.php');
+            /* PRG: show the login-details + welcome popup on the follow-up GET */
+            $_SESSION['reg_popup'] = ['uid' => (int)$uid, 'self' => true];
+            redirect('register.php');
         }
         $errors[] = $msg;
     }
 }
 
+/* just-registered member? render the success popup (PRG follow-up) */
+$regPopupMember = null;
+if (!empty($_SESSION['reg_popup']) && ($_SESSION['reg_popup']['self'] ?? false)) {
+    $m = q_row("SELECT * FROM users WHERE id = ?", [(int)$_SESSION['reg_popup']['uid']]);
+    if ($m) {
+        $regPopupMember = $m;
+    }
+    unset($_SESSION['reg_popup']);
+}
+
 $pageTitle = 'Register as Distributor';
 require __DIR__ . '/includes/site_header.php';
 ?>
+<?php if ($regPopupMember): ?>
+    <?= registration_success_popup($regPopupMember, url('login.php?login=' . urlencode($regPopupMember['username'])), true) ?>
+<?php endif; ?>
+
 <div class="auth-wrap">
     <div class="auth-card wide">
         <div class="auth-logo">

@@ -16,7 +16,7 @@ $opts = [
     'back_url'     => 'tree.php',
     'lock_sponsor' => true,
 ];
-[$errors, $f, $prefill] = member_register_handle($opts);
+[$errors, $f, $prefill, $regSuccess] = member_register_handle($opts);
 
 $activeKey = 'add-member';
 $pageTitle = 'Add Member';
@@ -29,6 +29,9 @@ require __DIR__ . '/../includes/dash_header.php';
         ➕ Add New Member
         <span class="right">New members are placed inside your own network — opened from a tree position, sponsor &amp; leg come preselected.</span>
     </div>
+    <?php if ($regSuccess): ?>
+        <?= registration_success_popup($regSuccess['member'], redirect_target($regSuccess['redirect']), false) ?>
+    <?php endif; ?>
     <?php member_register_render_form($f, $errors, $prefill, $opts); ?>
 </div>
 

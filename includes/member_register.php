@@ -8,7 +8,7 @@
  *
  * Usage in a panel page:
  *   $opts = ['area' => 'user', 'actor' => $u, 'success_url' => 'tree.php', ...];
- *   [$errors, $f] = member_register_handle($opts);
+ *   [$errors, $f, $prefill, $regSuccess] = member_register_handle($opts);
  *   ... render panel chrome ...
  *   member_register_render_form($f, $errors, $opts);
  */
@@ -54,6 +54,16 @@ function member_register_sponsor_allowed($area, $actor, $sponsorRow)
  */
 function member_register_handle($opts)
 {
+    /* just-registered member? (PRG follow-up for the success popup) */
+    $regSuccess = null;
+    if (!empty($_SESSION['reg_popup']) && !($_SESSION['reg_popup']['self'] ?? true)) {
+        $m = q_row("SELECT * FROM users WHERE id = ?", [(int)$_SESSION['reg_popup']['uid']]);
+        if ($m) {
+            $regSuccess = ['member' => $m, 'redirect' => $_SESSION['reg_popup']['redirect'] ?? $opts['success_url']];
+        }
+        unset($_SESSION['reg_popup']);
+    }
+
     $errors = [];
     $f = member_register_field_defaults();
     $prefill = [
@@ -142,9 +152,9 @@ function member_register_handle($opts)
                 /* first-time password = the User ID; must be changed after first login */
                 q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
                   [password_hash($nu['username'], PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
-                flash('success', 'Member registered successfully — User ID ' . $nu['username'] . ' (' . $nu['full_name'] .
-                    '). First-time password: the User ID itself; it must be changed at first login.');
-                redirect($opts['success_url']);
+                /* PRG: show the login-details + welcome popup on the follow-up GET */
+                $_SESSION['reg_popup'] = ['uid' => (int)$uid, 'self' => false, 'redirect' => $opts['success_url']];
+                redirect(basename($_SERVER['SCRIPT_NAME'] ?? 'add-member.php'));
             }
             $errors[] = $msg;
         }
@@ -159,7 +169,7 @@ function member_register_handle($opts)
         $f['leg'] = $prefill['leg'];
     }
 
-    return [$errors, $f, $prefill];
+    return [$errors, $f, $prefill, $regSuccess];
 }
 
 /**
