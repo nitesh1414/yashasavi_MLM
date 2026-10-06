@@ -59,7 +59,7 @@ h1, h2, h3, h4 { line-height: 1.25; color: #000; }
 .btn-block { display: block; width: 100%; }
 
 /* ---------- top bar ---------- */
-.topbar { background: var(--green-deep); color: #cfe3cf; font-size: 13px; }
+.topbar { background: var(--green-deep); color: #cfe3cf; font-size: 13px; padding-top: env(safe-area-inset-top, 0px); }
 .topbar .container { display: flex; justify-content: space-between; align-items: center; min-height: 38px; gap: 10px; flex-wrap: wrap; max-width: none; }
 .topbar a { color: #e8f3e8; margin-left: 14px; }
 .topbar .topbar-right { display: flex; align-items: center; }
@@ -851,3 +851,16 @@ body.nav-open .app-tabbar { display: none; }
     .nav-menu-brand img { width: 30px; height: 30px; object-fit: contain; border-radius: 8px; flex-shrink: 0; }
     .nav-menu-brand span { min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 }
+
+/* ================================================================== */
+/*  PWA standalone: keep headers clear of the notch / dynamic island   */
+/* ================================================================== */
+
+/* mobile: the navbar is the first bar (topbar is hidden) */
+@media (max-width: 860px) {
+    .navbar { padding-top: env(safe-area-inset-top, 0px); }
+    /* the slide-out drawer starts at the very top of the screen */
+    .nav-menu { padding-top: env(safe-area-inset-top, 0px); }
+}
+/* scroll progress line sits below the island */
+#scrollProgress { top: env(safe-area-inset-top, 0px); }

@@ -38,6 +38,7 @@ img { max-width: 100%; }
 /* ---------- layout ---------- */
 .dash { display: flex; min-height: 100vh; }
 .sidebar {
+    padding-top: env(safe-area-inset-top, 0px);
     width: var(--sidebar-w); background: var(--side); color: var(--side-text);
     position: fixed; inset: 0 auto 0 0; overflow-y: auto; z-index: 400;
     transition: transform .28s ease; display: flex; flex-direction: column;
@@ -59,7 +60,7 @@ img { max-width: 100%; }
 
 .main { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; }
 .topbar { min-width: 0; flex-wrap: nowrap; }
-.topbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 0 18px; height: 54px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 350; }
+.topbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 0 18px; padding-top: env(safe-area-inset-top, 0px); height: auto; min-height: 54px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 350; }
 .topbar .page-title { font-size: 17px; font-weight:400; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar .tb-right { margin-left: auto; flex-shrink: 0; }
 .tb-user { flex-shrink: 0; }
@@ -475,3 +476,10 @@ body.side-open .app-tabbar { display: none; }
     .side-brand { padding: 12px 10px; }
     .side-brand img { width: 34px; height: 34px; }
 }
+
+/* ================================================================== */
+/*  PWA standalone: bottom edges for phones with home indicators       */
+/* ================================================================== */
+
+/* member popup in the genealogy tree clears the gesture bar */
+.tree-popup { margin-bottom: env(safe-area-inset-bottom, 0px); }
