@@ -198,19 +198,31 @@ function register_distributor($data)
             return [false, 0, 'Sponsor account is not active.'];
         }
 
-        // unique checks
-        if (q_val("SELECT COUNT(*) FROM users WHERE email = ?", [$data['email']]) > 0) {
-            return [false, 0, 'This email address is already registered.'];
-        }
-        if (q_val("SELECT COUNT(*) FROM users WHERE mobile = ?", [$data['mobile']]) > 0) {
-            return [false, 0, 'This mobile number is already registered.'];
-        }
+        /* NOTE: email and mobile are no longer unique — one family may share
+         * contact details across several distributor IDs. */
 
-        $pos = find_position($sponsor['id'], $data['leg']);
-        if (!$pos) {
-            return [false, 0, 'No free position available under this sponsor.'];
+        /* explicit placement (bulk tools) or the standard spillover search */
+        $placementId = null; $leg = null;
+        if (!empty($data['placement'])) {
+            $puser = ctype_digit((string)$data['placement'])
+                ? q_row("SELECT * FROM users WHERE id = ?", [(int)$data['placement']])
+                : find_user((string)$data['placement']);
+            $pleg = (($data['placement_leg'] ?? $data['leg']) === 'R') ? 'R' : 'L';
+            if ($puser) {
+                $ch = user_children($puser['id']);
+                if ($ch[$pleg] === null) {
+                    $placementId = (int)$puser['id'];
+                    $leg = $pleg;
+                }
+            }
         }
-        [$placementId, $leg] = $pos;
+        if (!$placementId) {
+            $pos = find_position($sponsor['id'], $data['leg']);
+            if (!$pos) {
+                return [false, 0, 'No free position available under this sponsor.'];
+            }
+            [$placementId, $leg] = $pos;
+        }
 
         $parent = q_row("SELECT * FROM users WHERE id = ?", [$placementId]);
 

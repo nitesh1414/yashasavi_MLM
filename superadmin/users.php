@@ -92,6 +92,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td>
                     <div class="table-actions">
                         <a class="btn btn-outline btn-sm" href="user_view.php?id=<?= (int)$r['id'] ?>">View</a>
+                        <a class="btn btn-light btn-sm" href="user_edit.php?id=<?= (int)$r['id'] ?>">Edit</a>
                         <?php if ($r['status'] === 'active'): ?>
                         <form method="post" class="inline-form" data-confirm="Block this user? They will not be able to login.">
                             <?= csrf_field() ?>

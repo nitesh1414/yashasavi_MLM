@@ -191,6 +191,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        /* 3c — email/mobile may be shared (family members) — unique -> normal index */
+        if (ug_table_exists('users')) {
+            $idx = q_all("SHOW INDEX FROM users");
+            $byName = [];
+            foreach ($idx as $ix) {
+                $byName[$ix['Key_name']] = $ix;
+            }
+            foreach (['email', 'mobile'] as $col) {
+                if (isset($byName[$col]) && (int)$byName[$col]['Non_unique'] === 0) {
+                    $pdo->exec("ALTER TABLE users DROP INDEX `$col`");
+                    $pdo->exec("ALTER TABLE users ADD INDEX `idx_$col` (`$col`)");
+                    $log[] = "Users: $col is no longer unique (family members may share contact details).";
+                }
+            }
+        }
+
         /* 4 — MLM plan settings */
         $plan = $D['plan'];
         if (!(int)q_val("SELECT COUNT(*) FROM plan_settings WHERE id = 1")) {

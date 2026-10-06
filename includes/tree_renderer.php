@@ -15,7 +15,7 @@
  * registration form with sponsor + leg prefilled. A zoom toolbar (fit / in /
  * out, auto-fit on load + resize) keeps deep trees readable on any screen.
  */
-function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $addBase = 'add-member.php')
+function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $addBase = 'add-member.php', $viewUserBase = null)
 {
     // preload descendants up to $levels via BFS
     $byParent = [];
@@ -42,7 +42,7 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
     }
 
     $node = function ($user, $isRoot, $parentUser = null, $leg = null)
-        use ($linkBase, $addBase, $byParent, $rankNames) {
+        use ($linkBase, $addBase, $viewUserBase, $byParent, $rankNames) {
         if (!$user) {
             // Empty position directly below a REAL member — clickable add slot
             if ($parentUser && $leg) {
@@ -83,13 +83,21 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
             . '<dt>Rank</dt><dd>' . e($rank) . '</dd>'
             . '</dl>'
             . '<div class="t-tip-actions">'
+            . ($viewUserBase
+                ? '<a href="' . e($viewUserBase . '?id=' . (int)$user['id']) . '">👤 View distributor</a>'
+                : '')
             . '<a href="' . e($addHref) . '" title="Add a new member under ' . e($user['username']) . '">➕ Add under</a>'
             . '<a href="' . e($viewHref) . '">🔍 View subtree</a>'
             . '</div>'
             . '</div>';
 
+        /* In the super admin tree the ID pill itself links to the distributor view. */
+        $pillInner = e($user['username']);
+        $pill = $viewUserBase
+            ? '<a class="t-pill' . ($on ? ' on' : ' off') . '" href="' . e($viewUserBase . '?id=' . (int)$user['id']) . '" title="Open distributor view">' . $pillInner . '</a>'
+            : '<span class="t-pill' . ($on ? ' on' : ' off') . '">' . $pillInner . '</span>';
         return '<div class="t-node' . ($isRoot ? ' root' : '') . '" tabindex="0">'
-            . '<span class="t-pill' . ($on ? ' on' : ' off') . '">' . e($user['username']) . '</span>'
+            . $pill
             . $tip
             . '</div>';
     };

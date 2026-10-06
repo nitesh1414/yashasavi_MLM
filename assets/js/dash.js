@@ -216,6 +216,9 @@ document.addEventListener('DOMContentLoaded', function () {
         node.addEventListener('focusout', schedulePopHide);
         if (pill) {
             pill.addEventListener('click', function (e) {
+                /* if the pill is a link (super admin tree), follow it to the
+                   distributor view instead of toggling the popup */
+                if (pill.closest('a[href]') || pill.tagName === 'A') { hideTreePopup(); return; }
                 e.preventDefault();
                 /* on touch devices the pill has no hover: tap toggles the popup.
                    on desktop hover/focus already shows it, so click is a no-op. */

@@ -19,8 +19,7 @@ if (is_post()) {
     if (strlen($full_name) < 3) { $errors[] = 'Full name required.'; }
     if ($email !== '' && !is_email($email)) { $errors[] = 'Invalid email.'; }
     if (!is_mobile($mobile)) { $errors[] = 'Invalid mobile.'; }
-    if ($email && q_val("SELECT COUNT(*) FROM users WHERE email = ? AND id != ?", [$email, $id])) { $errors[] = 'Email already in use.'; }
-    if (q_val("SELECT COUNT(*) FROM users WHERE mobile = ? AND id != ?", [$mobile, $id])) { $errors[] = 'Mobile already in use.'; }
+    /* email/mobile may be shared across family members — no uniqueness checks */
     $newPass = $_POST['new_password'] ?? '';
     if ($newPass !== '') {
         if ($e = strong_password_error($newPass)) { $errors[] = $e; }
