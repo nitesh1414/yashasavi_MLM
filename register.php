@@ -29,8 +29,7 @@ if (is_post()) {
     foreach ($f as $k => $v) {
         $f[$k] = post_str($k, $v);
     }
-    $password = $_POST['password'] ?? '';
-    $password2 = $_POST['password2'] ?? '';
+    /* no password at registration: the first-time password is the User ID itself */
     $terms = isset($_POST['terms']);
 
     if ($f['sponsor'] === '') { $errors[] = 'Sponsor ID is required.'; }
@@ -44,44 +43,36 @@ if (is_post()) {
     if ($f['bank_ifsc'] !== '' && !preg_match('/^[A-Z]{4}0[A-Z0-9]{6}$/', strtoupper($f['bank_ifsc']))) { $errors[] = 'IFSC code looks invalid (e.g. SBIN0001234).'; }
     if ($f['aadhaar_no'] !== '' && !preg_match('/^[0-9]{12}$/', $f['aadhaar_no'])) { $errors[] = 'Aadhaar number must be 12 digits.'; }
     if ($f['pan_no'] !== '' && !preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', strtoupper($f['pan_no']))) { $errors[] = 'PAN number looks invalid.'; }
-    if ($e = strong_password_error($password)) { $errors[] = $e; }
-    if ($password !== $password2) { $errors[] = 'Passwords do not match.'; }
     if (!$terms) { $errors[] = 'You must accept the terms and conditions.'; }
 
     if (!$errors) {
         $f['leg'] = ($f['leg'] === 'R') ? 'R' : 'L';
         $f['bank_ifsc'] = strtoupper($f['bank_ifsc']);
         $f['pan_no'] = strtoupper($f['pan_no']);
-        $f['password'] = $password;
+        $f['password'] = 'Temp-' . bin2hex(random_bytes(8)); /* replaced by the User ID below */
 
-        // KYC document uploads (PAN card + Aadhaar card images) — required
+        // KYC document uploads (PAN card + Aadhaar card images) — OPTIONAL now;
+        // members can upload them later from their panel (Upload KYC page)
         $panImg = handle_upload('pan_card', 'kyc');
-        if ($panImg === null) {
-            $errors[] = 'Please upload your PAN card image (required for KYC).';
-        } elseif ($panImg === false) {
-            $errors[] = 'PAN card image could not be uploaded — use JPG, PNG, WEBP or GIF under ' . MAX_UPLOAD_MB . ' MB.';
-        }
         $aadImg = handle_upload('aadhaar_card', 'kyc');
-        if ($aadImg === null) {
-            $errors[] = 'Please upload your Aadhaar card image (required for KYC).';
-        } elseif ($aadImg === false) {
-            $errors[] = 'Aadhaar card image could not be uploaded — use JPG, PNG, WEBP or GIF under ' . MAX_UPLOAD_MB . ' MB.';
-        }
-        if (!$errors) {
-            $f['pan_image'] = $panImg;
-            $f['aadhaar_image'] = $aadImg;
-        } else {
-            // don't leave orphaned files behind when validation failed
+        $f['pan_image'] = is_string($panImg) ? $panImg : null;
+        $f['aadhaar_image'] = is_string($aadImg) ? $aadImg : null;
+        if ($panImg === false || $aadImg === false) {
             if (is_string($panImg)) { delete_upload($panImg); }
             if (is_string($aadImg)) { delete_upload($aadImg); }
+            $errors[] = 'An image could not be uploaded — use JPG, PNG, WEBP or GIF under ' . MAX_UPLOAD_MB . ' MB.';
         }
     }
 
     if (!$errors) {
         [$ok, $uid, $msg] = register_distributor($f);
         if ($ok) {
-            $u = q_row("SELECT username, full_name FROM users WHERE id = ?", [$uid]);
-            flash('success', 'Registration successful! Your User ID is ' . $u['username'] . '. You can now login.');
+            $u = q_row("SELECT username FROM users WHERE id = ?", [$uid]);
+            /* first-time password = the User ID; must be changed after first login */
+            q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
+              [password_hash($u['username'], PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
+            flash('success', 'Registration successful! Your User ID is ' . $u['username'] .
+                '. Your first-time password is your User ID (' . $u['username'] . ') — you must change it after logging in.');
             redirect('login.php');
         }
         $errors[] = $msg;
@@ -226,31 +217,23 @@ require __DIR__ . '/includes/site_header.php';
                 </div>
             </div>
 
-            <h3 style="font-size:15px;margin:18px 0 12px;color:#000">5️⃣ KYC Documents</h3>
+            <h3 style="font-size:15px;margin:18px 0 12px;color:#000">5️⃣ KYC Documents <small style="color:#666;font-weight:400">(optional — you can upload them later from your dashboard)</small></h3>
             <div class="form-grid">
                 <div class="form-group">
-                    <label>PAN Card Image <span class="req">*</span></label>
-                    <input class="form-control" type="file" name="pan_card" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+                    <label>PAN Card Image</label>
+                    <input class="form-control" type="file" name="pan_card" accept=".jpg,.jpeg,.png,.webp,.gif">
                     <div class="form-hint">Clear photo/scan of your PAN card (JPG, PNG or WEBP, max <?= MAX_UPLOAD_MB ?> MB).</div>
                 </div>
                 <div class="form-group">
-                    <label>Aadhaar Card Image <span class="req">*</span></label>
-                    <input class="form-control" type="file" name="aadhaar_card" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+                    <label>Aadhaar Card Image</label>
+                    <input class="form-control" type="file" name="aadhaar_card" accept=".jpg,.jpeg,.png,.webp,.gif">
                     <div class="form-hint">Clear photo/scan of your Aadhaar card (JPG, PNG or WEBP, max <?= MAX_UPLOAD_MB ?> MB).</div>
                 </div>
             </div>
 
-            <h3 style="font-size:15px;margin:18px 0 12px;color:#000">6️⃣ Login Details</h3>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Password <span class="req">*</span></label>
-                    <input class="form-control" type="password" name="password" required>
-                    <div class="form-hint">Minimum 8 characters with letters and numbers.</div>
-                </div>
-                <div class="form-group">
-                    <label>Confirm Password <span class="req">*</span></label>
-                    <input class="form-control" type="password" name="password2" required>
-                </div>
+            <div class="alert alert-warning" style="margin-top:18px">
+                <b>First login:</b> your password will be your User ID (shown after registration).
+                You must change it when you log in for the first time.
             </div>
 
             <label class="form-check" style="color:var(--ink)">

@@ -505,3 +505,26 @@ body.side-open .app-tabbar { display: none; }
     .dash .sidebar { padding-top: env(safe-area-inset-top, 0px) !important; }
     .app-tabbar { padding-bottom: calc(5px + env(safe-area-inset-bottom, 0px)) !important; }
 }
+
+/* ================================================================== */
+/*  no-data-cuts layer — long values wrap instead of being clipped    */
+/* ================================================================== */
+
+/* any cell / label / value can break long tokens (order no, user id,
+   email, IFSC, sponsor names, currency amounts) */
+table.table td, table.table th,
+.kv-table td, .kv-table th { overflow-wrap: anywhere; }
+.stat-card b, .stat-card span { overflow-wrap: anywhere; }
+.card { min-width: 0; }
+.table-wrap { max-width: 100%; }
+
+/* badges inside tables never push past their cell */
+.table .badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+
+/* tree member popup: long names / sponsors wrap, popup stays on screen */
+.tree-popup { max-width: min(300px, 92vw); }
+.tree-popup .t-tip-head { white-space: normal; overflow-wrap: anywhere; }
+.tree-popup dd { white-space: normal; overflow-wrap: anywhere; }
+
+/* summary table above the tree scrolls on its own on phones */
+.tree-summary { margin-bottom: 14px; }

@@ -15,7 +15,7 @@ if (is_post()) {
     if ($errors) {
         foreach ($errors as $er) { flash('error', $er); }
     } else {
-        q("UPDATE users SET password = ? WHERE id = ?",
+        q("UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?",
           [password_hash($new, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $u['id']]);
         flash('success', 'Password changed successfully.');
     }
@@ -33,7 +33,10 @@ require __DIR__ . '/../includes/dash_header.php';
     <form method="post">
         <?= csrf_field() ?>
         <div class="form-group"><label>Current Password</label>
-            <input class="form-control" type="password" name="current" required></div>
+            <input class="form-control" type="password" name="current" required>
+            <?php if (!empty($u['must_change_password'])): ?>
+                <div class="form-hint">First login: your current password is your User ID (<b><?= e($u['username']) ?></b>).</div>
+            <?php endif; ?></div>
         <div class="form-group"><label>New Password</label>
             <input class="form-control" type="password" name="new" required>
             <div class="form-hint">Minimum 8 characters with letters and numbers.</div></div>

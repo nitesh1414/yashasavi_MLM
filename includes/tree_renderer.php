@@ -1,7 +1,7 @@
 <?php
 /**
  * Binary genealogy tree renderer.
- * Renders $levels generations below $rootUser (user panel: 5, super admin: 10).
+ * Renders $levels generations below $rootUser (default 3; deeper via "view subtree").
  * $linkBase — URL for re-rooting (e.g. 'tree.php') with ?root=<id>
  * $addBase  — URL of the PANEL registration page (e.g. 'add-member.php')
  *
@@ -25,7 +25,7 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
         if (!$current) { break; }
         $ph = implode(',', array_map('intval', $current));
         $rows = q_all("SELECT id, username, full_name, leg, placement_id, left_bv, right_bv,
-                       is_active, status, rank_id, self_bv
+                       is_active, status, rank_id, self_bv, created_at, sponsor_id, path
                        FROM users WHERE placement_id IN ($ph)");
         $next = [];
         foreach ($rows as $r) {
@@ -41,8 +41,32 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
         $rankNames[$r['id']] = $r['name'];
     }
 
+    /* sponsors of the rendered members (for the tooltip) */
+    $sponsorNames = [null => 'Company Root'];
+    $spIds = [];
+    foreach ($all as $m) { if (!empty($m['sponsor_id'])) { $spIds[(int)$m['sponsor_id']] = 1; } }
+    if ($spIds) {
+        $in = implode(',', array_map('intval', array_keys($spIds)));
+        foreach (q_all("SELECT id, username, full_name FROM users WHERE id IN ($in)") as $sp) {
+            $sponsorNames[(int)$sp['id']] = $sp['username'] . ' — ' . $sp['full_name'];
+        }
+    }
+
+    /* member counts below each rendered member, per leg (via the materialized path) */
+    $legCounts = function ($user) use ($byParent) {
+        $out = ['L' => 0, 'R' => 0];
+        $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
+        foreach (['L', 'R'] as $side) {
+            if (!empty($kids[$side])) {
+                $out[$side] = (int)q_val("SELECT COUNT(*) FROM users WHERE path LIKE ?",
+                    [$kids[$side]['path'] . '%']);
+            }
+        }
+        return $out;
+    };
+
     $node = function ($user, $isRoot, $parentUser = null, $leg = null)
-        use ($linkBase, $addBase, $viewUserBase, $byParent, $rankNames) {
+        use ($linkBase, $addBase, $viewUserBase, $byParent, $rankNames, $sponsorNames, $legCounts) {
         if (!$user) {
             // Empty position directly below a REAL member — clickable add slot
             if ($parentUser && $leg) {
@@ -71,12 +95,21 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
         $upline = $parentUser ? $parentUser['username'] : 'Company Root';
         $rank = isset($rankNames[$user['rank_id']]) ? $rankNames[$user['rank_id']] : '—';
 
+        $joined = $user['created_at'] ? date('d M Y', strtotime($user['created_at'])) : '—';
+        $sponsorTxt = $sponsorNames[$user['sponsor_id'] ?? null] ?? '—';
+        $cnt = $legCounts($user);
+
         $tip = '<div class="t-tip" role="tooltip">'
             . '<div class="t-tip-head">' . e($user['full_name']) . ($blocked ? ' ⛔' : '') . '</div>'
             . '<dl>'
+            . '<dt>User ID</dt><dd><b>' . e($user['username']) . '</b></dd>'
             . '<dt>Status</dt><dd>' . e($statusTxt) . '</dd>'
+            . '<dt>Joined</dt><dd>' . e($joined) . '</dd>'
+            . '<dt>Sponsor</dt><dd>' . e($sponsorTxt) . '</dd>'
             . '<dt>Leg</dt><dd>' . ($isRoot ? '—' : ($user['leg'] === 'R' ? 'RIGHT' : 'LEFT')) . '</dd>'
             . '<dt>Upline</dt><dd>' . e($upline) . '</dd>'
+            . '<dt>Left members</dt><dd>' . number_format($cnt['L']) . '</dd>'
+            . '<dt>Right members</dt><dd>' . number_format($cnt['R']) . '</dd>'
             . '<dt>Left BV</dt><dd>' . e(number_format((float)$user['left_bv'], 0)) . '</dd>'
             . '<dt>Right BV</dt><dd>' . e(number_format((float)$user['right_bv'], 0)) . '</dd>'
             . '<dt>Self BV</dt><dd>' . e(number_format((float)$user['self_bv'], 0)) . '</dd>'
@@ -119,7 +152,25 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
     };
 
     $root = $all[$rootUser['id']];
-    return '<div class="tree-legends">
+
+    /* summary table: registrations + confirmed BV per leg of the viewed root */
+    $kids = isset($byParent[$root['id']]) ? $byParent[$root['id']] : [];
+    $sum = ['L' => ['n' => 0, 'bv' => (float)$root['left_bv']], 'R' => ['n' => 0, 'bv' => (float)$root['right_bv']]];
+    foreach (['L', 'R'] as $side) {
+        if (!empty($kids[$side])) {
+            $sum[$side]['n'] = (int)q_val("SELECT COUNT(*) FROM users WHERE path LIKE ?", [$kids[$side]['path'] . '%']);
+        }
+    }
+    $summary = '<div class="card" style="margin-bottom:14px">'
+        . '<div class="card-title">📊 Network Summary — ' . e($root['username']) . ' (' . e($root['full_name']) . ')</div>'
+        . '<div class="table-wrap"><table class="table">'
+        . '<thead><tr><th>Leg</th><th>Registrations</th><th>Confirmed BV</th><th>Matching Pairs</th></tr></thead>'
+        . '<tbody>'
+        . '<tr><td><b>LEFT</b></td><td>' . number_format($sum['L']['n']) . '</td><td>' . number_format($sum['L']['bv']) . '</td><td rowspan="2" style="text-align:center;font-size:16px"><b>' . number_format((int)$root['matched_pairs']) . '</b></td></tr>'
+        . '<tr><td><b>RIGHT</b></td><td>' . number_format($sum['R']['n']) . '</td><td>' . number_format($sum['R']['bv']) . '</td></tr>'
+        . '</tbody></table></div></div>';
+
+    return $summary . '<div class="tree-legends">
                 <span class="lg"><span class="dot" style="background:#43a047"></span> Active member</span>
                 <span class="lg"><span class="dot" style="background:#e53935"></span> Inactive member</span>
                 <span class="lg"><span class="dot" style="background:#fff;box-shadow:0 0 0 2px #d6a83c inset"></span> Root</span>

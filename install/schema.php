@@ -65,6 +65,7 @@ return [
     total_withdrawn DECIMAL(14,2) NOT NULL DEFAULT 0,
     status ENUM('active','blocked') NOT NULL DEFAULT 'active',
     kyc_status ENUM('pending','verified','rejected') NOT NULL DEFAULT 'pending',
+    must_change_password TINYINT(1) NOT NULL DEFAULT 0,
     kyc_remark VARCHAR(255) NULL,
     last_login DATETIME NULL,
     created_at DATETIME NOT NULL,
@@ -111,7 +112,7 @@ return [
     INDEX idx_cat (category_id),
     INDEX idx_status (status),
     INDEX idx_featured (is_featured)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC",
 
 "CREATE TABLE IF NOT EXISTS pages (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -127,7 +128,7 @@ return [
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
     INDEX idx_menu (show_in_menu, menu_order)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC",
 
 "CREATE TABLE IF NOT EXISTS sliders (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

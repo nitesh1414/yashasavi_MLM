@@ -78,8 +78,7 @@ function member_register_handle($opts)
         foreach ($f as $k => $v) {
             $f[$k] = post_str($k, $v);
         }
-        $password = $_POST['password'] ?? '';
-        $password2 = $_POST['password2'] ?? '';
+        /* no password field at registration — the User ID becomes the first-time password */
 
         $STATES = member_register_states();
 
@@ -94,8 +93,6 @@ function member_register_handle($opts)
         if ($f['bank_ifsc'] !== '' && !preg_match('/^[A-Z]{4}0[A-Z0-9]{6}$/', strtoupper($f['bank_ifsc']))) { $errors[] = 'IFSC code looks invalid (e.g. SBIN0001234).'; }
         if ($f['aadhaar_no'] !== '' && !preg_match('/^[0-9]{12}$/', $f['aadhaar_no'])) { $errors[] = 'Aadhaar number must be 12 digits.'; }
         if ($f['pan_no'] !== '' && !preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', strtoupper($f['pan_no']))) { $errors[] = 'PAN number looks invalid.'; }
-        if ($e = strong_password_error($password)) { $errors[] = $e; }
-        if ($password !== $password2) { $errors[] = 'Passwords do not match.'; }
 
         /* Super admin may add a member WITHOUT a sponsor: the member is then
          * placed under the company root (first free position of the leg). */
@@ -124,27 +121,17 @@ function member_register_handle($opts)
             $f['leg'] = ($f['leg'] === 'R') ? 'R' : 'L';
             $f['bank_ifsc'] = strtoupper($f['bank_ifsc']);
             $f['pan_no'] = strtoupper($f['pan_no']);
-            $f['password'] = $password;
+            $f['password'] = 'Temp-' . bin2hex(random_bytes(8)); /* replaced by the User ID below */
 
-            /* KYC document uploads (PAN card + Aadhaar card images) — required */
+            /* KYC document uploads — OPTIONAL (members upload later from their panel) */
             $panImg = handle_upload('pan_card', 'kyc');
-            if ($panImg === null) {
-                $errors[] = 'Please upload the PAN card image (required for KYC).';
-            } elseif ($panImg === false) {
-                $errors[] = 'PAN card image could not be uploaded — use JPG, PNG, WEBP or GIF under ' . MAX_UPLOAD_MB . ' MB.';
-            }
             $aadImg = handle_upload('aadhaar_card', 'kyc');
-            if ($aadImg === null) {
-                $errors[] = 'Please upload the Aadhaar card image (required for KYC).';
-            } elseif ($aadImg === false) {
-                $errors[] = 'Aadhaar card image could not be uploaded — use JPG, PNG, WEBP or GIF under ' . MAX_UPLOAD_MB . ' MB.';
-            }
-            if (!$errors) {
-                $f['pan_image'] = $panImg;
-                $f['aadhaar_image'] = $aadImg;
-            } else {
+            $f['pan_image'] = is_string($panImg) ? $panImg : null;
+            $f['aadhaar_image'] = is_string($aadImg) ? $aadImg : null;
+            if ($panImg === false || $aadImg === false) {
                 if (is_string($panImg)) { delete_upload($panImg); }
                 if (is_string($aadImg)) { delete_upload($aadImg); }
+                $errors[] = 'An image could not be uploaded — use JPG, PNG, WEBP or GIF under ' . MAX_UPLOAD_MB . ' MB.';
             }
         }
 
@@ -152,7 +139,11 @@ function member_register_handle($opts)
             [$ok, $uid, $msg] = register_distributor($f);
             if ($ok) {
                 $nu = q_row("SELECT username, full_name FROM users WHERE id = ?", [$uid]);
-                flash('success', 'Member registered successfully — User ID ' . $nu['username'] . ' (' . $nu['full_name'] . ').');
+                /* first-time password = the User ID; must be changed after first login */
+                q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
+                  [password_hash($nu['username'], PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
+                flash('success', 'Member registered successfully — User ID ' . $nu['username'] . ' (' . $nu['full_name'] .
+                    '). First-time password: the User ID itself; it must be changed at first login.');
                 redirect($opts['success_url']);
             }
             $errors[] = $msg;
@@ -315,31 +306,23 @@ function member_register_render_form($f, $errors, $prefill, $opts)
             </div>
         </div>
 
-        <h3 class="mf-section">5️⃣ KYC Documents</h3>
+        <h3 class="mf-section">5️⃣ KYC Documents <small style="color:#666;font-weight:400">(optional — the member can upload them later from their panel)</small></h3>
         <div class="form-grid2">
             <div class="form-group">
-                <label>PAN Card Image <span class="req">*</span></label>
-                <input class="form-control" type="file" name="pan_card" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+                <label>PAN Card Image</label>
+                <input class="form-control" type="file" name="pan_card" accept=".jpg,.jpeg,.png,.webp,.gif">
                 <div class="form-hint">Clear photo/scan of the PAN card (JPG, PNG or WEBP, max <?= MAX_UPLOAD_MB ?> MB).</div>
             </div>
             <div class="form-group">
-                <label>Aadhaar Card Image <span class="req">*</span></label>
-                <input class="form-control" type="file" name="aadhaar_card" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+                <label>Aadhaar Card Image</label>
+                <input class="form-control" type="file" name="aadhaar_card" accept=".jpg,.jpeg,.png,.webp,.gif">
                 <div class="form-hint">Clear photo/scan of the Aadhaar card (JPG, PNG or WEBP, max <?= MAX_UPLOAD_MB ?> MB).</div>
             </div>
         </div>
 
-        <h3 class="mf-section">6️⃣ Login Details</h3>
-        <div class="form-grid2">
-            <div class="form-group">
-                <label>Password <span class="req">*</span></label>
-                <input class="form-control" type="password" name="password" required>
-                <div class="form-hint">Minimum 8 characters with letters and numbers.</div>
-            </div>
-            <div class="form-group">
-                <label>Confirm Password <span class="req">*</span></label>
-                <input class="form-control" type="password" name="password2" required>
-            </div>
+        <div class="alert alert-warning">
+            <b>First login:</b> the member's password will be their User ID (generated after registration).
+            They must change it when they log in for the first time.
         </div>
 
         <button class="btn btn-primary" type="submit">➕ Register Member</button>

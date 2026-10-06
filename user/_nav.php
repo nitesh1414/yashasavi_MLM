@@ -16,6 +16,7 @@ $nav = [
     ['icon' => '👛', 'label' => 'My Wallet', 'href' => 'wallet.php', 'active' => $activeKey === 'wallet'],
     ['icon' => '🏦', 'label' => 'Payout Requests', 'href' => 'payout.php', 'active' => $activeKey === 'payout'],
     ['label2' => 'Account'],
+    ['icon' => '📄', 'label' => 'Upload KYC', 'href' => 'kyc.php', 'active' => $activeKey === 'kyc'],
     ['icon' => '👤', 'label' => 'My Profile', 'href' => 'profile.php', 'active' => $activeKey === 'profile'],
     ['icon' => '🔒', 'label' => 'Change Password', 'href' => 'password.php', 'active' => $activeKey === 'password'],
 ];

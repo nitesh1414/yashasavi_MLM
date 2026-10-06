@@ -90,6 +90,7 @@ function ug_column_fixes()
         ['commissions',   'bv',                     "`bv` DECIMAL(12,2) NOT NULL DEFAULT 0"],
         ['commissions',   'level',                  "`level` TINYINT UNSIGNED NULL"],
         ['users',         'self_bv',                "`self_bv` DECIMAL(12,2) NOT NULL DEFAULT 0"],
+        ['users',         'must_change_password',   "`must_change_password` TINYINT(1) NOT NULL DEFAULT 0"],
         ['users',         'left_bv',                "`left_bv` DECIMAL(12,2) NOT NULL DEFAULT 0"],
         ['users',         'right_bv',               "`right_bv` DECIMAL(12,2) NOT NULL DEFAULT 0"],
         ['users',         'matched_pairs',          "`matched_pairs` INT UNSIGNED NOT NULL DEFAULT 0"],
