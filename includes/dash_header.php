@@ -58,6 +58,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
                 <div class="sb-name"><?= e($siteName) ?></div>
                 <div class="sb-sub"><?= e($areaTitles[$area] ?? '') ?></div>
             </div>
+            <button class="side-close" aria-label="Close menu">✕</button>
         </div>
         <nav class="side-nav">
             <?php

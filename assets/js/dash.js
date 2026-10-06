@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (sb.classList.contains('open')) { closeSidebar(); } else { openSidebar(); }
         });
         if (so) { so.addEventListener('click', closeSidebar); }
+        var sc = document.querySelector('.side-close');
+        if (sc) { sc.addEventListener('click', function (e) { e.stopPropagation(); closeSidebar(); }); }
         /* tapping a menu item closes the drawer, then the browser follows the link */
         sb.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeSidebar); });
         document.addEventListener('click', function (e) {

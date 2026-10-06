@@ -8,10 +8,12 @@ $navPages = q_all("SELECT * FROM pages WHERE status='published' AND show_in_menu
 $currentScript = basename($_SERVER['SCRIPT_NAME'] ?? '');
 $currentSlug = get_str('slug');
 $menu = [
-    ['label' => 'Home', 'href' => url('index.php'), 'active' => $currentScript === 'index.php'],
-    ['label' => 'About Us', 'href' => url('page.php?slug=about-us'), 'active' => $currentScript === 'page.php' && $currentSlug === 'about-us'],
-    ['label' => 'Products', 'href' => url('products.php'), 'active' => in_array($currentScript, ['products.php', 'product.php'])],
+    ['label' => 'Home', 'href' => url('index.php'), 'active' => $currentScript === 'index.php', 'ico' => '🏠'],
+    ['label' => 'About Us', 'href' => url('page.php?slug=about-us'), 'active' => $currentScript === 'page.php' && $currentSlug === 'about-us', 'ico' => 'ℹ️'],
+    ['label' => 'Products', 'href' => url('products.php'), 'active' => in_array($currentScript, ['products.php', 'product.php']), 'ico' => '🛍️'],
 ];
+$pageIcons = ['opportunity' => '💼', 'legals' => '⚖️', 'promotion' => '📣', 'terms-and-conditions' => '📜',
+              'disclaimer' => '🛡️', 'privacy-policy' => '🛡️', 'refund-policy' => '💸', 'contact-us' => '📞'];
 foreach ($navPages as $p) {
     if (in_array($p['slug'], ['about-us'])) { continue; }
     /* the Opportunity menu entry opens the live plan page (ranks & rewards from DB) */
@@ -20,9 +22,10 @@ foreach ($navPages as $p) {
         'href' => $p['slug'] === 'opportunity' ? url('opportunity.php') : url('page.php?slug=' . $p['slug']),
         'active' => ($currentScript === 'page.php' && $currentSlug === $p['slug'])
             || ($p['slug'] === 'opportunity' && $currentScript === 'opportunity.php'),
+        'ico' => $pageIcons[$p['slug']] ?? '📄',
     ];
 }
-$menu[] = ['label' => 'Contact Us', 'href' => url('contact.php'), 'active' => $currentScript === 'contact.php'];
+$menu[] = ['label' => 'Contact Us', 'href' => url('contact.php'), 'active' => $currentScript === 'contact.php', 'ico' => '📞'];
 $metaTitle = isset($pageTitle) ? $pageTitle . ' — ' . $siteName : setting('seo_meta_title', $siteName);
 $metaDesc = isset($pageDesc) ? $pageDesc : setting('seo_meta_desc', '');
 $u = current_user();
@@ -83,11 +86,16 @@ require_once __DIR__ . '/social_icons.php';
         </a>
         <ul class="nav-menu" id="navMenu">
             <li class="nav-menu-head">
-                <span class="nav-menu-brand"><?= e($siteName) ?></span>
+                <span class="nav-menu-brand">
+                    <img src="<?= e($logo) ?>" alt="">
+                    <span><?= e($siteName) ?></span>
+                </span>
                 <button class="nav-close" aria-label="Close menu">✕</button>
             </li>
             <?php foreach ($menu as $m): ?>
-                <li><a href="<?= e($m['href']) ?>" class="<?= $m['active'] ? 'active' : '' ?>"><?= e($m['label']) ?></a></li>
+                <li><a href="<?= e($m['href']) ?>" class="<?= $m['active'] ? 'active' : '' ?>">
+                    <span class="m-ico"><?= $m['ico'] ?? '📄' ?></span><?= e($m['label']) ?>
+                </a></li>
             <?php endforeach; ?>
             <li class="nav-mobile-auth">
                 <?php if ($u): ?>
