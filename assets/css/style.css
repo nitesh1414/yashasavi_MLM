@@ -862,5 +862,9 @@ body.nav-open .app-tabbar { display: none; }
     /* the slide-out drawer starts at the very top of the screen */
     .nav-menu { padding-top: env(safe-area-inset-top, 0px); }
 }
+@media (orientation: landscape) {
+    .nav-menu { padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); }
+    .app-tabbar { padding-left: max(6px, env(safe-area-inset-left, 0px)); padding-right: max(6px, env(safe-area-inset-right, 0px)); }
+}
 /* scroll progress line sits below the island */
 #scrollProgress { top: env(safe-area-inset-top, 0px); }
