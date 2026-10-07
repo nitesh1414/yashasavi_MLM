@@ -18,18 +18,40 @@ if (is_post()) {
         $keep = (int)$root['id'];
         $del = q_all("SELECT id FROM users WHERE id != ?", [$keep]);
         $ids = array_map(fn ($r) => (int)$r['id'], $del);
-        if ($ids) {
-            $in = implode(',', $ids);
-            q("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id IN ($in))");
-            q("DELETE FROM orders WHERE user_id IN ($in)");
-            q("DELETE FROM commissions WHERE user_id IN ($in) OR from_user_id IN ($in)");
-            q("DELETE FROM wallet_transactions WHERE user_id IN ($in)");
-            q("DELETE FROM payouts WHERE user_id IN ($in)");
-            q("DELETE FROM users WHERE id IN ($in)");
+        try {
+            db_tx(function () use ($ids, $keep) {
+                if ($ids) {
+                    $in = implode(',', $ids);
+                    q("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id IN ($in))");
+                    /* commissions: owned by the deleted members OR earned from
+                     * their orders — must run BEFORE the orders themselves are
+                     * deleted (the subquery needs them); note: commissions has
+                     * no from_user_id column, the upline context lives in `note` */
+                    q("DELETE FROM commissions WHERE user_id IN ($in)
+                       OR order_id IN (SELECT id FROM orders WHERE user_id IN ($in))");
+                    q("DELETE FROM orders WHERE user_id IN ($in)");
+                }
+                /* sweep: commissions whose order no longer exists
+                 * (orphans from older runs / legacy data) */
+                q("DELETE FROM commissions WHERE order_id IS NOT NULL
+                   AND order_id NOT IN (SELECT id FROM orders)");
+                /* wallet history and payouts all belong to the wiped network */
+                q("DELETE FROM wallet_transactions");
+                q("DELETE FROM payouts");
+                if ($ids) {
+                    $in = implode(',', $ids);
+                    q("DELETE FROM users WHERE id IN ($in)");
+                }
+                /* reset the root to a clean company account — the whole
+                 * network (and every commission that fed the wallet) is gone */
+                q("UPDATE users SET left_bv = 0, right_bv = 0, self_bv = 0, matched_pairs = 0,
+                   wallet_balance = 0, total_earned = 0, total_withdrawn = 0 WHERE id = ?", [$keep]);
+            });
+            flash('success', 'Network wiped — all members except ' . e($root['username'])
+                . ' were deleted. Orders, commissions, wallets and network counters were reset.');
+        } catch (Throwable $e) {
+            flash('error', 'The wipe failed and NOTHING was deleted: ' . e($e->getMessage()));
         }
-        /* reset the root's network counters — the subtree is gone */
-        q("UPDATE users SET left_bv = 0, right_bv = 0, matched_pairs = 0 WHERE id = ?", [$keep]);
-        flash('success', 'Network wiped — all members except ' . e($root['username']) . ' were deleted and the network counters were reset.');
         redirect('bulk_members.php');
     }
 
