@@ -51,7 +51,9 @@ return [
     sponsor_id INT UNSIGNED NULL,
     placement_id INT UNSIGNED NULL,
     leg ENUM('L','R') NOT NULL DEFAULT 'L',
-    path VARCHAR(255) NOT NULL DEFAULT '/',
+    /* TEXT, not VARCHAR(255): deep straight-line seeds create paths far
+     * longer than 255 chars — one slash-id segment per level */
+    path TEXT NOT NULL,
     depth INT UNSIGNED NOT NULL DEFAULT 0,
     left_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
     right_bv DECIMAL(14,2) NOT NULL DEFAULT 0,

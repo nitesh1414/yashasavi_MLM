@@ -136,6 +136,12 @@ function ug_needs_upgrade($pdo)
     if ($type && stripos($type, 'sponsor_matching') === false) {
         return true;
     }
+    /* users.path must be TEXT — straight-line seeds create 250+ level
+     * paths that no longer fit into the old VARCHAR(255) */
+    $pathType = q_val("SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'path'");
+    if ($pathType && !in_array($pathType, ['text', 'mediumtext', 'longtext'], true)) {
+        return true;
+    }
     return false;
 }
 
@@ -205,6 +211,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->exec("ALTER TABLE users ADD INDEX `idx_$col` (`$col`)");
                     $log[] = "Users: $col is no longer unique (family members may share contact details).";
                 }
+            }
+        }
+
+        /* 3d — users.path must be TEXT: straight-line seeds (bulk members)
+         * create 250+ level ancestry paths longer than the old VARCHAR(255);
+         * a too-short column would silently truncate and corrupt the tree */
+        if (ug_table_exists('users')) {
+            $pathType = q_val("SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'path'");
+            if ($pathType && !in_array($pathType, ['text', 'mediumtext', 'longtext'], true)) {
+                $pdo->exec("ALTER TABLE users MODIFY `path` TEXT NOT NULL");
+                $log[] = 'Users: ancestry <code>path</code> widened to TEXT (supports deep straight-line seeds).';
             }
         }
 
