@@ -508,6 +508,109 @@ function run_binary_matching($user, $orderId)
  * Returns [ok(bool), message].
  */
 /**
+ * Move a member (with their entire downline) to a new position in the
+ * binary tree. The new slot is found with the same spillover search as
+ * registration: the first free position under the chosen target + leg.
+ *
+ * Updates placement_id / leg and rewrites path + depth for the member and
+ * every descendant. Leg BV counters of the affected upline chains are
+ * rebalanced (the team's confirmed BV moves with it). Sponsor (introducer),
+ * orders, wallet and already-paid commissions are untouched.
+ */
+function move_user_position($userId, $targetId, $leg, $adminId)
+{
+    return db_tx(function () use ($userId, $targetId, $leg, $adminId) {
+        $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [(int)$userId]);
+        if (!$u) {
+            return [false, 'Member not found.'];
+        }
+        if ((int)$u['placement_id'] === 0 || $u['path'] === '/') {
+            return [false, 'The company root cannot be moved.'];
+        }
+        $target = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [(int)$targetId]);
+        if (!$target) {
+            return [false, 'Target member not found.'];
+        }
+        if ($target['status'] !== 'active') {
+            return [false, 'Target account is not active.'];
+        }
+        if ((int)$target['id'] === (int)$u['id']) {
+            return [false, 'A member cannot be placed under themselves.'];
+        }
+        if (strpos($target['path'], $u['path']) === 0) {
+            return [false, 'Target is inside the member\'s own downline — that would create a loop.'];
+        }
+        $leg = ($leg === 'R') ? 'R' : 'L';
+        if ((int)$target['id'] === (int)$u['placement_id'] && $leg === $u['leg']) {
+            return [false, 'The member is already directly at this position.'];
+        }
+
+        $pos = find_position((int)$target['id'], $leg);
+        if (!$pos) {
+            return [false, 'No free position available under this target.'];
+        }
+        [$newParentId, $newLeg] = $pos;
+        $newParent = q_row("SELECT * FROM users WHERE id = ?", [$newParentId]);
+        if (!$newParent) {
+            return [false, 'Position error.'];
+        }
+        if ((int)$newParent['id'] === (int)$u['id'] || strpos($newParent['path'], $u['path']) === 0) {
+            return [false, 'The free position under this target falls inside the member\'s own downline — choose another target or leg.'];
+        }
+
+        $oldPath = $u['path'];
+        $newPath = $newParent['path'] . $u['id'] . '/';
+
+        /* path is VARCHAR(255) — make sure the deepest descendant still fits */
+        $maxLen = (float)q_val("SELECT COALESCE(MAX(LENGTH(path)), 0) FROM users WHERE path LIKE ?", [$oldPath . '%']);
+        if (strlen($newPath) + ((float)$maxLen - strlen($oldPath)) > 255) {
+            return [false, 'The member\'s downline is too deep to move to this position.'];
+        }
+
+        /* total confirmed BV that relocates with the subtree */
+        $bvDelta = (float)q_val("SELECT COALESCE(SUM(self_bv), 0) FROM users WHERE path LIKE ?", [$oldPath . '%']);
+
+        /* old upline chain: [ancestorId, leg that leads down to the member] */
+        $oldChain = [];
+        $cur = $u;
+        while ($cur && (int)$cur['placement_id'] > 0) {
+            $oldChain[] = [(int)$cur['placement_id'], $cur['leg']];
+            $cur = q_row("SELECT id, placement_id, leg FROM users WHERE id = ?", [(int)$cur['placement_id']]);
+        }
+
+        /* 1) rewrite paths of the member and their whole downline */
+        q("UPDATE users SET path = CONCAT(?, SUBSTRING(path, ?)) WHERE path LIKE ?",
+          [$newPath, strlen($oldPath) + 1, $oldPath . '%']);
+        /* 2) shift depths by the level difference */
+        $depthDelta = ((int)$newParent['depth'] + 1) - (int)$u['depth'];
+        if ($depthDelta !== 0) {
+            q("UPDATE users SET depth = depth + ? WHERE path LIKE ?", [$depthDelta, $newPath . '%']);
+        }
+        /* 3) new placement + leg */
+        q("UPDATE users SET placement_id = ?, leg = ? WHERE id = ?", [(int)$newParent['id'], $newLeg, (int)$u['id']]);
+
+        /* 4) rebalance leg BV: take it off the old chain, add it to the new chain */
+        foreach ($oldChain as $step) {
+            $col = $step[1] === 'R' ? 'right_bv' : 'left_bv';
+            q("UPDATE users SET $col = GREATEST(0, $col - ?) WHERE id = ?", [$bvDelta, $step[0]]);
+        }
+        $parent = q_row("SELECT id, placement_id, leg FROM users WHERE id = ?", [(int)$newParent['id']]);
+        $legFrom = $newLeg;
+        while ($parent && (int)$parent['id'] > 0) {
+            $col = $legFrom === 'R' ? 'right_bv' : 'left_bv';
+            q("UPDATE users SET $col = $col + ? WHERE id = ?", [$bvDelta, (int)$parent['id']]);
+            $legFrom = $parent['leg'];
+            $parent = (int)$parent['placement_id'] > 0
+                ? q_row("SELECT id, placement_id, leg FROM users WHERE id = ?", [(int)$parent['placement_id']])
+                : null;
+        }
+
+        return [true, $u['username'] . ' moved under ' . $newParent['username'] . ' (' . ($newLeg === 'R' ? 'RIGHT' : 'LEFT') . ' leg)'
+            . ($bvDelta > 0 ? ' — ' . number_format($bvDelta, 0) . ' BV relocated with the team.' : '.')];
+    });
+}
+
+/**
  * Single-action approval: authorizes the payment (marks it received/paid)
  * and then approves + delivers the order in one go.
  */

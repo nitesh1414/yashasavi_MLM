@@ -60,6 +60,7 @@ require __DIR__ . '/../includes/dash_header.php';
                     <a class="btn btn-outline btn-sm" href="user_edit.php?id=<?= (int)$u['id'] ?>">✏️ Edit</a>
                     <a class="btn btn-gold btn-sm" href="order_add.php?uid=<?= (int)$u['id'] ?>">🧾 Add Order</a>
                     <a class="btn btn-light btn-sm" href="tree.php?root=<?= (int)$u['id'] ?>">🌳 Tree</a>
+                    <a class="btn btn-outline btn-sm" href="user_position.php?id=<?= (int)$u['id'] ?>">🔁 Change Position</a>
                 </span>
             </div>
             <table class="kv-table" style="width:100%">
