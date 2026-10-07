@@ -235,7 +235,10 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('resize', hideTreePopup);
     window.addEventListener('scroll', hideTreePopup, true);
 
-    /* genealogy tree zoom (fit the tree in one window) */
+    /* genealogy tree zoom: the chart always starts at FULL size (100%) with
+       horizontal + vertical scroll bars — members never shrink to fit. The
+       toolbar offers an optional overview (fit) and a one-click return to
+       the readable 100% size. */
     document.querySelectorAll('[data-tree-zoom]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var tree = document.querySelector('.tree[data-tree-root]');
@@ -249,6 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var cur = parseFloat(tree.dataset.zoom || '1');
             if (btn.dataset.treeZoom === 'in') { cur = Math.min(1.4, cur + 0.15); }
             else if (btn.dataset.treeZoom === 'out') { cur = Math.max(0.2, cur - 0.15); }
+            else if (btn.dataset.treeZoom === 'full') { cur = 1; }
             else { cur = Math.min(1, (wrap.clientWidth - 16) / natural); }
             tree.dataset.zoom = cur;
             tree.style.zoom = cur;
@@ -256,13 +260,9 @@ document.addEventListener('DOMContentLoaded', function () {
             drawTreeLines();
         });
     });
-    /* auto-fit on load + resize, then draw the connector lines */
-    var fitBtn = document.querySelector('[data-tree-zoom="fit"]');
-    if (fitBtn) {
-        var rz;
-        window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { fitBtn.click(); }, 150); });
-        fitBtn.click();
-    }
+    /* keep the connector lines correct on resize — the chosen zoom stays */
+    var rzT;
+    window.addEventListener('resize', function () { clearTimeout(rzT); rzT = setTimeout(drawTreeLines, 150); });
     drawTreeLines();
     setTimeout(drawTreeLines, 350); /* once more after fonts settle */
 });

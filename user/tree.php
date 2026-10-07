@@ -35,7 +35,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <a class="btn btn-light btn-sm" href="tree.php?root=<?= (int)$rootUser['id'] ?>">🔄 Refresh</a>
         </span>
     </div>
-    <?= render_binary_tree($rootUser, 3, 'tree.php', 'add-member.php') ?>
+    <?= render_binary_tree($rootUser, 0, 'tree.php', 'add-member.php') ?>
 </div>
 
 <?php require __DIR__ . '/../includes/dash_footer.php'; ?>

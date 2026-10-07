@@ -1,39 +1,59 @@
 <?php
 /**
  * Binary genealogy tree renderer.
- * Renders $levels generations below $rootUser (default 3; deeper via "view subtree").
+ * Renders the COMPLETE downline of $rootUser (every member, unlimited
+ * depth) inside a scrollable chart — the viewer scrolls horizontally and
+ * vertically to see the whole network. $levels limits the depth when given
+ * (0 = all levels, the default).
  * $linkBase — URL for re-rooting (e.g. 'tree.php') with ?root=<id>
  * $addBase  — URL of the PANEL registration page (e.g. 'add-member.php')
  *
- * Design: minimal centered binary chart on the full page. Each member node
- * shows ONLY the member ID as a pill; hovering (desktop) or tapping (mobile)
- * the pill reveals the remaining information (name, status, leg, upline,
- * BVs, rank) plus the "add under this member" and "view subtree" actions in
- * a tooltip. Branches are drawn as straight lines between parent and child
- * pills by an SVG overlay (see dash.js drawTreeLines). Empty positions below
- * a member render as dashed "Add Member" pills that open the panel
- * registration form with sponsor + leg prefilled. A zoom toolbar (fit / in /
- * out, auto-fit on load + resize) keeps deep trees readable on any screen.
+ * Design: binary chart on the full page. Each member node shows ONLY the
+ * member ID as a pill at a FIXED readable size (never shrunk to fit);
+ * hovering (desktop) or tapping (mobile) the pill reveals the remaining
+ * information (name, status, leg, upline, BVs, rank) plus the "add under
+ * this member" and "view subtree" actions in a tooltip. Branches are drawn
+ * as straight lines between parent and child pills by an SVG overlay (see
+ * dash.js drawTreeLines). Empty positions below a member render as dashed
+ * "Add Member" pills that open the panel registration form with sponsor +
+ * leg prefilled. A zoom toolbar (100% / fit / in / out) allows an optional
+ * overview; the tree always STARTS at full size with scroll bars.
  */
-function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $addBase = 'add-member.php', $viewUserBase = null)
+function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $addBase = 'add-member.php', $viewUserBase = null)
 {
-    // preload descendants up to $levels via BFS
+    /* whole downline in ONE query via the materialized ancestry path.
+     * Safety cap for extreme networks: beyond it the top levels are shown
+     * and the viewer drills down with "view subtree". */
+    $cap = 4000;
+    $rows = q_all("SELECT id, username, full_name, leg, placement_id, left_bv, right_bv,
+                   is_active, status, rank_id, self_bv, created_at, sponsor_id, path
+                   FROM users WHERE path LIKE ? AND id != ?
+                   ORDER BY depth, id LIMIT " . ($cap + 1),
+                   [$rootUser['path'] . '%', (int)$rootUser['id']]);
+    $truncated = count($rows) > $cap;
+    if ($truncated) {
+        $rows = array_slice($rows, 0, $cap);
+    }
+
+    /* parents always have a smaller depth than their children, so one pass
+     * in this order builds the placement map without recursion */
     $byParent = [];
-    $current = [$rootUser['id']];
-    $all = [$rootUser['id'] => $rootUser];
-    for ($i = 0; $i < $levels; $i++) {
-        if (!$current) { break; }
-        $ph = implode(',', array_map('intval', $current));
-        $rows = q_all("SELECT id, username, full_name, leg, placement_id, left_bv, right_bv,
-                       is_active, status, rank_id, self_bv, created_at, sponsor_id, path
-                       FROM users WHERE placement_id IN ($ph)");
-        $next = [];
-        foreach ($rows as $r) {
-            $byParent[$r['placement_id']][$r['leg']] = $r;
-            $all[$r['id']] = $r;
-            $next[] = $r['id'];
+    $all = [(int)$rootUser['id'] => $rootUser];
+    foreach ($rows as $r) {
+        if (!isset($all[(int)$r['placement_id']])) { continue; } /* orphan guard */
+        $byParent[(int)$r['placement_id']][$r['leg']] = $r;
+        $all[(int)$r['id']] = $r;
+    }
+
+    /* subtree size of every member, computed bottom-up in one pass —
+     * replaces two COUNT(*) queries per rendered member */
+    $size = [];
+    foreach ($rows as $r) { $size[(int)$r['id']] = 1; }
+    for ($i = count($rows) - 1; $i >= 0; $i--) {
+        $pid = (int)$rows[$i]['placement_id'];
+        if (isset($size[$pid])) {
+            $size[$pid] += $size[(int)$rows[$i]['id']];
         }
-        $current = $next;
     }
 
     $rankNames = [];
@@ -52,14 +72,13 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
         }
     }
 
-    /* member counts below each rendered member, per leg (via the materialized path) */
-    $legCounts = function ($user) use ($byParent) {
+    /* members below each rendered member, per leg (from the computed sizes) */
+    $legCounts = function ($user) use ($byParent, $size) {
         $out = ['L' => 0, 'R' => 0];
         $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
         foreach (['L', 'R'] as $side) {
             if (!empty($kids[$side])) {
-                $out[$side] = (int)q_val("SELECT COUNT(*) FROM users WHERE path LIKE ?",
-                    [$kids[$side]['path'] . '%']);
+                $out[$side] = isset($size[(int)$kids[$side]['id']]) ? (int)$size[(int)$kids[$side]['id']] : 0;
             }
         }
         return $out;
@@ -139,8 +158,9 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
         use (&$renderLevel, $byParent, $node, $levels) {
         $html = '<li>' . $node($user, $isRoot, $parentUser, $leg);
         /* Only real members have children rows: each child position is either
-         * a member node or an add-member slot; nothing below empty slots. */
-        if ($user && $depth < $levels) {
+         * a member node or an add-member slot; nothing below empty slots.
+         * $levels < 1 renders the whole downline (scroll to explore). */
+        if ($user && ($levels < 1 || $depth < $levels)) {
             $html .= '<ul>';
             $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
             $html .= '<li>' . $renderLevel(isset($kids['L']) ? $kids['L'] : null, $depth + 1, false, $user, 'L') . '</li>';
@@ -154,13 +174,10 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
     $root = $all[$rootUser['id']];
 
     /* summary table: registrations + confirmed BV per leg of the viewed root */
-    $kids = isset($byParent[$root['id']]) ? $byParent[$root['id']] : [];
     $sum = ['L' => ['n' => 0, 'bv' => (float)$root['left_bv']], 'R' => ['n' => 0, 'bv' => (float)$root['right_bv']]];
-    foreach (['L', 'R'] as $side) {
-        if (!empty($kids[$side])) {
-            $sum[$side]['n'] = (int)q_val("SELECT COUNT(*) FROM users WHERE path LIKE ?", [$kids[$side]['path'] . '%']);
-        }
-    }
+    $rootCnt = $legCounts($root);
+    $sum['L']['n'] = $rootCnt['L'];
+    $sum['R']['n'] = $rootCnt['R'];
     $summary = '<div class="card" style="margin-bottom:14px">'
         . '<div class="card-title">📊 Network Summary — ' . e($root['username']) . ' (' . e($root['full_name']) . ')</div>'
         . '<div class="table-wrap"><table class="table">'
@@ -170,17 +187,25 @@ function render_binary_tree($rootUser, $levels = 5, $linkBase = 'tree.php', $add
         . '<tr><td><b>RIGHT</b></td><td>' . number_format($sum['R']['n']) . '</td><td>' . number_format($sum['R']['bv']) . '</td></tr>'
         . '</tbody></table></div></div>';
 
-    return $summary . '<div class="tree-legends">
+    return $summary
+        . ($truncated
+            ? '<div class="alert alert-warning">This network has more than ' . number_format($cap)
+                . ' members — showing the top ' . number_format($cap) . '. Use 🔍 <b>View subtree</b> '
+                . 'on any member to continue deeper into that branch.</div>'
+            : '')
+        . '<div class="tree-legends">
                 <span class="lg"><span class="dot" style="background:#43a047"></span> Active member</span>
                 <span class="lg"><span class="dot" style="background:#e53935"></span> Inactive member</span>
                 <span class="lg"><span class="dot" style="background:#fff;box-shadow:0 0 0 2px #d6a83c inset"></span> Root</span>
+                <span class="lg">📜 Scroll in any direction to see the <b>whole</b> network — members stay full size</span>
                 <span class="lg">Hover / tap a member ID for details &amp; actions</span>
                 <span class="lg">Empty slots add a member at that exact position</span>
             </div>
             <div class="tree-toolbar">
                 <div class="tt-zoom">
                     <button type="button" data-tree-zoom="out" title="Zoom out">➖</button>
-                    <button type="button" data-tree-zoom="fit" title="Fit to window">⛶ Fit</button>
+                    <button type="button" data-tree-zoom="fit" title="Fit to window (overview)">⛶ Fit</button>
+                    <button type="button" data-tree-zoom="full" title="Back to full size (100%)">🔍 100%</button>
                     <button type="button" data-tree-zoom="in" title="Zoom in">➕</button>
                 </div>
             </div>
