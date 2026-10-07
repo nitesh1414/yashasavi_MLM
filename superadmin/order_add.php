@@ -85,33 +85,24 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="form-grid2">
             <div class="form-group">
                 <label>Distributor <span class="req">*</span></label>
-                <select class="form-control" name="user_id" id="mo-user" required>
-                    <option value="">— select distributor —</option>
-                    <?php foreach ($users as $u): ?>
-                        <option value="<?= (int)$u['id'] ?>" data-name="<?= e($u['full_name']) ?>"<?= $preUid === (int)$u['id'] ? ' selected' : '' ?>>
-                            <?= e($u['username'] . ' — ' . $u['full_name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <div class="form-hint">User ID with the member's name.</div>
+                <div class="combo" id="mo-user-combo">
+                    <input class="form-control combo-input" type="text" id="mo-user" placeholder="Search distributor — ID or name" autocomplete="off">
+                    <input type="hidden" name="user_id" id="mo-user-id" value="">
+                    <button type="button" class="combo-toggle" tabindex="-1" aria-label="Show all">▾</button>
+                    <div class="combo-list" id="mo-user-list"></div>
+                </div>
+                <div class="form-hint">Type to search by User ID, name or mobile — or click ▾ to browse.</div>
             </div>
 
             <div class="form-group">
                 <label>Product <span class="req">*</span></label>
-                <select class="form-control" name="product_id" id="mo-product" required>
-                    <option value="">— select product —</option>
-                    <?php foreach ($products as $p): ?>
-                        <option value="<?= (int)$p['id'] ?>"
-                                data-name="<?= e($p['name']) ?>"
-                                data-mrp="<?= (float)$p['mrp'] ?>"
-                                data-dp="<?= (float)$p['dp'] ?>"
-                                data-bv="<?= (float)$p['bv'] ?>"
-                                data-stock="<?= (int)$p['stock'] ?>">
-                            <?= e($p['name']) ?> — ₹<?= number_format((float)$p['dp']) ?> / <?= number_format((float)$p['bv']) ?> BV
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <div class="form-hint">Product with distributor price and BV.</div>
+                <div class="combo" id="mo-product-combo">
+                    <input class="form-control combo-input" type="text" id="mo-product" placeholder="Search product" autocomplete="off">
+                    <input type="hidden" name="product_id" id="mo-product-id" value="">
+                    <button type="button" class="combo-toggle" tabindex="-1" aria-label="Show all">▾</button>
+                    <div class="combo-list" id="mo-product-list"></div>
+                </div>
+                <div class="form-hint">Type to search — shows distributor price, BV and stock.</div>
             </div>
 
             <div class="form-group">
@@ -121,7 +112,7 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
         </div>
 
-        <!-- live pricing panel: fills as soon as both dropdowns have a choice -->
+        <!-- live pricing panel: fills as soon as both fields have a choice -->
         <div id="mo-pricing" class="mo-pricing" style="display:none">
             <div class="mo-pricing-head">🧾 Order summary</div>
             <div class="mo-row"><span>Order for</span><b id="mo-for">—</b></div>
@@ -140,62 +131,173 @@ require __DIR__ . '/../includes/dash_header.php';
             The cash payment is recorded as received; BV, commissions and stock update immediately — no approval step needed.
         </div>
     </form>
-</div>
 
 <style>
 .mo-pricing{background:#f4f8f3;border:1px solid #dfe9dc;border-radius:12px;padding:4px 14px;margin:16px 0 6px}
 .mo-pricing-head{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:#68786b;padding:10px 0 4px}
-.mo-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed #dfe8dc;font-size:13.5px}
+.mo-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed #dfe9dc;font-size:13.5px}
 .mo-row:last-child{border-bottom:0}
 .mo-row>span{color:#68786b}
 .mo-row>b{color:#000;font-weight:600;text-align:right;overflow-wrap:anywhere}
 .mo-row.mo-total{background:#eaf4e8;border-radius:10px;padding:10px 12px;margin-top:6px;border-bottom:0}
 .mo-row.mo-total b{font-size:16px;color:#2e7d32}
+.combo{position:relative}
+.combo-input{font-size:16px;padding-right:36px}
+.combo-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;font-size:15px;color:#68786b;cursor:pointer;padding:8px;line-height:1}
+.combo-toggle:hover{color:#1b3a1f}
+.combo-list{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #cfd8cf;border-radius:10px;box-shadow:0 12px 30px rgba(22,53,26,.16);max-height:262px;overflow-y:auto;z-index:60;-webkit-overflow-scrolling:touch}
+.combo-list.open{display:block}
+.combo-opt{padding:9px 12px;font-size:13px;cursor:pointer;line-height:1.4}
+.combo-opt b{color:#000;font-weight:600;overflow-wrap:anywhere}
+.combo-opt small{display:block;color:#68786b;font-size:11.5px}
+.combo-opt:hover,.combo-opt.active{background:#eaf4e8}
+.combo-empty{padding:10px 12px;color:#68786b;font-size:12.5px}
 </style>
 
 <script>
 (function () {
-    var uSel = document.getElementById('mo-user');
-    var pSel = document.getElementById('mo-product');
+    /* data from PHP: [{id, label, sub, search, ...}] */
+    var USERS = <?= json_encode(array_map(function ($u) {
+        return [
+            'id'     => (int)$u['id'],
+            'label'  => $u['username'] . ' — ' . $u['full_name'],
+            'sub'    => trim(($u['city'] ?? '') . ' • ' . ($u['mobile'] ?? ''), ' •'),
+            'search' => $u['username'] . ' ' . $u['full_name'] . ' ' . ($u['mobile'] ?? '') . ' ' . ($u['city'] ?? ''),
+        ];
+    }, $users)) ?>;
+    var PRODUCTS = <?= json_encode(array_map(function ($p) {
+        return [
+            'id'     => (int)$p['id'],
+            'label'  => $p['name'],
+            'sub'    => '₹' . number_format((float)$p['dp']) . ' DP • ' . number_format((float)$p['bv']) . ' BV • ' . (int)$p['stock'] . ' in stock',
+            'search' => $p['name'],
+            'mrp'    => (float)$p['mrp'],
+            'dp'     => (float)$p['dp'],
+            'bv'     => (float)$p['bv'],
+            'stock'  => (int)$p['stock'],
+        ];
+    }, $products)) ?>;
+
+    /* ---- searchable dropdown (combobox) ---- */
+    function makeCombo(inputId, hiddenId, listId, items, onPick) {
+        var input = document.getElementById(inputId);
+        var hidden = document.getElementById(hiddenId);
+        var list = document.getElementById(listId);
+        var toggle = input.parentNode.querySelector('.combo-toggle');
+        var open = false, activeIndex = -1, filtered = items.slice();
+
+        function render() {
+            list.innerHTML = '';
+            if (!filtered.length) {
+                list.innerHTML = '<div class="combo-empty">No matches found</div>';
+                return;
+            }
+            filtered.forEach(function (it, i) {
+                var d = document.createElement('div');
+                d.className = 'combo-opt' + (i === activeIndex ? ' active' : '');
+                var b = document.createElement('b');
+                b.textContent = it.label;
+                d.appendChild(b);
+                if (it.sub) {
+                    var sm = document.createElement('small');
+                    sm.textContent = it.sub;
+                    d.appendChild(sm);
+                }
+                /* mousedown fires before blur and before click-through */
+                d.addEventListener('mousedown', function (e) { e.preventDefault(); pick(it); });
+                list.appendChild(d);
+            });
+        }
+        function filter() {
+            var q = input.value.trim().toLowerCase();
+            filtered = !q ? items.slice() : items.filter(function (it) {
+                return (it.label + ' ' + (it.search || '')).toLowerCase().indexOf(q) !== -1;
+            });
+            activeIndex = filtered.length ? 0 : -1;
+            render();
+        }
+        function openList() { filter(); list.classList.add('open'); open = true; }
+        function closeList() { list.classList.remove('open'); open = false; }
+        function pick(it) {
+            input.value = it.label;
+            hidden.value = it.id;
+            closeList();
+            if (onPick) { onPick(it); }
+        }
+        input.addEventListener('focus', openList);
+        input.addEventListener('click', openList);
+        input.addEventListener('input', function () {
+            hidden.value = '';
+            openList();
+            if (onPick) { onPick(null); }
+        });
+        input.addEventListener('keydown', function (e) {
+            if (!open) {
+                if (e.key === 'ArrowDown') { openList(); e.preventDefault(); }
+                return;
+            }
+            if (e.key === 'ArrowDown') { activeIndex = Math.min(activeIndex + 1, filtered.length - 1); render(); scrollActive(); e.preventDefault(); }
+            else if (e.key === 'ArrowUp') { activeIndex = Math.max(activeIndex - 1, 0); render(); scrollActive(); e.preventDefault(); }
+            else if (e.key === 'Enter') { if (filtered[activeIndex]) { pick(filtered[activeIndex]); } e.preventDefault(); }
+            else if (e.key === 'Escape') { closeList(); }
+        });
+        function scrollActive() {
+            var el = list.querySelector('.combo-opt.active');
+            if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'nearest' }); }
+        }
+        toggle.addEventListener('click', function () {
+            if (open) { closeList(); } else { input.focus(); openList(); }
+        });
+        document.addEventListener('click', function (e) {
+            if (!input.parentNode.contains(e.target)) { closeList(); }
+        });
+        return {
+            pick: pick,
+            getSelected: function () {
+                var v = hidden.value;
+                for (var i = 0; i < items.length; i++) { if (String(items[i].id) === String(v)) { return items[i]; } }
+                return null;
+            }
+        };
+    }
+
     var qty = document.getElementById('mo-qty');
     var box = document.getElementById('mo-pricing');
     var submit = document.getElementById('mo-submit');
 
     function money(n) { return '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
-
     function upd() {
-        var uOpt = uSel.options[uSel.selectedIndex];
-        var pOpt = pSel.options[pSel.selectedIndex];
-        var ready = uOpt && uOpt.value && pOpt && pOpt.value;
-        submit.disabled = !ready;
-        if (!ready) { box.style.display = 'none'; return; }
+        var u = userCombo.getSelected();
+        var p = prodCombo.getSelected();
+        submit.disabled = !(u && p);
+        if (!(u && p)) { box.style.display = 'none'; return; }
 
         var q = Math.max(1, parseInt(qty.value, 10) || 1);
-        var dp = parseFloat(pOpt.getAttribute('data-dp')) || 0;
-        var mrp = parseFloat(pOpt.getAttribute('data-mrp')) || 0;
-        var bv = parseFloat(pOpt.getAttribute('data-bv')) || 0;
+        document.getElementById('mo-for').textContent = u.label;
+        document.getElementById('mo-pname').textContent = p.label;
+        document.getElementById('mo-umrp').textContent = money(p.mrp);
+        document.getElementById('mo-udp').textContent = money(p.dp);
+        document.getElementById('mo-ubv').textContent = Number(p.bv).toLocaleString('en-IN') + ' BV';
+        document.getElementById('mo-total').textContent = money(p.dp * q);
+        document.getElementById('mo-tmrp').textContent = money(p.mrp * q);
+        document.getElementById('mo-tbv').textContent = Number(p.bv * q).toLocaleString('en-IN') + ' BV';
 
-        document.getElementById('mo-for').textContent = uOpt.textContent.trim();
-        document.getElementById('mo-pname').textContent = pOpt.getAttribute('data-name');
-        document.getElementById('mo-umrp').textContent = money(mrp);
-        document.getElementById('mo-udp').textContent = money(dp);
-        document.getElementById('mo-ubv').textContent = Number(bv).toLocaleString('en-IN') + ' BV';
-        document.getElementById('mo-q').textContent = q;
-        document.getElementById('mo-total').textContent = money(dp * q);
-        document.getElementById('mo-tmrp').textContent = money(mrp * q);
-        document.getElementById('mo-tbv').textContent = Number(bv * q).toLocaleString('en-IN') + ' BV';
-
-        /* warn about stock */
-        var stock = parseInt(pOpt.getAttribute('data-stock'), 10) || 0;
-        qty.max = Math.max(1, stock);
-        document.getElementById('mo-q').textContent = q + (q > stock ? '  ⚠ only ' + stock + ' in stock' : '');
-
+        qty.max = Math.max(1, p.stock);
+        document.getElementById('mo-q').textContent = q + (q > p.stock ? '  ⚠ only ' + p.stock + ' in stock' : '');
         box.style.display = '';
     }
 
-    uSel.addEventListener('change', upd);
-    pSel.addEventListener('change', upd);
+    var userCombo = makeCombo('mo-user', 'mo-user-id', 'mo-user-list', USERS, upd);
+    var prodCombo = makeCombo('mo-product', 'mo-product-id', 'mo-product-list', PRODUCTS, upd);
     qty.addEventListener('input', upd);
+
+    /* preselected distributor (opened from the member view: ?uid=) */
+    <?php if ($preUid > 0): ?>
+    (function () {
+        var pre = USERS.filter(function (u) { return u.id === <?= (int)$preUid ?>; })[0];
+        if (pre) { userCombo.pick(pre); }
+    })();
+    <?php endif; ?>
     upd();
 })();
 </script>
