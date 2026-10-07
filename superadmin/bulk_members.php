@@ -60,8 +60,23 @@ if (is_post()) {
                 /* the one-time straight-line seed record belongs to the wiped network */
                 q("DELETE FROM settings WHERE skey = 'line_seed'");
             });
+            /* restart member numbering so the next member becomes id 2 /
+             * YSH100002 again instead of continuing the old counter. MySQL
+             * lifts the value to (highest remaining id + 1) on the next
+             * insert — the company root keeps its id. Run OUTSIDE the
+             * transaction: DDL statements commit implicitly. */
+            $freshIds = true;
+            try {
+                db()->exec("ALTER TABLE users AUTO_INCREMENT = 1");
+            } catch (Throwable $e) {
+                $freshIds = false;   /* numbering continues — cosmetic only */
+            }
             flash('success', 'Network wiped — all members except ' . e($root['username'])
-                . ' were deleted. Orders, commissions, wallets and network counters were reset.');
+                . ' were deleted. Orders, commissions, wallets and network counters were reset.'
+                . ($freshIds
+                    ? ' Member IDs start from the beginning again (next member: YSH'
+                        . (100000 + (int)$root['id'] + 1) . ').'
+                    : ''));
         } catch (Throwable $e) {
             flash('error', 'The wipe failed and NOTHING was deleted: ' . e($e->getMessage()));
         }
@@ -425,6 +440,7 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
             Deletes every member except the company root (<?= e($rootUser ?: '—') ?>) —
             including their orders, commissions, wallet transactions and payouts — and resets the
             root's network counters. The root's own orders and wallet are kept.
+            Member IDs then start from the beginning again (next member: <?= e('YSH' . (100000 + (int)($root['id'] ?? 0) + 1)) ?>).
         </p>
         <button class="btn btn-danger" type="submit" data-confirm="DELETE EVERY member except the company root? This cannot be undone.">🗑️ Wipe Network (keep root)</button>
     </form>
