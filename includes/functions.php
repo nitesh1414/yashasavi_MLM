@@ -563,54 +563,44 @@ function registration_success_popup(array $member, $targetUrl, $selfRegister = t
     ob_start();
     ?>
 <style>
-.regpop-overlay{position:fixed;inset:0;background:rgba(16,34,19,.66);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;animation:regpop-fade .2s ease-out}
+.regpop-overlay{position:fixed;inset:0;background:rgba(16,34,19,.66);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;animation:regpop-fade .18s ease-out}
 @keyframes regpop-fade{from{opacity:0}to{opacity:1}}
-@keyframes regpop-pop{from{opacity:0;transform:scale(.92) translateY(14px)}to{opacity:1;transform:none}}
-.regpop{position:relative;background:#fff;border-radius:18px;width:min(440px,94vw);max-height:90vh;overflow-y:auto;padding:28px 22px 22px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.35);animation:regpop-pop .28s cubic-bezier(.2,.9,.3,1.2);font-family:inherit}
-.regpop-x{position:absolute;top:8px;right:10px;background:none;border:0;font-size:26px;line-height:1;color:#9aa79b;cursor:pointer;padding:6px}
+@keyframes regpop-pop{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:none}}
+.regpop{position:relative;background:#fff;border-radius:14px;width:min(400px,94vw);max-height:94vh;overflow-y:auto;padding:16px 12px 12px;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.32);animation:regpop-pop .22s ease-out;font-family:inherit}
+.regpop-x{position:absolute;top:4px;right:8px;background:none;border:0;font-size:20px;line-height:1;color:#9aa79b;cursor:pointer;padding:4px}
 .regpop-x:hover{color:#000}
-.regpop-emoji{font-size:46px;line-height:1}
-.regpop h2{margin:10px 0 4px;font-size:22px;color:#1b3a1f;font-weight:700}
-.regpop-welcome{font-size:13.5px;color:#4a5a4d;margin:0 0 14px;line-height:1.55}
-.regpop-box{background:#f4f8f3;border:1px solid #dfe9dc;border-radius:12px;padding:4px 14px;margin:0 0 12px;text-align:left}
-.regpop-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed #dfe8dc;font-size:13px}
+.regpop h2{margin:0 0 3px;font-size:17px;color:#1b3a1f;font-weight:700;line-height:1.25}
+.regpop-welcome{font-size:12px;color:#4a5a4d;margin:0 0 9px;line-height:1.5}
+.regpop-box{background:#f4f8f3;border:1px solid #dfe9dc;border-radius:10px;padding:1px 10px;margin:0 0 8px;text-align:left}
+.regpop-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px dashed #dfe8dc;font-size:12px}
 .regpop-row:last-child{border-bottom:0}
-.regpop-row>span{color:#68786b;flex-shrink:0}
-.regpop-row>b{color:#000;font-weight:600;text-align:right;overflow-wrap:anywhere}
-.regpop-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;background:#fff;border:1px solid #c8dcc6;border-radius:8px;padding:3px 10px;cursor:pointer;user-select:all;white-space:nowrap}
+.regpop-row>span{color:#68786b;flex-shrink:0;font-size:11.5px}
+.regpop-row>b{color:#000;font-weight:600;text-align:right;overflow-wrap:anywhere;line-height:1.35}
+.regpop-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:#fff;border:1px solid #c8dcc6;border-radius:7px;padding:2px 8px;cursor:pointer;user-select:all;white-space:nowrap}
 .regpop-code:hover{border-color:#2e7d32;background:#f0f7ee}
-.regpop-note{font-size:12.5px;background:#fdf3d7;border:1px solid #efe0a8;color:#000;border-radius:10px;padding:9px 12px;margin:0 0 8px;text-align:left;line-height:1.5}
-.regpop-btn{display:block;background:#2e7d32;color:#fff !important;text-decoration:none;font-size:15px;font-weight:600;padding:13px 16px;border-radius:12px;margin-top:14px}
+.regpop-note{font-size:11px;background:#fdf3d7;border:1px solid #efe0a8;color:#000;border-radius:8px;padding:6px 9px;margin:0 0 4px;text-align:left;line-height:1.5}
+.regpop-btn{display:block;background:#2e7d32;color:#fff !important;text-decoration:none;font-size:13.5px;font-weight:600;padding:10px 12px;border-radius:10px;margin-top:8px}
 .regpop-btn:hover{background:#256c29}
-@media (max-width:540px){.regpop{padding:22px 14px 16px}.regpop h2{font-size:19px}.regpop-row{font-size:12.5px;flex-direction:column;align-items:flex-start;gap:2px}.regpop-row>b{text-align:left}}
+@media (max-width:400px){.regpop{padding:14px 8px 10px}.regpop-row{font-size:11.5px;gap:6px}}
 </style>
 <div class="regpop-overlay" id="regpop-overlay">
     <div class="regpop" role="dialog" aria-modal="true" aria-labelledby="regpop-title">
         <button type="button" class="regpop-x" id="regpop-close" aria-label="Close">&times;</button>
-        <div class="regpop-emoji"><?= $selfRegister ? '🎉' : '✅' ?></div>
-        <h2 id="regpop-title"><?= $selfRegister ? 'Registration Successful!' : 'Member Registered!' ?></h2>
+        <h2 id="regpop-title"><?= $selfRegister ? '🎉 Registration Successful!' : '✅ Member Registered!' ?></h2>
         <p class="regpop-welcome">
             <?php if ($selfRegister): ?>
-                Welcome to <b><?= e($site) ?></b>, <?= e($member['full_name']) ?>! 🌿<br>
-                Your distributor account has been created successfully.
+                Welcome to <b><?= e($site) ?></b>, <b><?= e($member['full_name']) ?></b>! Your account is ready.
             <?php else: ?>
-                <b><?= e($member['full_name']) ?></b> has been added to the network.<br>
-                Share these login details with the member — they are shown only once.
+                <b><?= e($member['full_name']) ?></b> — share these login details with the member (shown only once).
             <?php endif; ?>
         </p>
         <div class="regpop-box">
-            <div class="regpop-row"><span>Member Name</span><b><?= e($member['full_name']) ?></b></div>
-            <div class="regpop-row"><span>User ID</span><b class="regpop-code" data-copy="<?= e($uid) ?>" title="Click to copy"><?= e($uid) ?> 📋</b></div>
-            <div class="regpop-row"><span>First-time Password</span><b class="regpop-code" data-copy="<?= e($uid) ?>" title="Click to copy"><?= e($uid) ?> 📋</b></div>
+            <div class="regpop-row"><span>User ID (first-time password)</span><b class="regpop-code" data-copy="<?= e($uid) ?>" title="Click to copy"><?= e($uid) ?> 📋</b></div>
             <div class="regpop-row"><span>Sponsor</span><b><?= e($sponsorTxt) ?></b></div>
-            <div class="regpop-row"><span>Joined On</span><b><?= e($joined) ?></b></div>
+            <div class="regpop-row"><span>Joined</span><b><?= e($joined) ?></b></div>
         </div>
-        <p class="regpop-note">🔐 <b>First login:</b> the password is the User ID itself — for your security,
-            please change it after your first login (Dashboard → Change Password).</p>
-        <?php if ($selfRegister): ?>
-            <p class="regpop-note">📄 You can upload your PAN &amp; Aadhaar card images anytime from your
-                dashboard — <b>Account → Upload KYC</b>.</p>
-        <?php endif; ?>
+        <p class="regpop-note">🔐 <b>Password = User ID.</b> Please change it after your first login
+            (Dashboard → Change Password).<?= $selfRegister ? ' 📄 PAN &amp; Aadhaar can be uploaded later (Dashboard → Upload KYC).' : '' ?></p>
         <a class="regpop-btn" id="regpop-go" href="<?= e($target) ?>">
             <?= $selfRegister ? '🔐 Continue to Login' : '✅ Continue' ?>
         </a>

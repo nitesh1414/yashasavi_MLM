@@ -3,7 +3,7 @@
    - static assets (css/js/images/fonts): cache-first with background refresh
    - page navigations + anything dynamic: network-first, offline fallback page
    - PHP responses are never cached (sessions, cart, panels). */
-const VERSION = 'v1.8.3';
+const VERSION = 'v1.8.4';
 const CACHE = 'yashasavi-' + VERSION;
 const OFFLINE_URL = 'offline.html';
 const STATIC_EXT = /\.(css|js|png|jpe?g|gif|svg|webp|ico|woff2?|ttf)$/i;
