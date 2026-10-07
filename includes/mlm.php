@@ -507,6 +507,31 @@ function run_binary_matching($user, $orderId)
  *
  * Returns [ok(bool), message].
  */
+/**
+ * Single-action approval: authorizes the payment (marks it received/paid)
+ * and then approves + delivers the order in one go.
+ */
+function authorize_and_approve_order($orderId, $adminId)
+{
+    $order = q_row("SELECT * FROM orders WHERE id = ?", [$orderId]);
+    if (!$order) {
+        return [false, 'Order not found.'];
+    }
+    if ($order['status'] !== 'pending') {
+        return [false, 'Order is not pending (current status: ' . $order['status'] . ').'];
+    }
+    $authorized = false;
+    if ($order['payment_status'] !== 'paid') {
+        q("UPDATE orders SET payment_status = 'paid' WHERE id = ?", [$orderId]);
+        $authorized = true;
+    }
+    $res = approve_order($orderId, $adminId);
+    if ($res[0] && $authorized) {
+        $res[1] = 'Payment authorized. ' . $res[1];
+    }
+    return $res;
+}
+
 function approve_order($orderId, $adminId)
 {
     return db_tx(function () use ($orderId, $adminId) {

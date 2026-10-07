@@ -24,7 +24,8 @@ if (is_post()) {
         }
         redirect('order_view.php?id=' . $id);
     } elseif ($action === 'approve') {
-        [$ok, $msg] = approve_order($id, $a['id']);
+        /* one click: authorize the payment AND approve + deliver the order */
+        [$ok, $msg] = authorize_and_approve_order($id, $a['id']);
         $ok ? flash('success', $msg) : flash('error', $msg);
         redirect('order_view.php?id=' . $id);
     } elseif ($action === 'reject') {
@@ -64,36 +65,23 @@ require __DIR__ . '/../includes/dash_header.php';
             </table>
         </div>
 
-        <?php if ($o['status'] === 'pending' && $o['payment_status'] !== 'paid'): ?>
+        <?php if ($o['status'] === 'pending'): ?>
         <div class="alert alert-warning" style="margin-top:16px">
-            <b>Payment pending</b> — this order (<?= e(ucfirst(str_replace('_', ' ', $o['payment_mode']))) ?>)
-            is not paid yet. Authorize the payment once you have received / verified the
-            amount<?= $o['payment_mode'] === 'cash' ? ' (cash on delivery or pickup)' : '' ?>.
-            <b>The order cannot be approved until the payment is authorized.</b>
+            <?php if ($o['payment_status'] !== 'paid'): ?>
+                <b>Payment pending</b> — this order (<?= e(ucfirst(str_replace('_', ' ', $o['payment_mode']))) ?>)
+                is not marked as paid yet. The button below authorizes the payment
+                <?= $o['payment_mode'] === 'cash' ? ' (cash on delivery or pickup)' : '' ?>,
+            <?php else: ?>
+                Payment is authorized. The button below
+            <?php endif; ?>
+            approves and delivers the order, immediately crediting <b><?= e($o['total_bv']) ?> BV</b>
+            to the network and paying sponsor / level / binary matching commissions as per the MLM plan.
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <form method="post" class="inline-form" data-confirm="Authorize this payment?">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="authorize_payment">
-                <button class="btn btn-primary" type="submit">💵 Authorize Payment</button>
-            </form>
-            <form method="post" class="inline-form" style="display:flex;gap:8px;flex-wrap:wrap">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="reject">
-                <input class="form-control" name="reason" placeholder="Rejection reason" style="max-width:240px">
-                <button class="btn btn-danger" type="submit" data-confirm="Reject this order?">✖ Reject</button>
-            </form>
-        </div>
-        <?php elseif ($o['status'] === 'pending'): ?>
-        <div class="alert alert-warning" style="margin-top:16px">
-            Payment is authorized. Approving this order will immediately credit <b><?= e($o['total_bv']) ?> BV</b>
-            to the network and pay sponsor / level / binary matching commissions as per the MLM plan.
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <form method="post" class="inline-form" data-confirm="Approve order and run commissions?">
+            <form method="post" class="inline-form" data-confirm="Authorize payment, approve and deliver this order? Commissions will be credited immediately.">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="approve">
-                <button class="btn btn-primary" type="submit">✔ Approve Order</button>
+                <button class="btn btn-primary" type="submit">✅ Approve, Authorize Payment &amp; Deliver</button>
             </form>
             <form method="post" class="inline-form" style="display:flex;gap:8px;flex-wrap:wrap">
                 <?= csrf_field() ?>

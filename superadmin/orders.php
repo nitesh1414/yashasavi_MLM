@@ -8,7 +8,8 @@ if (is_post()) {
     $action = post_str('action');
     $id = (int)post_str('id');
     if ($action === 'approve') {
-        [$ok, $msg] = approve_order($id, $a['id']);
+        /* one click: authorize the payment AND approve + deliver the order */
+        [$ok, $msg] = authorize_and_approve_order($id, $a['id']);
         $ok ? flash('success', $msg) : flash('error', $msg);
     } elseif ($action === 'reject') {
         [$ok, $msg] = reject_order($id, $a['id'], post_str('reason'));
@@ -86,11 +87,11 @@ require __DIR__ . '/../includes/dash_header.php';
                     <div class="table-actions">
                         <a class="btn btn-outline btn-sm" href="order_view.php?id=<?= (int)$o['id'] ?>">Open</a>
                         <?php if ($o['status'] === 'pending'): ?>
-                        <form method="post" class="inline-form" data-confirm="Approve this order? Commissions will be credited to the upline immediately.">
+                        <form method="post" class="inline-form" data-confirm="Authorize payment, approve and deliver this order? Commissions will be credited immediately.">
                             <?= csrf_field() ?>
                             <input type="hidden" name="action" value="approve">
                             <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
-                            <button class="btn btn-primary btn-sm" type="submit">✔ Approve</button>
+                            <button class="btn btn-primary btn-sm" type="submit">✔ Approve &amp; Deliver</button>
                         </form>
                         <form method="post" class="inline-form" data-confirm="Reject this order?">
                             <?= csrf_field() ?>
