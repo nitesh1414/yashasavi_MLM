@@ -235,6 +235,23 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('resize', hideTreePopup);
     window.addEventListener('scroll', hideTreePopup, true);
 
+    /* center the horizontal scroll on the VIEWED member (the tree root):
+       wide trees would otherwise open at the far-left edge with the viewed
+       member invisible somewhere in the middle */
+    function centerTreeOnRoot() {
+        var wrap = document.querySelector('.tree-wrap');
+        var tree = document.querySelector('.tree[data-tree-root]');
+        if (!wrap || !tree) { return; }
+        var root = tree.querySelector(':scope > ul > li > .t-node');
+        if (root) {
+            var wr = wrap.getBoundingClientRect();
+            var rr = root.getBoundingClientRect();
+            wrap.scrollLeft += rr.left + rr.width / 2 - (wr.left + wr.width / 2);
+        } else {
+            wrap.scrollLeft = (wrap.scrollWidth - wrap.clientWidth) / 2;
+        }
+    }
+
     /* genealogy tree zoom: the chart always starts at FULL size (100%) with
        horizontal + vertical scroll bars — members never shrink to fit. The
        toolbar offers an optional overview (fit) and a one-click return to
@@ -258,11 +275,17 @@ document.addEventListener('DOMContentLoaded', function () {
             tree.style.zoom = cur;
             if (typeof hideTreePopup === 'function') { hideTreePopup(); }
             drawTreeLines();
+            /* after a reset-style view (100% or Fit) put the viewed member
+               back in the middle of the frame */
+            if (btn.dataset.treeZoom === 'full' || btn.dataset.treeZoom === 'fit') {
+                centerTreeOnRoot();
+            }
         });
     });
     /* keep the connector lines correct on resize — the chosen zoom stays */
     var rzT;
     window.addEventListener('resize', function () { clearTimeout(rzT); rzT = setTimeout(drawTreeLines, 150); });
     drawTreeLines();
-    setTimeout(drawTreeLines, 350); /* once more after fonts settle */
+    centerTreeOnRoot();                                  /* viewed member starts centered */
+    setTimeout(function () { drawTreeLines(); centerTreeOnRoot(); }, 350); /* once more after fonts settle */
 });
