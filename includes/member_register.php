@@ -332,7 +332,7 @@ function member_register_render_form($f, $errors, $prefill, $opts)
 
         <div class="alert alert-warning">
             <b>First login:</b> the member's password will be their User ID (generated after registration).
-            They must change it when they log in for the first time.
+            They can change it anytime after logging in (Dashboard → Change Password).
         </div>
 
         <button class="btn btn-primary" type="submit">➕ Register Member</button>

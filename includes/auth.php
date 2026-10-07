@@ -56,14 +56,6 @@ function require_user()
         flash('warning', 'Please login to continue.');
         redirect('/login.php');
     }
-    /* first login: the member must change the initial password (User ID) first */
-    if (!empty($u['must_change_password'])) {
-        $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
-        if (!in_array($script, ['password.php', 'logout.php'], true)) {
-            flash('warning', 'Please change your password to continue — your first-time password is your User ID.');
-            redirect('/user/password.php');
-        }
-    }
     return $u;
 }
 

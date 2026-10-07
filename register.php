@@ -247,7 +247,7 @@ require __DIR__ . '/includes/site_header.php';
 
             <div class="alert alert-warning" style="margin-top:18px">
                 <b>First login:</b> your password will be your User ID (shown after registration).
-                You must change it when you log in for the first time.
+                For your security, please change it after your first login (Dashboard → Change Password).
             </div>
 
             <label class="form-check" style="color:var(--ink)">

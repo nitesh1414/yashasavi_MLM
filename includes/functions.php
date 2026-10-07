@@ -605,8 +605,8 @@ function registration_success_popup(array $member, $targetUrl, $selfRegister = t
             <div class="regpop-row"><span>Sponsor</span><b><?= e($sponsorTxt) ?></b></div>
             <div class="regpop-row"><span>Joined On</span><b><?= e($joined) ?></b></div>
         </div>
-        <p class="regpop-note">🔐 <b>First login:</b> the password is the User ID itself — it must be changed
-            immediately after logging in for the first time.</p>
+        <p class="regpop-note">🔐 <b>First login:</b> the password is the User ID itself — for your security,
+            please change it after your first login (Dashboard → Change Password).</p>
         <?php if ($selfRegister): ?>
             <p class="regpop-note">📄 You can upload your PAN &amp; Aadhaar card images anytime from your
                 dashboard — <b>Account → Upload KYC</b>.</p>
