@@ -90,7 +90,6 @@ if (is_post()) {
         $fullName = post_str('full_name') ?: 'Yashasavi Veda Herbal';
         $mobile = post_str('mobile') ?: '9529512562';
         $email = post_str('email');
-        $password = post_str('password') ?: 'User@1234';
         $activate = post_str('activate') === '1';
 
         $sponsor = find_user($sponsorCode);
@@ -117,6 +116,9 @@ if (is_post()) {
                 $slots[] = [$ch[$slot[1]], 'R'];
             }
             [$placeRow, $placeLeg] = $slot;
+            /* the first-time password is the member's own User ID — exactly
+             * like normal registration (register.php); the random placeholder
+             * below is replaced immediately after the account is created */
             [$ok, $uid, $code] = register_distributor([
                 'sponsor' => $sponsor['username'],
                 'leg' => $placeLeg,
@@ -141,7 +143,7 @@ if (is_post()) {
                 'bank_branch' => '',
                 'aadhaar_no' => '',
                 'pan_no' => '',
-                'password' => $password,
+                'password' => 'Temp-' . bin2hex(random_bytes(8)),
             ]);
             if (!$ok) {
                 flash('error', 'Creation stopped after ' . $made . ' members: ' . e($code));
@@ -150,6 +152,9 @@ if (is_post()) {
             $made++;
             if ($firstCode === '') { $firstCode = $code; }
             $lastCode = $code;
+            /* first-time password = the User ID; must be changed after first login */
+            q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
+              [password_hash($code, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
             if ($activate) {
                 q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
             }
@@ -160,7 +165,8 @@ if (is_post()) {
         }
         flash('success', $made . ' member' . ($made === 1 ? '' : 's') . ' created'
             . ($firstCode ? ' (' . e($firstCode) . ' … ' . e($lastCode) . ')' : '')
-            . ($activate ? ' — all ACTIVE and KYC-verified.' : '.'));
+            . ($activate ? ' — all ACTIVE and KYC-verified' : '')
+            . '. First-time password: each member\'s own User ID.');
         redirect('bulk_members.php');
     }
 
@@ -176,7 +182,6 @@ if (is_post()) {
         $fullName = post_str('full_name') ?: 'Yashasavi Veda Herbal';
         $mobile = post_str('mobile') ?: '9529512562';
         $email = post_str('email');
-        $password = post_str('password') ?: 'User@1234';
         $activate = post_str('activate') === '1';
 
         $sponsor = find_user($sponsorCode);
@@ -240,7 +245,9 @@ if (is_post()) {
                     'bank_branch' => '',
                     'aadhaar_no' => '',
                     'pan_no' => '',
-                    'password' => $password,
+                    /* first-time password = the User ID, like normal registration;
+                     * replaced immediately after the account is created */
+                    'password' => 'Temp-' . bin2hex(random_bytes(8)),
                 ]);
                 if (!$ok) {
                     $stopped = ($leg === 'L' ? 'Left' : 'Right') . ' line stopped after '
@@ -250,6 +257,9 @@ if (is_post()) {
                 $madeByLeg[$leg]++;
                 if ($firstByLeg[$leg] === '') { $firstByLeg[$leg] = $code; }
                 $lastByLeg[$leg] = $code;
+                /* first-time password = the User ID; must be changed after first login */
+                q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
+                  [password_hash($code, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
                 if ($activate) {
                     q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
                 }
@@ -287,8 +297,9 @@ if (is_post()) {
                 }
             }
             flash('success', 'Straight lines created — ' . implode(', ', $parts)
-                . '. Every member is sponsored by the member directly above them; new registrations '
-                . 'below the lines follow the normal MLM placement logic.');
+                . '. Every member is sponsored by the member directly above them and their first-time '
+                . 'password is their own User ID; new registrations below the lines follow the normal '
+                . 'MLM placement logic.');
         }
         redirect('bulk_members.php');
     }
@@ -345,8 +356,11 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
                 <input class="form-control" type="email" name="email" value="yashasaviveda26@gmail.com">
             </div>
             <div class="form-group">
-                <label>Password for every member</label>
-                <input class="form-control" name="password" value="User@1234" required>
+                <label>Password</label>
+                <div class="form-hint" style="margin-top:8px">
+                    🔐 Each member's first-time password is their own <b>User ID</b> (e.g. <b>YSH100002</b>)
+                    — exactly like a normal registration. They must change it after first login.
+                </div>
             </div>
             <div class="form-group">
                 <label>&nbsp;</label>
@@ -416,8 +430,11 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
                 <input class="form-control" type="email" name="email" value="yashasaviveda26@gmail.com">
             </div>
             <div class="form-group">
-                <label>Password for every member</label>
-                <input class="form-control" name="password" value="User@1234" required>
+                <label>Password</label>
+                <div class="form-hint" style="margin-top:8px">
+                    🔐 Each member's first-time password is their own <b>User ID</b> (e.g. <b>YSH100002</b>)
+                    — exactly like a normal registration. They must change it after first login.
+                </div>
             </div>
             <div class="form-group">
                 <label>&nbsp;</label>
