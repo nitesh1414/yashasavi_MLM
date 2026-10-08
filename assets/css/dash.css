@@ -192,17 +192,22 @@ select.form-control { appearance: auto; }
 .tree-toolbar .tt-zoom { display: flex; gap: 6px; margin-left: auto; }
 .tree-toolbar .tt-zoom button { border: 1px solid var(--line); background: #fff; color: #000; border-radius: 8px; font-size: 13px; min-width: 38px; min-height: 30px; padding: 3px 12px; cursor: pointer; font-family: var(--font); }
 .tree-toolbar .tt-zoom button:hover { background: #f0f3ee; }
+.tree-toolbar .tt-level { display: flex; align-items: center; gap: 6px; }
+.tree-toolbar .tt-level input { width: 64px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: var(--font); }
+.tree-toolbar .tt-level button { border: 1px solid var(--line); background: #fff; color: #000; border-radius: 8px; font-size: 13px; min-height: 30px; padding: 3px 14px; cursor: pointer; font-family: var(--font); }
+.tree-toolbar .tt-level button:hover { background: #f0f3ee; }
+.tree-toolbar .tt-level .lvl-result { font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
 
 /* the chart uses the complete page width and centers on the root;
    branches are straight SVG lines (drawn by dash.js) */
-.tree-wrap { overflow: auto; -webkit-overflow-scrolling: touch; padding: 30px 12px 18px; max-height: calc(100vh - 215px); }
+.tree-wrap { overflow: auto; -webkit-overflow-scrolling: touch; padding: 14px 10px 14px; max-height: calc(100vh - 215px); }
 .tree { position: relative; display: flex; justify-content: center; min-width: max-content; margin: 0 auto; }
 .tree svg.tree-lines { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; overflow: visible; }
 .tree svg.tree-lines line, .tree svg.tree-lines path { stroke: #94b098; stroke-width: 2; stroke-linecap: round; }
 .tree svg.tree-lines path { fill: none; }
 .tree > ul { position: relative; z-index: 1; }
 .tree ul { display: flex; justify-content: center; }
-.tree li { position: relative; list-style: none; padding: 30px 10px 0; display: flex; flex-direction: column; align-items: center; }
+.tree li { position: relative; list-style: none; padding: 15px 5px 0; display: flex; flex-direction: column; align-items: center; }
 .tree li:only-child { padding-top: 0; }
 
 /* member node = ID badge only (active green / inactive red); details open in a floating popup */
@@ -230,11 +235,14 @@ select.form-control { appearance: auto; }
 
 /* add-member slot (dashed pill) */
 .tree .t-node.empty.add { padding: 0; }
-.tree .t-node.empty.add a { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 13px; color: #000; text-decoration: none; border: 1.5px dashed #a9c3ac; border-radius: 8px; background: #fbfdfb; white-space: nowrap; }
+.tree .t-node.empty.add a { display: flex; flex-direction: row; align-items: center; gap: 4px; padding: 3px 9px; color: #000; text-decoration: none; border: 1.5px dashed #a9c3ac; border-radius: 8px; background: #fbfdfb; white-space: nowrap; }
 .tree .t-node.empty.add a:hover { background: #e8f3e8; border-color: var(--accent); }
-.tree .t-node.empty.add .t-add-plus { font-size: 13px; line-height: 1.15; }
-.tree .t-node.empty.add .t-add-text { font-size: 10.5px; font-weight: 400; }
-.tree .t-node.empty.add .t-add-leg { font-size: 8.5px; letter-spacing: 1px; opacity: .75; }
+.tree .t-node.empty.add .t-add-plus { font-size: 11px; line-height: 1; }
+.tree .t-node.empty.add .t-add-text { font-size: 10px; font-weight: 400; line-height: 1; }
+/* level search: dim everything, ring the matching level */
+.tree .t-pill.dim { opacity: .3; }
+.tree .t-pill.hl { box-shadow: 0 0 0 3px #d6a83c, 0 2px 5px rgba(0, 0, 0, .18); }
+.tree .t-pill.dim, .tree .t-pill.hl { transition: opacity .2s; }
 
 .tree-legends { display: flex; gap: 14px; justify-content: center; font-size: 11px; color: var(--ink-soft); margin-bottom: 4px; flex-wrap: wrap; }
 .tree-legends .lg { display: flex; align-items: center; gap: 5px; }

@@ -26,7 +26,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
      * and the viewer drills down with "view subtree". */
     $cap = 4000;
     $rows = q_all("SELECT id, username, full_name, leg, placement_id, left_bv, right_bv,
-                   is_active, status, rank_id, self_bv, created_at, sponsor_id, path
+                   is_active, status, rank_id, self_bv, created_at, sponsor_id, path, depth
                    FROM users WHERE path LIKE ? AND id != ?
                    ORDER BY depth, id LIMIT " . ($cap + 1),
                    [$rootUser['path'] . '%', (int)$rootUser['id']]);
@@ -84,7 +84,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
         return $out;
     };
 
-    $node = function ($user, $isRoot, $parentUser = null, $leg = null)
+    $node = function ($user, $isRoot, $parentUser = null, $leg = null, $level = 1)
         use ($linkBase, $addBase, $viewUserBase, $byParent, $rankNames, $sponsorNames, $legCounts) {
         if (!$user) {
             // Empty position directly below a REAL member — clickable add slot
@@ -92,10 +92,9 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                 $href = $addBase . '?ref=' . urlencode($parentUser['username']) . '&leg=' . $leg;
                 $legName = $leg === 'L' ? 'LEFT' : 'RIGHT';
                 return '<div class="t-node empty add">
-                            <a href="' . e($href) . '" title="Add a new member in this position">
+                            <a href="' . e($href) . '" title="Add a new member in this position (' . $legName . ' leg)">
                                 <span class="t-add-plus">➕</span>
-                                <span class="t-add-text">Add Member</span>
-                                <span class="t-add-leg">' . $legName . '</span>
+                                <span class="t-add-text">Add ' . $legName . '</span>
                             </a>
                         </div>';
             }
@@ -126,6 +125,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             . '<dt>Joined</dt><dd>' . e($joined) . '</dd>'
             . '<dt>Sponsor</dt><dd>' . e($sponsorTxt) . '</dd>'
             . '<dt>Leg</dt><dd>' . ($isRoot ? '—' : ($user['leg'] === 'R' ? 'RIGHT' : 'LEFT')) . '</dd>'
+            . '<dt>Level</dt><dd>' . (int)$level . '</dd>'
             . '<dt>Upline</dt><dd>' . e($upline) . '</dd>'
             . '<dt>Left members</dt><dd>' . number_format($cnt['L']) . '</dd>'
             . '<dt>Right members</dt><dd>' . number_format($cnt['R']) . '</dd>'
@@ -156,7 +156,9 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
 
     $renderLevel = function ($user, $depth, $isRoot, $parentUser = null, $leg = null)
         use (&$renderLevel, $byParent, $node, $levels) {
-        $html = '<li>' . $node($user, $isRoot, $parentUser, $leg);
+        $level = $depth + 1;   /* root = level 1 */
+        $html = '<li data-level="' . $level . '"' . ($isRoot ? ' style="padding-top:0"' : '') . '>'
+            . $node($user, $isRoot, $parentUser, $leg, $level);
         /* Only real members have children rows: each child position is either
          * a member node or an add-member slot; nothing below empty slots.
          * $levels < 1 renders the whole downline (scroll to explore). */
@@ -172,6 +174,13 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
     };
 
     $root = $all[$rootUser['id']];
+
+    /* deepest level in the fetched downline (viewed member = level 1) */
+    $maxLevel = 1;
+    foreach ($rows as $r) {
+        $rel = (int)$r['depth'] - (int)$rootUser['depth'] + 1;
+        if ($rel > $maxLevel) { $maxLevel = $rel; }
+    }
 
     /* summary table: registrations + confirmed BV per leg of the viewed root */
     $sum = ['L' => ['n' => 0, 'bv' => (float)$root['left_bv']], 'R' => ['n' => 0, 'bv' => (float)$root['right_bv']]];
@@ -197,11 +206,18 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                 <span class="lg"><span class="dot" style="background:#43a047"></span> Active member</span>
                 <span class="lg"><span class="dot" style="background:#e53935"></span> Inactive member</span>
                 <span class="lg"><span class="dot" style="background:#fff;box-shadow:0 0 0 2px #d6a83c inset"></span> Root</span>
-                <span class="lg">📜 Scroll in any direction to see the <b>whole</b> network — members stay full size</span>
+                <span class="lg">📜 First frame shows up to <b>level 7</b> — scroll for the rest; members stay full size</span>
+                <span class="lg">🔎 Enter a level number and press <b>Go</b> to jump to that level</span>
                 <span class="lg">Hover / tap a member ID for details &amp; actions</span>
-                <span class="lg">Empty slots add a member at that exact position</span>
             </div>
             <div class="tree-toolbar">
+                <div class="tt-level">
+                    <span class="tt-label">Level:</span>
+                    <input type="number" min="1" max="' . (int)$maxLevel . '" value="1" data-tree-level-input
+                           title="Jump to a level (1 = the viewed member)" aria-label="Tree level">
+                    <button type="button" data-tree-level-go title="Scroll to this level and highlight its members">Go</button>
+                    <span class="lvl-result" data-tree-level-result></span>
+                </div>
                 <div class="tt-zoom">
                     <button type="button" data-tree-zoom="out" title="Zoom out">➖</button>
                     <button type="button" data-tree-zoom="fit" title="Fit to window (overview)">⛶ Fit</button>
@@ -209,8 +225,8 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                     <button type="button" data-tree-zoom="in" title="Zoom in">➕</button>
                 </div>
             </div>
-            <div class="tree-wrap"><div class="tree" data-tree-root="1" data-tree-lines="1">'
-            . '<svg class="tree-lines" aria-hidden="true"></svg><ul>' .
-            preg_replace('~<li>~', '<li style="padding-top:0">', $renderLevel($root, 0, true), 1) .
-            '</ul></div></div>';
+            <div class="tree-wrap"><div class="tree" data-tree-root="1" data-tree-lines="1" data-tree-max-level="' . (int)$maxLevel . '">'
+            . '<svg class="tree-lines" aria-hidden="true"></svg><ul>'
+            . $renderLevel($root, 0, true)
+            . '</ul></div></div>';
 }

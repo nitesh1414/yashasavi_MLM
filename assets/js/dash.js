@@ -282,10 +282,83 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+    /* first frame: show up to level 7 without shrinking the members much.
+       If the compact chart still does not fit 7 levels vertically, zoom out
+       a little (never below 80%) so the first screen covers levels 1-7. */
+    function fitTreeFirstFrame() {
+        var tree = document.querySelector('.tree[data-tree-root]');
+        var wrap = document.querySelector('.tree-wrap');
+        if (!tree || !wrap) { return; }
+        var l8 = tree.querySelector('li[data-level="8"]');
+        if (!l8) { return; }   /* tree shallower than 7 levels — all visible */
+        var top = l8.getBoundingClientRect().top - tree.getBoundingClientRect().top;
+        var avail = wrap.clientHeight - 28;
+        if (top > avail && top > 0) {
+            var z = Math.max(0.8, avail / top);
+            tree.dataset.zoom = z;
+            tree.style.zoom = z;
+            drawTreeLines();
+        }
+    }
+
+    /* level search: scroll to the level, ring its members, dim the rest */
+    var levelGo = document.querySelector('[data-tree-level-go]');
+    var levelInp = document.querySelector('[data-tree-level-input]');
+    var levelRes = document.querySelector('[data-tree-level-result]');
+    function clearLevelHighlight(tree) {
+        tree.querySelectorAll('.t-pill.dim, .t-pill.hl').forEach(function (p) {
+            p.classList.remove('dim', 'hl');
+        });
+    }
+    function gotoTreeLevel() {
+        var tree = document.querySelector('.tree[data-tree-root]');
+        var wrap = document.querySelector('.tree-wrap');
+        if (!tree || !wrap || !levelInp) { return; }
+        var max = parseInt(tree.dataset.treeMaxLevel || '1', 10);
+        var lvl = parseInt(levelInp.value, 10);
+        if (!lvl || lvl < 1) { lvl = 1; }
+        if (lvl > max) { lvl = max; }
+        levelInp.value = lvl;
+        clearLevelHighlight(tree);
+        var pills = tree.querySelectorAll('li[data-level="' + lvl + '"] > .t-node .t-pill');
+        if (!pills.length) {
+            if (levelRes) { levelRes.textContent = 'Level ' + lvl + ': no members'; }
+            return;
+        }
+        tree.querySelectorAll('li[data-level] > .t-node .t-pill').forEach(function (p) { p.classList.add('dim'); });
+        pills.forEach(function (p) { p.classList.remove('dim'); p.classList.add('hl'); });
+        /* bring the level to the top of the frame and keep the root centered */
+        var li = pills[0].closest('li');
+        if (li) {
+            wrap.scrollTop += li.getBoundingClientRect().top - wrap.getBoundingClientRect().top - 10;
+        }
+        centerTreeOnRoot();
+        if (typeof hideTreePopup === 'function') { hideTreePopup(); }
+        if (levelRes) {
+            levelRes.textContent = 'Level ' + lvl + ' — ' + pills.length +
+                ' member' + (pills.length === 1 ? '' : 's') + ' (max ' + max + ')';
+        }
+    }
+    if (levelGo) { levelGo.addEventListener('click', gotoTreeLevel); }
+    if (levelInp) {
+        levelInp.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); gotoTreeLevel(); }
+        });
+    }
+    /* clicking a dimmed/hl pill area of another level does not clear — a new
+       Go press or changing the input does; also clear on zoom reset */
+    document.querySelectorAll('[data-tree-zoom]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var tree = document.querySelector('.tree[data-tree-root]');
+            if (tree) { clearLevelHighlight(tree); }
+        });
+    });
+
     /* keep the connector lines correct on resize — the chosen zoom stays */
     var rzT;
     window.addEventListener('resize', function () { clearTimeout(rzT); rzT = setTimeout(drawTreeLines, 150); });
     drawTreeLines();
+    fitTreeFirstFrame();
     centerTreeOnRoot();                                  /* viewed member starts centered */
     setTimeout(function () { drawTreeLines(); centerTreeOnRoot(); }, 350); /* once more after fonts settle */
 });
