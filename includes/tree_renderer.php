@@ -163,10 +163,30 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
          * a member node or an add-member slot; nothing below empty slots.
          * $levels < 1 renders the whole downline (scroll to explore). */
         if ($user && ($levels < 1 || $depth < $levels)) {
-            $html .= '<ul>';
             $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
-            $html .= '<li>' . $renderLevel(isset($kids['L']) ? $kids['L'] : null, $depth + 1, false, $user, 'L') . '</li>';
-            $html .= '<li>' . $renderLevel(isset($kids['R']) ? $kids['R'] : null, $depth + 1, false, $user, 'R') . '</li>';
+            $lKid = $kids['L'] ?? null;
+            $rKid = $kids['R'] ?? null;
+            $childLevel = $depth + 2;
+            $html .= '<ul>';
+            if ($lKid && $rKid) {
+                /* both legs real — classic two-child row */
+                $html .= '<li>' . $renderLevel($lKid, $depth + 1, false, $user, 'L') . '</li>';
+                $html .= '<li>' . $renderLevel($rKid, $depth + 1, false, $user, 'R') . '</li>';
+            } elseif ($lKid || $rKid) {
+                /* ONE real child (straight-line leg): the child renders
+                 * directly below its parent so the leg is a vertical line —
+                 * the empty sibling position floats beside the line as a
+                 * compact chip instead of widening the chart */
+                $real = $lKid ?: $rKid;
+                $emptyLeg = $lKid ? 'R' : 'L';
+                $html .= '<li>' . $renderLevel($real, $depth + 1, false, $user, $real['leg']) . '</li>';
+                $html .= '<li class="side-slot ' . $emptyLeg . '" data-level="' . $childLevel . '">'
+                    . $node(null, false, $user, $emptyLeg, $childLevel) . '</li>';
+            } else {
+                /* leaf — both positions free (frontier row) */
+                $html .= '<li data-level="' . $childLevel . '">' . $node(null, false, $user, 'L', $childLevel) . '</li>';
+                $html .= '<li data-level="' . $childLevel . '">' . $node(null, false, $user, 'R', $childLevel) . '</li>';
+            }
             $html .= '</ul>';
         }
         $html .= '</li>';
@@ -207,6 +227,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                 <span class="lg"><span class="dot" style="background:#e53935"></span> Inactive member</span>
                 <span class="lg"><span class="dot" style="background:#fff;box-shadow:0 0 0 2px #d6a83c inset"></span> Root</span>
                 <span class="lg">📜 First frame shows up to <b>level 7</b> — scroll for the rest; members stay full size</span>
+                <span class="lg">➡️ Single-child legs render as straight vertical lines — the ➕ chip beside the line is that free position</span>
                 <span class="lg">🔎 Enter a level number and press <b>Go</b> to jump to that level</span>
                 <span class="lg">Hover / tap a member ID for details &amp; actions</span>
             </div>

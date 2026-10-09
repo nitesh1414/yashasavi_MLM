@@ -117,6 +117,15 @@ function user_children($userId)
  * otherwise the search walks down that leg (spillover) level by level.
  * Returns [placementUserId, leg] or null.
  */
+/**
+ * Find the position for a new member in the given leg below $sponsorId.
+ * SAME-LEG spillover: if the sponsor's leg slot is free the sponsor is
+ * returned directly; otherwise the search walks straight down that leg —
+ * a member added to the LEFT leg always lands in the left-most free LEFT
+ * slot (never in a right position of some level) and vice versa, so each
+ * leg grows as one straight line on its extreme side of the tree.
+ * Returns [placementUserId, leg] or null.
+ */
 function find_position($sponsorId, $leg)
 {
     $leg = ($leg === 'R') ? 'R' : 'L';
@@ -124,21 +133,16 @@ function find_position($sponsorId, $leg)
     if ($children[$leg] === null) {
         return [$sponsorId, $leg];
     }
-    // BFS down the chosen leg for the first node with a free slot
-    $queue = [$children[$leg]['id']];
+    // walk straight down the same leg to the deepest free same-leg slot
+    $node = $children[$leg];
     $seen = 0;
-    while ($queue && $seen < 100000) {
+    while ($seen < 100000) {
         $seen++;
-        $nodeId = array_shift($queue);
-        $ch = user_children($nodeId);
-        if ($ch['L'] === null) {
-            return [$nodeId, 'L'];
+        $ch = user_children($node['id']);
+        if ($ch[$leg] === null) {
+            return [$node['id'], $leg];
         }
-        if ($ch['R'] === null) {
-            return [$nodeId, 'R'];
-        }
-        $queue[] = $ch['L']['id'];
-        $queue[] = $ch['R']['id'];
+        $node = $ch[$leg];
     }
     return null;
 }

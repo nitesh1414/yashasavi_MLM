@@ -99,31 +99,28 @@ if (is_post()) {
         }
         if (!is_mobile($mobile)) { flash('error', 'Invalid mobile number.'); redirect('bulk_members.php'); }
 
-        /* Breadth-first placement INSIDE the sponsor's chosen leg subtree —
-         * a queue of free [row, leg] slots; every new member opens two more.
-         * Fast even for hundreds of members. */
-        $slots = [[$sponsor, $leg]];
+        /* SAME-LEG placement: the first member takes the sponsor's chosen leg
+         * (or continues below the deepest member of that leg) and every next
+         * member goes directly below the previous one — the leg grows as one
+         * straight line on the extreme LEFT / RIGHT side of the tree, never
+         * in the opposite position of any level. The entered sponsor stays
+         * the introducer of every created member. */
         $made = 0; $firstCode = ''; $lastCode = '';
+        $anchor = $sponsor;
+        while (true) {
+            $ch = user_children($anchor['id']);
+            if ($ch[$leg] === null) { break; }
+            $anchor = $ch[$leg];
+        }
         for ($i = 0; $i < $count; $i++) {
-            /* next free slot (expand occupied ones as we pass them) */
-            while (true) {
-                if (!$slots) { break 2; }   /* no free slot left — impossible here */
-                $slot = array_shift($slots);
-                $ch = user_children($slot[0]['id']);
-                if ($ch[$slot[1]] === null) { break; }
-                /* occupied: its two child slots join the end of the queue */
-                $slots[] = [$ch[$slot[1]], 'L'];
-                $slots[] = [$ch[$slot[1]], 'R'];
-            }
-            [$placeRow, $placeLeg] = $slot;
             /* the first-time password is the member's own User ID — exactly
              * like normal registration (register.php); the random placeholder
              * below is replaced immediately after the account is created */
             [$ok, $uid, $code] = register_distributor([
                 'sponsor' => $sponsor['username'],
-                'leg' => $placeLeg,
-                'placement' => (int)$placeRow['id'],
-                'placement_leg' => $placeLeg,
+                'leg' => $leg,
+                'placement' => (int)$anchor['id'],
+                'placement_leg' => $leg,
                 'full_name' => $fullName,
                 'email' => $email,
                 'mobile' => $mobile,
@@ -158,10 +155,8 @@ if (is_post()) {
             if ($activate) {
                 q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
             }
-            /* the new member opens two child slots in the fill order */
-            $newRow = q_row("SELECT id, username, path, depth FROM users WHERE id = ?", [$uid]);
-            $slots[] = [$newRow, 'L'];
-            $slots[] = [$newRow, 'R'];
+            /* the next member goes directly below this one */
+            $anchor = q_row("SELECT * FROM users WHERE id = ?", [$uid]);
         }
         flash('success', $made . ' member' . ($made === 1 ? '' : 's') . ' created'
             . ($firstCode ? ' (' . e($firstCode) . ' … ' . e($lastCode) . ')' : '')
@@ -317,7 +312,8 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
 
     <div class="alert alert-warning">
         <b>Generate</b> creates many members at once with shared contact details (e.g. one team/company list)
-        on the chosen leg of an anchor member — breadth-first, exactly like normal registrations.
+        on the chosen leg of an anchor member — one below another on the extreme side of that leg,
+        exactly like normal registrations (the entered sponsor stays the introducer of every member).
         <b>Straight Lines</b> is the one-time setup tool: it places members one below another on the
         left and right of a sponsor (the member above is the sponsor).
         <b>Wipe</b> deletes <u>every member except the company root</u> together with their orders,
@@ -335,8 +331,8 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
             <div class="form-group">
                 <label>Leg to fill</label>
                 <select class="form-control" name="leg">
-                    <option value="R" selected>RIGHT</option>
-                    <option value="L">LEFT</option>
+                    <option value="R" selected>RIGHT (extreme right)</option>
+                    <option value="L">LEFT (extreme left)</option>
                 </select>
             </div>
             <div class="form-group">
