@@ -94,7 +94,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                 return '<div class="t-node empty add">
                             <a href="' . e($href) . '" title="Add a new member in this position (' . $legName . ' leg)">
                                 <span class="t-add-plus">➕</span>
-                                <span class="t-add-text">Add ' . $legName . '</span>
+                                <span class="t-add-text">' . $legName . '</span>
                             </a>
                         </div>';
             }
@@ -148,8 +148,10 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
          * link: a click/tap opens the info popup (the "View distributor"
          * action lives inside the popup), so the info never appears on
          * hover or focus without an explicit click. */
-        $ico = '<svg class="t-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
-            . '<path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+        /* wide bust icon — it stretches to exactly the width of the User ID
+         * below it, so the icon visually covers the complete ID */
+        $ico = '<svg class="t-ico" viewBox="0 0 40 20" aria-hidden="true" focusable="false">'
+            . '<path fill="currentColor" d="M20 10a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 1.2c-7.4 0-16 2.9-16 6.3V20h32v-2.5c0-3.4-8.6-6.3-16-6.3z"/></svg>';
         $pill = '<span class="t-pill ' . ($on ? 'on' : 'off') . '" title="Click for details">'
             . $ico . '<span class="t-id">' . e($user['username']) . '</span></span>';
         return '<div class="t-node' . ($isRoot ? ' root' : '') . '">'
