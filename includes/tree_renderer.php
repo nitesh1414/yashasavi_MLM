@@ -143,11 +143,15 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             . '</div>'
             . '</div>';
 
-        /* The pill is NOT a link: a click/tap opens the info popup (the
-         * "View distributor" action lives inside the popup), so the info
-         * never appears on hover or focus without an explicit click. */
-        $pillInner = e($user['username']);
-        $pill = '<span class="t-pill' . ($on ? ' on' : ' off') . '" title="Click for details">' . $pillInner . '</span>';
+        /* Compact member node: a small person icon (green = active,
+         * red = inactive) with the User ID below it. The pill is NOT a
+         * link: a click/tap opens the info popup (the "View distributor"
+         * action lives inside the popup), so the info never appears on
+         * hover or focus without an explicit click. */
+        $ico = '<svg class="t-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+            . '<path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+        $pill = '<span class="t-pill ' . ($on ? 'on' : 'off') . '" title="Click for details">'
+            . $ico . '<span class="t-id">' . e($user['username']) . '</span></span>';
         return '<div class="t-node' . ($isRoot ? ' root' : '') . '">'
             . $pill
             . $tip
@@ -287,8 +291,8 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                 . 'on any member to continue deeper into that branch.</div>'
             : '')
         . '<div class="tree-legends">
-                <span class="lg"><span class="dot" style="background:#43a047"></span> Active member</span>
-                <span class="lg"><span class="dot" style="background:#e53935"></span> Inactive member</span>
+                <span class="lg"><span class="dot" style="background:#43a047"></span> Active member (green icon)</span>
+                <span class="lg"><span class="dot" style="background:#e53935"></span> Inactive member (red icon)</span>
                 <span class="lg"><span class="dot" style="background:#fff;box-shadow:0 0 0 2px #d6a83c inset"></span> Root</span>
                 <span class="lg">📜 First frame shows up to <b>level 7</b> — scroll for the rest; members stay full size</span>
                 <span class="lg">➡️ Single-child legs render as straight vertical lines — the ➕ chip beside the line is that free position</span>
