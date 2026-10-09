@@ -576,3 +576,23 @@ table.table td, table.table th,
 .pt-chip b { color: #103a14; }
 .pt-chip.green { background: #edf7ed; border-color: #81c784; }
 .pt-chip.gold { background: #fdf6e3; border-color: #d6a83c; }
+
+/* ---- DataTables (sortable / searchable tables: All Distributors, My Team) ---- */
+table.dataTable { width: 100% !important; margin: 0; }
+table.dataTable thead th { position: relative; cursor: pointer; white-space: nowrap; -webkit-user-select: none; user-select: none; }
+table.dataTable thead th:after { content: '\21C5'; opacity: .25; margin-left: 5px; font-size: 10px; }
+table.dataTable thead th.sorting_asc:after { content: '\25B2'; opacity: .85; color: var(--accent); }
+table.dataTable thead th.sorting_desc:after { content: '\25BC'; opacity: .85; color: var(--accent); }
+table.dataTable thead th:hover { background: #eef3ec; }
+.dataTables_wrapper { margin-top: 2px; }
+.dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter { margin: 10px 0; font-size: 12.5px; color: var(--ink-soft); }
+.dataTables_wrapper .dataTables_length select { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; background: #fff; font-size: 12.5px; margin: 0 4px; }
+.dataTables_wrapper .dataTables_filter input { border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; font-size: 12.5px; margin-left: 6px; }
+.dataTables_wrapper .dataTables_filter input:focus { outline: 2px solid rgba(16, 58, 20, .25); border-color: var(--accent); }
+.dataTables_wrapper .dataTables_info { font-size: 12px; color: var(--ink-soft); margin: 10px 0; }
+.dataTables_wrapper .dataTables_paginate { margin: 10px 0; display: flex; gap: 4px; flex-wrap: wrap; }
+.dataTables_wrapper .dataTables_paginate .paginate_button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 4px 11px; font-size: 12.5px; color: var(--ink) !important; cursor: pointer; text-decoration: none; }
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover { border-color: var(--accent); background: #eef3ec; }
+.dataTables_wrapper .dataTables_paginate .paginate_button.current { background: var(--accent); border-color: var(--accent); color: #fff !important; }
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled { opacity: .4; cursor: default; }
+table.dataTable td.dataTables_empty { text-align: center; padding: 26px; color: var(--ink-soft); }

@@ -36,11 +36,18 @@ if ($status !== '') {
     $params[] = $status;
 }
 $total = (int)q_val("SELECT COUNT(*) FROM users u WHERE $where", $params);
-[$per, $offset] = paginate($total, 20, $links);
+/* all matching rows at once — the DataTable on this page provides the
+ * sorting (click a column name), instant search and pagination client-side */
 $rows = q_all("SELECT u.*, s.username AS sponsor_name, r.name AS rank_name FROM users u
                LEFT JOIN users s ON s.id = u.sponsor_id
                LEFT JOIN ranks r ON r.id = u.rank_id
-               WHERE $where ORDER BY u.id DESC LIMIT $per OFFSET $offset", $params);
+               WHERE $where ORDER BY u.id DESC", $params);
+
+$pageScriptsFiles = [
+    url('assets/datatables/jquery.min.js'),
+    url('assets/datatables/jquery.dataTables.min.js'),
+    url('assets/js/dtables.js'),
+];
 
 $activeKey = 'users';
 $pageTitle = 'Distributors';
@@ -72,11 +79,14 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="empty-state"><span class="es-ico">👥</span>No distributors found.</div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
+        <table class="table table-dt" style="width:100%">
+            <thead>
             <tr>
-                <th>User</th><th>Sponsor</th><th>Team BV (L / R)</th><th>Wallet</th>
+                <th>User</th><th>Sponsor</th><th>Left BV</th><th>Right BV</th><th>Wallet</th>
                 <th>Rank</th><th>Status</th><th>Actions</th>
             </tr>
+            </thead>
+            <tbody>
             <?php foreach ($rows as $r): ?>
             <tr>
                 <td>
@@ -85,8 +95,9 @@ require __DIR__ . '/../includes/dash_header.php';
                     <small style="color:#000"><?= e($r['full_name']) ?> · <?= e($r['mobile']) ?></small>
                 </td>
                 <td><?= e($r['sponsor_name'] ?: '—') ?></td>
-                <td><?= e(number_format((float)$r['left_bv'], 0)) ?> / <?= e(number_format((float)$r['right_bv'], 0)) ?></td>
-                <td><?= money($r['wallet_balance']) ?></td>
+                <td data-order="<?= (float)$r['left_bv'] ?>"><?= e(number_format((float)$r['left_bv'], 0)) ?></td>
+                <td data-order="<?= (float)$r['right_bv'] ?>"><?= e(number_format((float)$r['right_bv'], 0)) ?></td>
+                <td data-order="<?= (float)$r['wallet_balance'] ?>"><?= money($r['wallet_balance']) ?></td>
                 <td><?= e($r['rank_name'] ?: '—') ?></td>
                 <td><?= status_badge($r['status']) ?></td>
                 <td>
@@ -107,13 +118,15 @@ require __DIR__ . '/../includes/dash_header.php';
                             <button class="btn btn-outline btn-sm" type="submit">Unblock</button>
                         </form>
                         <?php endif; ?>
+                        <a class="btn btn-danger btn-sm" href="user_delete.php?id=<?= (int)$r['id'] ?>"
+                           title="Delete this distributor (asks for confirmation first)">🗑 Delete</a>
                     </div>
                 </td>
             </tr>
             <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
-    <?= $links ?>
     <?php endif; ?>
 </div>
 

@@ -22,10 +22,17 @@ if ($q !== '') {
     $params[] = "%$q%";
 }
 $total = (int)q_val("SELECT COUNT(*) FROM users u WHERE $where", $params);
-[$per, $offset] = paginate($total, 20, $links);
+/* all matching rows at once — the DataTable provides sorting (click a
+ * column name), instant search and pagination client-side */
 $rows = q_all("SELECT u.*, s.username AS sponsor_name FROM users u
                LEFT JOIN users s ON s.id = u.sponsor_id
-               WHERE $where ORDER BY u.id DESC LIMIT $per OFFSET $offset", $params);
+               WHERE $where ORDER BY u.id DESC", $params);
+
+$pageScriptsFiles = [
+    url('assets/datatables/jquery.min.js'),
+    url('assets/datatables/jquery.dataTables.min.js'),
+    url('assets/js/dtables.js'),
+];
 
 $activeKey = 'team';
 $pageTitle = 'My Team';
@@ -56,28 +63,31 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="empty-state"><span class="es-ico">👥</span>No members found.</div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
+        <table class="table table-dt" style="width:100%">
+            <thead>
             <tr>
                 <th>User</th><th>Name</th><th>Leg</th><th>Sponsor</th>
                 <th>Self BV</th><th>Status</th><th>Joined</th>
             </tr>
+            </thead>
+            <tbody>
             <?php foreach ($rows as $r): ?>
             <tr>
                 <td><b><?= e($r['username']) ?></b></td>
                 <td><?= e($r['full_name']) ?><br><small style="color:#000"><?= e($r['mobile']) ?></small></td>
                 <td><?= $r['leg'] === 'L' ? badge('Left', 'info') : badge('Right', 'warning') ?></td>
                 <td><?= e($r['sponsor_name'] ?? '—') ?></td>
-                <td><?= bv($r['self_bv']) ?></td>
+                <td data-order="<?= (float)$r['self_bv'] ?>"><?= bv($r['self_bv']) ?></td>
                 <td>
                     <?= (int)$r['is_active'] ? badge('Active', 'success') : badge('Inactive', 'warning') ?>
                     <?= $r['status'] === 'blocked' ? badge('Blocked', 'danger') : '' ?>
                 </td>
-                <td><?= dmy($r['created_at']) ?></td>
+                <td data-order="<?= e($r['created_at']) ?>"><?= dmy($r['created_at']) ?></td>
             </tr>
             <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
-    <?= $links ?>
     <?php endif; ?>
 </div>
 

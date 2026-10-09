@@ -22,6 +22,11 @@ if ('serviceWorker' in navigator) {
     });
 }
 </script>
+<?php if (!empty($pageScriptsFiles)): ?>
+<?php foreach ((array)$pageScriptsFiles as $psf): ?>
+<script src="<?= e($psf) ?>"></script>
+<?php endforeach; ?>
+<?php endif; ?>
 <?php if (!empty($pageScripts)): ?>
 <script><?= $pageScripts ?></script>
 <?php endif; ?>
