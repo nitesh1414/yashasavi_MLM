@@ -145,21 +145,25 @@ document.addEventListener('DOMContentLoaded', function () {
         svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
         var NS = 'http://www.w3.org/2000/svg';
         var frag = document.createDocumentFragment();
-        tree.querySelectorAll('li').forEach(function (li) {
-            var ul = li.querySelector(':scope > ul');
-            if (!ul) { return; }
-            var pn = li.querySelector(':scope > .t-node');
-            if (!pn) { return; }
+        /* parent links are DATA-DRIVEN (data-id / data-parent): straight-line
+           legs are rendered as flat sibling lists, so the DOM hierarchy does
+           not reflect the member hierarchy */
+        var byId = {};
+        tree.querySelectorAll('li[data-id]').forEach(function (li) {
+            byId[li.getAttribute('data-id')] = li;
+        });
+        tree.querySelectorAll('[data-parent]').forEach(function (el) {
+            var pli = byId[el.getAttribute('data-parent')];
+            if (!pli) { return; }
+            var pn = pli.querySelector(':scope > .t-node');
+            var cn = el.matches('li') ? el.querySelector(':scope > .t-node') : el.querySelector('.t-node');
+            if (!pn || !cn) { return; }
             var pp = posIn(pn, tree);
-            var px = pp.x + pn.offsetWidth / 2, py = pp.y + pn.offsetHeight;
-            ul.querySelectorAll(':scope > li').forEach(function (cli) {
-                var cn = cli.querySelector(':scope > .t-node');
-                if (!cn) { return; }
-                var cp = posIn(cn, tree);
-                var path = document.createElementNS(NS, 'path');
-                path.setAttribute('d', elbowPath(px, py, cp.x + cn.offsetWidth / 2, cp.y));
-                frag.appendChild(path);
-            });
+            var cp = posIn(cn, tree);
+            var path = document.createElementNS(NS, 'path');
+            path.setAttribute('d', elbowPath(pp.x + pn.offsetWidth / 2, pp.y + pn.offsetHeight,
+                                             cp.x + cn.offsetWidth / 2, cp.y));
+            frag.appendChild(path);
         });
         while (svg.firstChild) { svg.removeChild(svg.firstChild); }
         svg.appendChild(frag);

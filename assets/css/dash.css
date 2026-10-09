@@ -209,13 +209,19 @@ select.form-control { appearance: auto; }
 .tree ul { display: flex; justify-content: center; }
 .tree li { position: relative; list-style: none; padding: 15px 5px 0; display: flex; flex-direction: column; align-items: center; }
 .tree li:only-child { padding-top: 0; }
-/* single-child legs: the empty sibling position floats beside the vertical
-   line so the real child sits straight below its parent — legs stay narrow
-   vertical lines instead of a wide diagonal staircase */
-.tree li.side-slot { position: absolute; top: 57px; padding: 0; z-index: 1; }
-.tree li.side-slot.L { right: calc(50% + 56px); }
-.tree li.side-slot.R { left: calc(50% + 56px); }
-.tree li.side-slot .t-node.empty.add { opacity: .85; }
+/* single-child legs render as FLAT sibling lists (one <ul class="chain">):
+   the DOM nesting depth stays constant no matter how many levels deep the
+   leg goes — browsers cap HTML nesting at ~512 levels, and a 250-level
+   nested list broke there, leaking the hidden member info onto the page */
+.tree ul.chain { flex-direction: column; align-items: center; }
+.tree ul.chain > li:only-child { padding-top: 15px; }
+/* a straight-line member's free position floats beside the line, inside the
+   member's own <li> (it is absolute, so it never widens the chart) */
+.tree .side-slot { position: absolute; top: 57px; z-index: 1; }
+.tree .side-slot.L { right: calc(50% + 56px); }
+.tree .side-slot.R { left: calc(50% + 56px); }
+.tree .side-slot .t-node.empty.add { opacity: .85; }
+.tree .deep-note { margin-top: 10px; font-size: 10.5px; color: var(--ink-soft); background: #fff8e6; border: 1px dashed var(--line); border-radius: 8px; padding: 4px 10px; white-space: nowrap; }
 
 /* member node = ID badge only (active green / inactive red); details open in a floating popup */
 .tree .t-node { position: relative; display: flex; flex-direction: column; align-items: center; outline: none; }

@@ -154,10 +154,19 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             . '</div>';
     };
 
-    $renderLevel = function ($user, $depth, $isRoot, $parentUser = null, $leg = null)
-        use (&$renderLevel, $byParent, $node, $levels) {
+    /* nesting guard: browsers cap HTML nesting depth (~512 levels). Chains
+     * are rendered FLAT so they never add depth; only consecutive two-child
+     * splits nest — beyond this guard the split member shows a drill-down
+     * note instead (realistically never reached). */
+    $nestGuard = 240;
+    $deepNote = '<div class="deep-note">More levels below — use 🔍 View subtree on this member to continue.</div>';
+
+    $renderLevel = function ($user, $depth, $isRoot, $parentUser = null, $leg = null, $ndepth = 1)
+        use (&$renderLevel, $byParent, $node, $levels, $nestGuard, $deepNote) {
         $level = $depth + 1;   /* root = level 1 */
-        $html = '<li data-level="' . $level . '"' . ($isRoot ? ' style="padding-top:0"' : '') . '>'
+        $html = '<li data-level="' . $level . '" data-id="' . (int)$user['id'] . '"'
+            . ($parentUser ? ' data-parent="' . (int)$parentUser['id'] . '"' : '')
+            . ($isRoot ? ' style="padding-top:0"' : '') . '>'
             . $node($user, $isRoot, $parentUser, $leg, $level);
         /* Only real members have children rows: each child position is either
          * a member node or an add-member slot; nothing below empty slots.
@@ -166,28 +175,83 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
             $lKid = $kids['L'] ?? null;
             $rKid = $kids['R'] ?? null;
-            $childLevel = $depth + 2;
-            $html .= '<ul>';
             if ($lKid && $rKid) {
-                /* both legs real — classic two-child row */
-                $html .= '<li>' . $renderLevel($lKid, $depth + 1, false, $user, 'L') . '</li>';
-                $html .= '<li>' . $renderLevel($rKid, $depth + 1, false, $user, 'R') . '</li>';
+                /* both legs real — classic two-child row (one nesting level) */
+                if ($ndepth >= $nestGuard) {
+                    $html .= $deepNote;
+                } else {
+                    $html .= '<ul>'
+                        . $renderLevel($lKid, $depth + 1, false, $user, 'L', $ndepth + 1)
+                        . $renderLevel($rKid, $depth + 1, false, $user, 'R', $ndepth + 1)
+                        . '</ul>';
+                }
             } elseif ($lKid || $rKid) {
-                /* ONE real child (straight-line leg): the child renders
-                 * directly below its parent so the leg is a vertical line —
-                 * the empty sibling position floats beside the line as a
-                 * compact chip instead of widening the chart */
-                $real = $lKid ?: $rKid;
+                /* ONE real child — straight-line leg. Rendered as a FLAT list
+                 * of sibling <li>s: every member of the leg is a direct child
+                 * of one <ul class="chain">, so the DOM nesting depth stays
+                 * constant no matter how many levels deep the leg goes.
+                 * (A nested list 250 levels deep exceeded the browser's
+                 * ~512-level HTML nesting cap: the parser flattened the
+                 * structure and the hidden member info leaked onto the page.)
+                 * Parent links for the connector lines are carried in
+                 * data-id / data-parent attributes instead of DOM nesting. */
                 $emptyLeg = $lKid ? 'R' : 'L';
-                $html .= '<li>' . $renderLevel($real, $depth + 1, false, $user, $real['leg']) . '</li>';
-                $html .= '<li class="side-slot ' . $emptyLeg . '" data-level="' . $childLevel . '">'
-                    . $node(null, false, $user, $emptyLeg, $childLevel) . '</li>';
+                /* this member's free position floats beside the line */
+                $html .= '<div class="side-slot ' . $emptyLeg . '" data-parent="' . (int)$user['id'] . '">'
+                    . $node(null, false, $user, $emptyLeg, $depth + 2) . '</div>';
+                $html .= '<ul class="chain">';
+                $p = $user;
+                $cur = $lKid ?: $rKid;
+                $lvl = $depth + 2;
+                while (true) {
+                    $ck = isset($byParent[$cur['id']]) ? $byParent[$cur['id']] : [];
+                    $cl = $ck['L'] ?? null;
+                    $cr = $ck['R'] ?? null;
+                    $html .= '<li data-level="' . $lvl . '" data-id="' . (int)$cur['id'] . '"'
+                        . ' data-parent="' . (int)$p['id'] . '">'
+                        . $node($cur, false, $p, $cur['leg'], $lvl);
+                    if ($cl && $cr) {
+                        /* the leg splits into two real children — normal
+                         * nested two-child row from here (chain ends) */
+                        if ($ndepth >= $nestGuard) {
+                            $html .= $deepNote;
+                        } else {
+                            $html .= '<ul>'
+                                . $renderLevel($cl, $lvl, false, $cur, 'L', $ndepth + 1)
+                                . $renderLevel($cr, $lvl, false, $cur, 'R', $ndepth + 1)
+                                . '</ul>';
+                        }
+                        $html .= '</li>';
+                        break;
+                    }
+                    if (!$cl && !$cr) {
+                        /* leg tail — its two free positions below it */
+                        $el = $lvl + 1;
+                        $html .= '<ul>'
+                            . '<li data-level="' . $el . '" data-parent="' . (int)$cur['id'] . '">' . $node(null, false, $cur, 'L', $el) . '</li>'
+                            . '<li data-level="' . $el . '" data-parent="' . (int)$cur['id'] . '">' . $node(null, false, $cur, 'R', $el) . '</li>'
+                            . '</ul></li>';
+                        break;
+                    }
+                    /* single child continues the leg as the NEXT SIBLING li;
+                     * this member's free position floats beside the line */
+                    $cel = $cl ? 'R' : 'L';
+                    $html .= '<div class="side-slot ' . $cel . '" data-parent="' . (int)$cur['id'] . '">'
+                        . $node(null, false, $cur, $cel, $lvl + 1) . '</div>';
+                    $html .= '</li>';
+                    $p = $cur;
+                    $cur = $cl ?: $cr;
+                    $lvl++;
+                }
+                $html .= '</ul>';
             } else {
                 /* leaf — both positions free (frontier row) */
-                $html .= '<li data-level="' . $childLevel . '">' . $node(null, false, $user, 'L', $childLevel) . '</li>';
-                $html .= '<li data-level="' . $childLevel . '">' . $node(null, false, $user, 'R', $childLevel) . '</li>';
+                $el = $depth + 2;
+                $html .= '<ul>'
+                    . '<li data-level="' . $el . '" data-parent="' . (int)$user['id'] . '">' . $node(null, false, $user, 'L', $el) . '</li>'
+                    . '<li data-level="' . $el . '" data-parent="' . (int)$user['id'] . '">' . $node(null, false, $user, 'R', $el) . '</li>'
+                    . '</ul>';
             }
-            $html .= '</ul>';
         }
         $html .= '</li>';
         return $html;
