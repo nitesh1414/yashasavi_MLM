@@ -217,7 +217,7 @@ select.form-control { appearance: auto; }
 .tree ul.chain > li:only-child { padding-top: 15px; }
 /* a straight-line member's free position floats beside the line, inside the
    member's own <li> (it is absolute, so it never widens the chart) */
-.tree .side-slot { position: absolute; top: 64px; z-index: 1; }
+.tree .side-slot { position: absolute; top: 86px; z-index: 1; }
 .tree .side-slot.L { right: calc(50% + 38px); }
 .tree .side-slot.R { left: calc(50% + 38px); }
 .tree .side-slot .t-node.empty.add { opacity: .85; }
@@ -229,8 +229,9 @@ select.form-control { appearance: auto; }
    active, red = inactive) with the User ID below it */
 .tree .t-pill { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 8px 2px; border-radius: 9px; background: #fff; border: 1px solid var(--line); white-space: nowrap; cursor: pointer; box-shadow: 0 1px 3px rgba(0, 0, 0, .14); }
 .tree .t-pill:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, .24); }
-.tree .t-pill .t-ico { display: block; width: 100%; height: auto; }   /* stretches to the full width of the ID below */
-.tree .t-pill .t-id { display: block; font-size: 8px; font-weight: 600; line-height: 1.15; color: #2b3a2b; }
+/* Font Awesome person icon sized to cover the complete User ID below it */
+.tree .t-pill .t-ico { display: block; font-size: 50px; line-height: 1; }
+.tree .t-pill .t-id { display: block; font-size: 7px; font-weight: 600; line-height: 1.15; color: #2b3a2b; }
 .tree .t-pill.on .t-ico { color: #2e7d32; }
 .tree .t-pill.off .t-ico { color: #c62828; }
 .tree .t-node.root .t-pill { box-shadow: 0 0 0 2px rgba(214, 168, 60, .65), 0 1px 3px rgba(0, 0, 0, .14); }
@@ -269,7 +270,8 @@ select.form-control { appearance: auto; }
 @media (max-width: 820px) {
     .tree-wrap { padding: 24px 6px 12px; max-height: calc(100vh - 185px); }
     .tree li { padding: 26px 6px 0; }
-    .tree .t-pill .t-id { font-size: 7px; }
+    .tree .t-pill .t-ico { font-size: 40px; }
+    .tree .t-pill .t-id { font-size: 6px; }
     .tree-popup { left: 50% !important; top: auto !important; bottom: 14px; transform: translateX(-50%); min-width: 240px; max-width: calc(100vw - 24px); }
 }
 

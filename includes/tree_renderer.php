@@ -148,10 +148,9 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
          * link: a click/tap opens the info popup (the "View distributor"
          * action lives inside the popup), so the info never appears on
          * hover or focus without an explicit click. */
-        /* wide bust icon — it stretches to exactly the width of the User ID
-         * below it, so the icon visually covers the complete ID */
-        $ico = '<svg class="t-ico" viewBox="0 0 40 20" aria-hidden="true" focusable="false">'
-            . '<path fill="currentColor" d="M20 10a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm0 1.2c-7.4 0-16 2.9-16 6.3V20h32v-2.5c0-3.4-8.6-6.3-16-6.3z"/></svg>';
+        /* Font Awesome user icon — big enough to cover the complete User ID
+         * placed below it; colored green (active) / red (inactive) via CSS */
+        $ico = '<i class="t-ico fas fa-user" aria-hidden="true"></i>';
         $pill = '<span class="t-pill ' . ($on ? 'on' : 'off') . '" title="Click for details">'
             . $ico . '<span class="t-id">' . e($user['username']) . '</span></span>';
         return '<div class="t-node' . ($isRoot ? ' root' : '') . '">'

@@ -40,6 +40,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <link rel="icon" href="<?= e(upload_url(setting('site_favicon')) ?: placeholder('i')) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="<?= url('assets/font-awesome/css/all.min.css') ?>?v=<?= APP_VERSION ?>">
 <link rel="stylesheet" href="<?= url('assets/css/dash.css') ?>?v=<?= APP_VERSION ?>">
 <link rel="manifest" href="<?= e(url('manifest.php')) ?>">
 <meta name="theme-color" content="#103a14">
