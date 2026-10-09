@@ -19,45 +19,139 @@ require __DIR__ . '/_nav.php';
 require __DIR__ . '/../includes/dash_header.php';
 
 $unit = max(1, (float)$plan['pair_unit_bv']);
+/* payout rate for one matched pair of the plan unit (₹450 on the current plan) */
+$pairPay = $plan['binary_type'] === 'percent'
+    ? $unit * (float)$plan['binary_value'] / 100
+    : (float)$plan['binary_value'];
 ?>
 
 <div class="two-col">
     <div>
         <div class="card">
-            <div class="card-title">💠 Binary Pair Matching Income</div>
-            <div class="plan-box">
-                Every purchase in your team adds <b>BV (Business Volume)</b> to your <b>Left</b> or <b>Right</b> leg.
-                Income is paid on matched pairs: <b>1:<?= e($plan['pair_unit_bv'] . ' BV') ?></b> on both legs = 1 pair.
-                <?php if ($plan['binary_type'] === 'percent'): ?>
-                    Pair income = <b><?= e($plan['binary_value']) ?>%</b> of matched BV (<?= money($unit * $plan['binary_value'] / 100) ?> per pair).
-                <?php else: ?>
-                    Pair income = <b><?= money($plan['binary_value']) ?></b> per matched pair.
-                <?php endif; ?>
-                Unmatched BV is <b><?= (int)$plan['carry_forward'] === 1 ? 'carried forward' : 'flushed' ?></b>.
-                <?php if ((float)$plan['daily_cap'] > 0): ?>Daily cap: <b><?= money($plan['daily_cap']) ?></b>.<?php endif; ?>
+            <div class="card-title">1. 🤝 Direct Sponsor Income</div>
+            <div class="plan-tree">
+                <div class="pt-node you">
+                    <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                    <span class="pt-name">YOU</span>
+                    <span class="pt-sub">Sponsor</span>
+                </div>
+                <div class="pt-stem"></div>
+                <div class="pt-node">
+                    <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                    <span class="pt-name">Direct Member</span>
+                    <span class="pt-sub">directly sponsored by you</span>
+                </div>
             </div>
-            <table class="kv-table" style="width:100%">
-                <tr><td>Left leg BV</td><td><b><?= bv($u['left_bv']) ?></b></td></tr>
-                <tr><td>Right leg BV</td><td><b><?= bv($u['right_bv']) ?></b></td></tr>
-                <tr><td>Pairs matched so far</td><td><b><?= (int)$u['matched_pairs'] ?></b></td></tr>
-                <tr><td>Binary income earned</td><td><b><?= money($earn['binary']) ?></b></td></tr>
+            <div class="pt-chips">
+                <span class="pt-chip">Joining amount: <b>₹6,000</b></span>
+                <span class="pt-chip">Business Volume: <b>3,000 BV</b></span>
+                <span class="pt-chip green">Your Direct Sponsor commission: <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b></span>
+            </div>
+            <div class="plan-box">
+                Every member you <b>directly sponsor</b> who joins with the ₹6,000 plan (3,000 BV) pays you a
+                <b>direct sponsor commission of <?= money(3000 * $plan['sponsor_percent'] / 100) ?></b>
+                (<?= e($plan['sponsor_percent']) ?>% of the joining BV) — on every eligible direct sponsorship.
+                <table class="kv-table" style="width:100%;margin-top:10px">
+                    <tr><td>Direct sponsor income earned</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">2. 💠 Matching Bonus Income</div>
+            <div class="plan-tree">
+                <div class="pt-node you">
+                    <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                    <span class="pt-name">YOU</span>
+                </div>
+                <div class="pt-branch"></div>
+                <div class="pt-kids">
+                    <div class="pt-kid">
+                        <div class="pt-node">
+                            <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                            <span class="pt-name">LEFT (L)</span>
+                            <span class="pt-sub">Left BV 3,000</span>
+                        </div>
+                    </div>
+                    <div class="pt-kid">
+                        <div class="pt-node">
+                            <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                            <span class="pt-name">RIGHT (R)</span>
+                            <span class="pt-sub">Right BV 3,000</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <table class="table" style="width:100%">
+                <tr><th>Left BV</th><th>Right BV</th><th>Matched BV</th><th>Payout</th></tr>
+                <tr>
+                    <td>3,000</td>
+                    <td>3,000</td>
+                    <td><b>3,000</b> = 1 pair</td>
+                    <td><b><?= money($pairPay) ?></b></td>
+                </tr>
             </table>
-        </div>
-
-        <div class="card">
-            <div class="card-title">🤝 Direct Sponsor Bonus</div>
             <div class="plan-box">
-                You earn <b><?= e($plan['sponsor_percent']) ?>%</b> of the BV of every purchase made by your
-                <b>directly sponsored</b> members. Earned so far: <b><?= money($earn['sponsor']) ?></b>.
+                Matching bonus is calculated on <b>eligible matching business volume</b>:
+                3,000 BV on your <b>Left</b> leg + 3,000 BV on your <b>Right</b> leg = 1 matched pair,
+                paid at the payout rate of <b><?= money($pairPay) ?></b> per <?= e($plan['pair_unit_bv']) ?> BV matched pair.
+                <br><b>Eligibility rules:</b>
+                your account must be an <b>active member</b><?= (int)$plan['matching_requires_active'] ? '' : ' (not required by current settings)' ?>;
+                only <b>confirmed / approved order BV</b> counts;
+                unmatched BV is <b><?= (int)$plan['carry_forward'] === 1 ? 'carried forward to the next matching' : 'flushed' ?></b>;
+                <?php if ((float)$plan['daily_cap'] > 0): ?>daily cap: <b><?= money($plan['daily_cap']) ?></b>;<?php endif; ?>
+                pair matching is 1:<?= e($plan['pair_unit_bv']) ?> on both legs.
+                <table class="kv-table" style="width:100%;margin-top:10px">
+                    <tr><td>Your left leg BV</td><td><b><?= bv($u['left_bv']) ?></b></td></tr>
+                    <tr><td>Your right leg BV</td><td><b><?= bv($u['right_bv']) ?></b></td></tr>
+                    <tr><td>Pairs matched so far</td><td><b><?= (int)$u['matched_pairs'] ?></b></td></tr>
+                    <tr><td>Matching bonus income earned</td><td><b><?= money($earn['binary']) ?></b></td></tr>
+                </table>
             </div>
         </div>
 
         <div class="card">
-            <div class="card-title">💫 Sponsor Matching Income</div>
+            <div class="card-title">3. 💫 50% Direct Sponsor Bonus Income</div>
+            <div class="plan-tree">
+                <div class="pt-node you">
+                    <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                    <span class="pt-name">YOU</span>
+                    <span class="pt-sub">Sponsor</span>
+                </div>
+                <div class="pt-stem"></div>
+                <div class="pt-node">
+                    <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                    <span class="pt-name">Direct Member</span>
+                    <span class="pt-sub">directly sponsored by you</span>
+                </div>
+                <div class="pt-branch"></div>
+                <div class="pt-kids">
+                    <div class="pt-kid">
+                        <div class="pt-node">
+                            <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                            <span class="pt-name">LEFT (L)</span>
+                            <span class="pt-sub">3,000 BV</span>
+                        </div>
+                    </div>
+                    <div class="pt-kid">
+                        <div class="pt-node">
+                            <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                            <span class="pt-name">RIGHT (R)</span>
+                            <span class="pt-sub">3,000 BV</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pt-chips">
+                <span class="pt-chip">Member's Matching Bonus: <b><?= money($pairPay) ?></b></span>
+                <span class="pt-chip gold">Your 50% Direct Sponsor Bonus: <b><?= money($pairPay * $plan['sponsor_matching_percent'] / 100) ?></b></span>
+            </div>
             <div class="plan-box">
-                When a member you directly sponsored earns <b>binary matching income</b>, you receive
+                When <b>one of the legs</b> of your directly sponsored member completes a Matching Bonus Income
+                (<?= money($pairPay) ?> in the example), you receive
                 <b><?= e($plan['sponsor_matching_percent']) ?>%</b> of that matching income —
-                <b>no level limit</b>, on every matching payout of your directs.
+                <b><?= money($pairPay * $plan['sponsor_matching_percent'] / 100) ?></b> — as your Direct Sponsor Bonus.
+                It applies to <b>every matching payout</b> of every directly sponsored member, with <b>no level limit</b>.
                 <table class="kv-table" style="width:100%;margin-top:10px">
                     <tr><td>Sponsor matching earned</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
                 </table>

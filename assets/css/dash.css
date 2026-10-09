@@ -555,3 +555,24 @@ table.table td, table.table th,
 
 /* summary table above the tree scrolls on its own on phones */
 .tree-summary { margin-bottom: 14px; }
+
+/* ---- plan page income diagrams (Direct Sponsor / Matching Bonus / Sponsor Bonus) ---- */
+.plan-tree { display: flex; flex-direction: column; align-items: center; margin: 12px 0 4px; }
+.pt-node { display: flex; flex-direction: column; align-items: center; gap: 1px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 7px 16px 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, .1); text-align: center; }
+.pt-node .pt-ico { font-size: 24px; line-height: 1; color: #2e7d32; }
+.pt-node.you .pt-ico { color: #b8860b; }
+.pt-node.you { box-shadow: 0 0 0 2px rgba(214, 168, 60, .45), 0 1px 3px rgba(0, 0, 0, .1); }
+.pt-node .pt-name { font-size: 11.5px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+.pt-node .pt-sub { font-size: 9.5px; color: var(--ink-soft); line-height: 1.3; }
+.pt-stem { width: 2px; height: 20px; background: #b9c8b9; }
+.pt-branch { position: relative; height: 24px; width: 260px; }
+.pt-branch::before { content: ''; position: absolute; top: 0; left: 50%; width: 2px; height: 12px; margin-left: -1px; background: #b9c8b9; }
+.pt-branch::after { content: ''; position: absolute; top: 12px; left: 25%; right: 25%; height: 2px; background: #b9c8b9; }
+.pt-kids { display: flex; width: 260px; }
+.pt-kid { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; }
+.pt-kid::before { content: ''; width: 2px; height: 12px; background: #b9c8b9; }
+.pt-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 10px 0 2px; }
+.pt-chip { font-size: 11px; background: #eef3ec; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; color: var(--ink); white-space: nowrap; }
+.pt-chip b { color: #103a14; }
+.pt-chip.green { background: #edf7ed; border-color: #81c784; }
+.pt-chip.gold { background: #fdf6e3; border-color: #d6a83c; }
