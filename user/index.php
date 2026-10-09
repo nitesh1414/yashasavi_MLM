@@ -107,7 +107,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Direct Sponsor Income</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
                 <tr><td>Binary Matching Income</td><td><b><?= money($earn['binary']) ?></b></td></tr>
                 <tr><td>Sponsor Matching Income</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
-                <tr><td>Level Income</td><td><b><?= money($earn['level']) ?></b></td></tr>
+                <tr><td>50% Direct SP Match Income</td><td><b><?= money($earn['level']) ?></b></td></tr>
                 <tr><td>Cash Rewards (Rank)</td><td><b><?= money($earn['rank']) ?></b></td></tr>
                 <tr><td>Car Fund</td><td><b><?= money($earn['car_fund']) ?></b></td></tr>
                 <tr><td>Award Rewards</td><td><b><?= money($earn['award']) ?></b></td></tr>

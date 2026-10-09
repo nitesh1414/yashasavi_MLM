@@ -10,7 +10,7 @@
  *
  * Design: binary chart on the full page. Each member node shows ONLY the
  * member ID as a pill at a FIXED readable size (never shrunk to fit);
- * hovering (desktop) or tapping (mobile) the pill reveals the remaining
+ * clicking / tapping the pill reveals the remaining
  * information (name, status, leg, upline, BVs, rank) plus the "add under
  * this member" and "view subtree" actions in a tooltip. Branches are drawn
  * as straight lines between parent and child pills by an SVG overlay (see
@@ -101,7 +101,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             return '';
         }
 
-        // Member node — visible: ID pill only; everything else in the hover tooltip
+        // Member node — visible: ID pill only; everything else in the click tooltip
         $on = (int)$user['is_active'] === 1;
         $blocked = $user['status'] === 'blocked';
         $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
@@ -143,12 +143,12 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             . '</div>'
             . '</div>';
 
-        /* In the super admin tree the ID pill itself links to the distributor view. */
+        /* The pill is NOT a link: a click/tap opens the info popup (the
+         * "View distributor" action lives inside the popup), so the info
+         * never appears on hover or focus without an explicit click. */
         $pillInner = e($user['username']);
-        $pill = $viewUserBase
-            ? '<a class="t-pill' . ($on ? ' on' : ' off') . '" href="' . e($viewUserBase . '?id=' . (int)$user['id']) . '" title="Open distributor view">' . $pillInner . '</a>'
-            : '<span class="t-pill' . ($on ? ' on' : ' off') . '">' . $pillInner . '</span>';
-        return '<div class="t-node' . ($isRoot ? ' root' : '') . '" tabindex="0">'
+        $pill = '<span class="t-pill' . ($on ? ' on' : ' off') . '" title="Click for details">' . $pillInner . '</span>';
+        return '<div class="t-node' . ($isRoot ? ' root' : '') . '">'
             . $pill
             . $tip
             . '</div>';
@@ -229,7 +229,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                 <span class="lg">📜 First frame shows up to <b>level 7</b> — scroll for the rest; members stay full size</span>
                 <span class="lg">➡️ Single-child legs render as straight vertical lines — the ➕ chip beside the line is that free position</span>
                 <span class="lg">🔎 Enter a level number and press <b>Go</b> to jump to that level</span>
-                <span class="lg">Hover / tap a member ID for details &amp; actions</span>
+                <span class="lg">Click / tap a member ID for details &amp; actions — click again (or anywhere) to close</span>
             </div>
             <div class="tree-toolbar">
                 <div class="tt-level">

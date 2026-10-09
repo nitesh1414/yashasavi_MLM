@@ -166,27 +166,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /* member pill info popup: one floating popup appended to <body> so it is
-       never clipped by the tree scroll area and never disturbs the layout */
-    var treePopup = null, popTimer = null, popNode = null;
+       never clipped by the tree scroll area and never disturbs the layout.
+       CLICK-ONLY: it opens when a member pill is clicked/tapped and closes on
+       a second click, a click anywhere else, scrolling, resizing or Esc — it
+       never opens on hover or focus, so information can never appear on the
+       page without an explicit click */
+    var treePopup = null, popNode = null;
     function getTreePopup() {
         if (!treePopup) {
             treePopup = document.createElement('div');
             treePopup.className = 'tree-popup';
-            treePopup.setAttribute('role', 'tooltip');
+            treePopup.setAttribute('role', 'dialog');
             document.body.appendChild(treePopup);
-            treePopup.addEventListener('mouseenter', cancelPopHide);
-            treePopup.addEventListener('mouseleave', schedulePopHide);
             treePopup.addEventListener('click', function (e) { if (e.target.closest('a')) { hideTreePopup(); } });
         }
         return treePopup;
     }
     function hideTreePopup() {
-        clearTimeout(popTimer);
         if (treePopup) { treePopup.classList.remove('show'); }
         popNode = null;
     }
-    function schedulePopHide() { clearTimeout(popTimer); popTimer = setTimeout(hideTreePopup, 250); }
-    function cancelPopHide() { clearTimeout(popTimer); }
     function showTreePopup(node) {
         var pill = node.querySelector('.t-pill');
         var tip = node.querySelector('.t-tip');
@@ -209,24 +208,14 @@ document.addEventListener('DOMContentLoaded', function () {
         popNode = node;
     }
     document.querySelectorAll('.tree .t-node:not(.empty)').forEach(function (node) {
-        var pill = node.querySelector('.t-pill');
-        node.addEventListener('mouseenter', function () { cancelPopHide(); showTreePopup(node); });
-        node.addEventListener('mouseleave', schedulePopHide);
-        node.addEventListener('focusin', function () { cancelPopHide(); showTreePopup(node); });
-        node.addEventListener('focusout', schedulePopHide);
-        if (pill) {
-            pill.addEventListener('click', function (e) {
-                /* if the pill is a link (super admin tree), follow it to the
-                   distributor view instead of toggling the popup */
-                if (pill.closest('a[href]') || pill.tagName === 'A') { hideTreePopup(); return; }
-                e.preventDefault();
-                /* on touch devices the pill has no hover: tap toggles the popup.
-                   on desktop hover/focus already shows it, so click is a no-op. */
-                if (!window.matchMedia('(hover: none)').matches) { return; }
-                if (popNode === node && treePopup && treePopup.classList.contains('show')) { hideTreePopup(); }
-                else { cancelPopHide(); showTreePopup(node); }
-            });
-        }
+        node.addEventListener('click', function (e) {
+            /* links inside the tree (add slots, popup actions) navigate normally */
+            if (e.target.closest('a[href]')) { return; }
+            e.preventDefault();
+            /* click toggles: same member closes, another member switches */
+            if (popNode === node && treePopup && treePopup.classList.contains('show')) { hideTreePopup(); }
+            else { showTreePopup(node); }
+        });
     });
     document.addEventListener('click', function (e) {
         if (!e.target.closest('.t-node') && !e.target.closest('.tree-popup')) { hideTreePopup(); }

@@ -117,7 +117,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Self purchase BV</td><td><b><?= bv($u['self_bv']) ?></b></td></tr>
                 <tr><td>Direct referral income</td><td><?= money($earn['sponsor']) ?></td></tr>
                 <tr><td>Binary matching income</td><td><?= money($earn['binary']) ?></td></tr>
-                <tr><td>Level income</td><td><?= money($earn['level']) ?></td></tr>
+                <tr><td>50% Direct SP Match Income</td><td><?= money($earn['level']) ?></td></tr>
                 <tr><td>Rank rewards</td><td><?= money($earn['rank']) ?></td></tr>
                 <tr><td>Total withdrawn</td><td><?= money($u['total_withdrawn']) ?></td></tr>
             </table>
