@@ -79,6 +79,18 @@ if (is_post()) {
         flash('success', 'Level income percentages saved.');
         redirect('plan.php?tab=levels');
     }
+
+    if ($tab === 'recalc') {
+        /* recompute Total Income + BV of ALL members from the approved
+         * order history under the CURRENT plan settings */
+        [$ok, $st] = recalculate_all_incomes();
+        flash('success',
+            'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed under the current settings — '
+            . number_format($st['commissions']) . ' income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total) for '
+            . number_format($st['members']) . ' member(s) in ' . $st['seconds'] . 's. '
+            . 'Wallet balances were rebuilt from the ledger; manual entries and payouts were kept.');
+        redirect('plan.php');
+    }
 }
 
 $cur = get_str('tab', 'main');
@@ -100,7 +112,8 @@ require __DIR__ . '/../includes/dash_header.php';
         </span>
     </div>
     <p class="form-hint" style="margin-bottom:16px">
-        Changes apply to <b>future</b> orders only. Last updated: <?= dmy($plan['updated_at'], true) ?>.
+        Changes apply to <b>future</b> orders only — run the recalculation below to also apply them to
+        <b>all existing orders and members</b>. Last updated: <?= dmy($plan['updated_at'], true) ?>.
     </p>
 
     <?php if ($cur === 'main'): ?>
@@ -220,6 +233,28 @@ require __DIR__ . '/../includes/dash_header.php';
 
         <button class="btn btn-primary" type="submit">💾 Save Plan Settings</button>
     </form>
+
+    <div class="card" style="margin-top:18px;border:1.5px dashed var(--accent)">
+        <div class="card-title">🔄 Recalculate Total Income &amp; BV of all members</div>
+        <p style="font-size:13px;color:var(--ink-soft)">
+            After changing any setting above, run this to recompute <b>every member's Total Income and
+            BV</b> from the full <b>approved order history</b> using the NEW settings: Left / Right / Self
+            BV, matched pairs, ranks, Direct Sponsor Income, Matching Bonus, level income, 50% Direct
+            Sponsor Bonus, rank rewards, car fund and award rewards.
+        </p>
+        <ul style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 14px 18px">
+            <li>All automatic income entries are wiped and rebuilt chronologically; daily / monthly caps apply to each order's original day.</li>
+            <li>Wallet balances are rebuilt from the complete ledger — <b>manual income entries and payout history are kept</b>.</li>
+            <li>Members are only ever <b>activated</b> by the recalculation, never de-activated (manual activations survive).</li>
+            <li>Pending / rejected orders are ignored; product stock and order statuses are not touched.</li>
+            <li>Large networks may take a while — everything runs in one database transaction.</li>
+        </ul>
+        <form method="post" data-confirm="Recalculate the Total Income and BV of ALL members from the order history using the CURRENT plan settings? All automatic income entries will be replaced.">
+            <?= csrf_field() ?>
+            <input type="hidden" name="tab" value="recalc">
+            <button class="btn btn-primary" type="submit">🔄 Recalculate Total Income &amp; BV now</button>
+        </form>
+    </div>
 
     <?php else: ?>
     <form method="post">

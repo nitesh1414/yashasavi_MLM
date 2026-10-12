@@ -270,6 +270,15 @@ function register_distributor($data)
  * Credit a user's wallet inside the current transaction.
  * Returns the new balance.
  */
+/** Timestamp used for new commission / wallet rows and for daily-cap
+ *  windows. During a full recalculation (recalculate_all_incomes) it is
+ *  set to the replayed order's approval time, so daily / monthly caps
+ *  apply to each order's ORIGINAL day instead of "today". */
+function commission_now()
+{
+    return (!empty($GLOBALS['__commission_clock'])) ? $GLOBALS['__commission_clock'] : now();
+}
+
 function credit_wallet($userId, $amount, $refType, $refId, $note)
 {
     $amount = round((float)$amount, 2);
@@ -282,7 +291,7 @@ function credit_wallet($userId, $amount, $refType, $refId, $note)
       [$newBal, $amount, $userId]);
     q("INSERT INTO wallet_transactions (user_id, type, amount, balance_after, ref_type, ref_id, note, created_at)
        VALUES (?, 'credit', ?, ?, ?, ?, ?, ?)",
-      [$userId, $amount, $newBal, $refType, $refId, $note, now()]);
+      [$userId, $amount, $newBal, $refType, $refId, $note, commission_now()]);
     return $newBal;
 }
 
@@ -310,7 +319,7 @@ function add_commission($userId, $orderId, $type, $amount, $bvAmount, $level = n
 {
     q("INSERT INTO commissions (user_id, order_id, type, amount, bv, level, note, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'credited', ?)",
-      [$userId, $orderId, $type, round((float)$amount, 2), round((float)$bvAmount, 2), $level, $note, now()]);
+      [$userId, $orderId, $type, round((float)$amount, 2), round((float)$bvAmount, 2), $level, $note, commission_now()]);
     $cid = (int)db()->lastInsertId();
     credit_wallet($userId, $amount, 'commission', $cid, ucfirst($type) . ' income' . ($note ? ' — ' . $note : ''));
     return $cid;
@@ -441,15 +450,16 @@ function run_binary_matching($user, $orderId)
     $monthCap = isset($plan['monthly_cap']) ? (float)$plan['monthly_cap'] : 0.0;
     $capLeft = null;
     if ($cap > 0 || $monthCap > 0) {
+        $clockTs = strtotime(commission_now());
         $paidToday = (float)q_val(
             "SELECT COALESCE(SUM(amount),0) FROM commissions
              WHERE user_id = ? AND type = 'binary' AND status = 'credited' AND created_at >= ?",
-            [$user['id'], date('Y-m-d 00:00:00')]
+            [$user['id'], date('Y-m-d 00:00:00', $clockTs)]
         );
         $paidThisMonth = (float)q_val(
             "SELECT COALESCE(SUM(amount),0) FROM commissions
              WHERE user_id = ? AND type = 'binary' AND status = 'credited' AND created_at >= ?",
-            [$user['id'], date('Y-m-01 00:00:00')]
+            [$user['id'], date('Y-m-01 00:00:00', $clockTs)]
         );
         if ($cap > 0) { $capLeft = $cap - $paidToday; }
         if ($monthCap > 0) {
@@ -653,77 +663,11 @@ function approve_order($orderId, $adminId)
             return [false, 'Cash payment has not been authorized yet — use the “Authorize Payment” button first.'];
         }
 
-        $totalBv = (float)$order['total_bv'];
-        $buyer = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$order['user_id']]);
-        if (!$buyer) {
+        /* 1-5) business effects: BV, activation, sponsor + level income,
+         *      binary matching, ranks & special rewards (shared with the
+         *      full plan recalculation) */
+        if (!apply_order_business_effects($order)) {
             return [false, 'Buyer account missing.'];
-        }
-
-        $plan = get_plan();
-
-        /* 1) self BV + activation */
-        q("UPDATE users SET self_bv = self_bv + ? WHERE id = ?", [$totalBv, $buyer['id']]);
-        $buyer['self_bv'] = (float)$buyer['self_bv'] + $totalBv;
-        if ((int)$buyer['is_active'] !== 1 && $buyer['self_bv'] >= (float)$plan['activation_bv']) {
-            q("UPDATE users SET is_active = 1, activated_at = ? WHERE id = ?", [now(), $buyer['id']]);
-            $buyer['is_active'] = 1;
-        }
-
-        /* 2) sponsor bonus */
-        if ((float)$plan['sponsor_percent'] > 0 && $buyer['sponsor_id']) {
-            $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$buyer['sponsor_id']]);
-            if ($sponsor && $sponsor['status'] === 'active' && (int)$sponsor['is_active'] === 1) {
-                $amt = round($totalBv * (float)$plan['sponsor_percent'] / 100, 2);
-                if ($amt > 0) {
-                    add_commission($sponsor['id'], $order['id'], 'sponsor', $amt, $totalBv, null,
-                        'Direct referral purchase of ' . $buyer['username']);
-                }
-            }
-        }
-
-        /* 3) level income along the sponsor chain */
-        $levelPercents = get_plan_levels();
-        $depth = (int)$plan['level_depth'];
-        if ($depth > 0) {
-            $uplineId = $buyer['sponsor_id'];
-            $level = 1;
-            while ($uplineId && $level <= $depth) {
-                $up = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$uplineId]);
-                if (!$up) {
-                    break;
-                }
-                $pct = isset($levelPercents[$level]) ? (float)$levelPercents[$level] : 0.0;
-                if ($pct > 0
-                    && $up['status'] === 'active'
-                    && !((int)$plan['level_requires_active'] === 1 && (int)$up['is_active'] !== 1)) {
-                    $amt = round($totalBv * $pct / 100, 2);
-                    if ($amt > 0) {
-                        add_commission($up['id'], $order['id'], 'level', $amt, $totalBv, $level,
-                            'Level ' . $level . ' income');
-                    }
-                }
-                $uplineId = $up['sponsor_id'] ?: null;
-                $level++;
-            }
-        }
-
-        /* 4) propagate BV up the placement tree + binary matching */
-        $chain = ancestor_chain($buyer); // nearest first
-        $leg = $buyer['leg'];            // leg of buyer relative to its parent
-        foreach ($chain as $anc) {
-            $col = ($leg === 'R') ? 'right_bv' : 'left_bv';
-            q("UPDATE users SET $col = $col + ? WHERE id = ?", [$totalBv, $anc['id']]);
-            $anc[$col] = (float)$anc[$col] + $totalBv;
-            run_binary_matching($anc, $order['id']);
-            $leg = $anc['leg']; // leg of this ancestor relative to its own parent
-        }
-
-        /* 5) rank check + special rewards (car fund, award rewards) for buyer and ancestors */
-        check_rank($buyer['id'], $order['id']);
-        check_special_rewards($buyer['id'], $order['id']);
-        foreach ($chain as $anc) {
-            check_rank($anc['id'], $order['id']);
-            check_special_rewards($anc['id'], $order['id']);
         }
 
         /* 6) finalize order + stock */
@@ -736,6 +680,157 @@ function approve_order($orderId, $adminId)
 
         return [true, 'Order approved. Commissions have been processed.'];
     });
+}
+
+/**
+ * Core business effects of an approved order: self BV + activation,
+ * direct sponsor bonus, level income, BV propagation up the placement
+ * tree with binary matching, and rank / special-reward checks.
+ * Shared by approve_order() and the full plan recalculation
+ * (recalculate_all_incomes()); payment status, order status and stock
+ * are the caller's business. Returns false when the buyer is missing.
+ */
+function apply_order_business_effects(array $order)
+{
+    $totalBv = (float)$order['total_bv'];
+    $buyer = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$order['user_id']]);
+    if (!$buyer) {
+        return false;
+    }
+    $plan = get_plan();
+
+    /* 1) self BV + activation */
+    q("UPDATE users SET self_bv = self_bv + ? WHERE id = ?", [$totalBv, $buyer['id']]);
+    $buyer['self_bv'] = (float)$buyer['self_bv'] + $totalBv;
+    if ((int)$buyer['is_active'] !== 1 && $buyer['self_bv'] >= (float)$plan['activation_bv']) {
+        q("UPDATE users SET is_active = 1, activated_at = ? WHERE id = ?", [now(), $buyer['id']]);
+        $buyer['is_active'] = 1;
+    }
+
+    /* 2) sponsor bonus */
+    if ((float)$plan['sponsor_percent'] > 0 && $buyer['sponsor_id']) {
+        $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$buyer['sponsor_id']]);
+        if ($sponsor && $sponsor['status'] === 'active' && (int)$sponsor['is_active'] === 1) {
+            $amt = round($totalBv * (float)$plan['sponsor_percent'] / 100, 2);
+            if ($amt > 0) {
+                add_commission($sponsor['id'], $order['id'], 'sponsor', $amt, $totalBv, null,
+                    'Direct referral purchase of ' . $buyer['username']);
+            }
+        }
+    }
+
+    /* 3) level income along the sponsor chain */
+    $levelPercents = get_plan_levels();
+    $depth = (int)$plan['level_depth'];
+    if ($depth > 0) {
+        $uplineId = $buyer['sponsor_id'];
+        $level = 1;
+        while ($uplineId && $level <= $depth) {
+            $up = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$uplineId]);
+            if (!$up) {
+                break;
+            }
+            $pct = isset($levelPercents[$level]) ? (float)$levelPercents[$level] : 0.0;
+            if ($pct > 0
+                && $up['status'] === 'active'
+                && !((int)$plan['level_requires_active'] === 1 && (int)$up['is_active'] !== 1)) {
+                $amt = round($totalBv * $pct / 100, 2);
+                if ($amt > 0) {
+                    add_commission($up['id'], $order['id'], 'level', $amt, $totalBv, $level,
+                        'Level ' . $level . ' income');
+                }
+            }
+            $uplineId = $up['sponsor_id'] ?: null;
+            $level++;
+        }
+    }
+
+    /* 4) propagate BV up the placement tree + binary matching */
+    $chain = ancestor_chain($buyer); // nearest first
+    $leg = $buyer['leg'];            // leg of buyer relative to its parent
+    foreach ($chain as $anc) {
+        $col = ($leg === 'R') ? 'right_bv' : 'left_bv';
+        q("UPDATE users SET $col = $col + ? WHERE id = ?", [$totalBv, $anc['id']]);
+        $anc[$col] = (float)$anc[$col] + $totalBv;
+        run_binary_matching($anc, $order['id']);
+        $leg = $anc['leg']; // leg of this ancestor relative to its own parent
+    }
+
+    /* 5) rank check + special rewards (car fund, award rewards) for buyer and ancestors */
+    check_rank($buyer['id'], $order['id']);
+    check_special_rewards($buyer['id'], $order['id']);
+    foreach ($chain as $anc) {
+        check_rank($anc['id'], $order['id']);
+        check_special_rewards($anc['id'], $order['id']);
+    }
+
+    return true;
+}
+
+/**
+ * Recalculate the Total Income and BV of ALL members from the approved
+ * order history using the CURRENT plan settings. Run from the MLM plan
+ * settings page after the admin changes any plan value.
+ *
+ * Wipes and rebuilds: left / right / self BV, matched pairs, ranks and
+ * every automatic commission (direct sponsor, binary matching, level,
+ * 50% sponsor match, rank rewards, car fund, award rewards) together
+ * with their wallet ledger rows. Manual commissions ('other', 'retail')
+ * and the payout history are kept. Wallet balances are rebuilt from the
+ * complete ledger afterwards. Members are only ever ACTIVATED by the
+ * replay, never de-activated — manual activations survive.
+ *
+ * Returns [ok(bool), stats(array)].
+ */
+function recalculate_all_incomes()
+{
+    $t0 = microtime(true);
+    $stats = ['orders' => 0, 'commissions' => 0, 'earned' => 0.0, 'members' => 0, 'seconds' => 0.0];
+
+    db_tx(function () use (&$stats, $t0) {
+        $plan = get_plan();
+
+        /* 1) wipe the derived data of every member */
+        q("UPDATE users SET left_bv = 0, right_bv = 0, self_bv = 0, matched_pairs = 0, total_earned = 0, rank_id = NULL");
+
+        /* 2) remove the automatic commissions and their wallet ledger
+         *    rows — manual ('other' / 'retail') entries and payouts stay */
+        q("DELETE wt FROM wallet_transactions wt
+           JOIN commissions c ON c.id = wt.ref_id AND wt.ref_type = 'commission'
+           WHERE c.type IN ('sponsor','binary','level','sponsor_matching','rank','car_fund','award')");
+        q("DELETE FROM commissions WHERE type IN ('sponsor','binary','level','sponsor_matching','rank','car_fund','award')");
+        $kept = (int)q_val("SELECT COUNT(*) FROM commissions");
+
+        /* 3) replay every approved order chronologically under the NEW
+         *    settings; the commission clock runs at each order's approval
+         *    time so daily / monthly caps apply to the original days */
+        $orders = q_all("SELECT * FROM orders WHERE status = 'approved'
+                         ORDER BY COALESCE(approved_at, created_at) ASC, id ASC");
+        foreach ($orders as $order) {
+            $GLOBALS['__commission_clock'] = $order['approved_at'] ?: $order['created_at'];
+            apply_order_business_effects($order);
+            $stats['orders']++;
+        }
+        $GLOBALS['__commission_clock'] = null;
+
+        /* 4) activation only ever upgrades (manual activations survive) */
+        q("UPDATE users SET is_active = 1, activated_at = COALESCE(activated_at, ?)
+           WHERE is_active = 0 AND self_bv >= ?", [now(), (float)$plan['activation_bv']]);
+
+        /* 5) wallet balances = the complete ledger */
+        q("UPDATE users u SET wallet_balance =
+             (SELECT COALESCE(SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE -t.amount END), 0)
+              FROM wallet_transactions t WHERE t.user_id = u.id)");
+
+        $stats['commissions'] = (int)q_val("SELECT COUNT(*) FROM commissions") - $kept;
+        $stats['earned'] = (float)q_val(
+            "SELECT COALESCE(SUM(amount),0) FROM commissions
+             WHERE type IN ('sponsor','binary','level','sponsor_matching','rank','car_fund','award')");
+        $stats['members'] = (int)q_val("SELECT COUNT(*) FROM users WHERE total_earned > 0");
+        $stats['seconds'] = round(microtime(true) - $t0, 1);
+    });
+
+    return [true, $stats];
 }
 
 /** Reject a pending order. */
