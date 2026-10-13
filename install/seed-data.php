@@ -16,13 +16,13 @@ function seed_data()
 
     /* MLM plan settings (row id = 1) */
     'plan' => [
-        'activation_bv' => 500, 'sponsor_percent' => 10, 'pair_unit_bv' => 3000,
+        'activation_bv' => 3000, 'sponsor_percent' => 10, 'pair_unit_bv' => 3000,
         'binary_type' => 'fixed', 'binary_value' => 450, 'level_depth' => 0,
         'daily_cap' => 320000, 'monthly_cap' => 800000, 'carry_forward' => 1,
         'matching_requires_active' => 1, 'level_requires_active' => 1,
         'sponsor_matching_percent' => 50, 'point_bv' => 400,
         'car_fund_points' => 500, 'car_fund_amount' => 150000,
-        'tds_percent' => 5, 'admin_charge_percent' => 7, 'payout_min' => 500,
+        'tds_percent' => 5, 'admin_charge_percent' => 5, 'payout_min' => 500,
     ],
 
     /* Cash reward ranks — 1 Point = 400 BV team business (min_team_bv = points x 400) */

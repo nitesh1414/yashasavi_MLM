@@ -11,7 +11,46 @@ if (is_post()) {
         [$ok, $msg] = process_payout($id, $action, $a['id'], post_str('reason'));
         $ok ? flash('success', $msg) : flash('error', $msg);
     }
+    if ($action === 'generate') {
+        /* date-wise payout report: pending payouts for every eligible member
+         * (three plan incomes only), TDS + admin charge deducted */
+        $date = post_str('date');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            flash('error', 'Please choose a valid report date.');
+            redirect('payouts.php');
+        }
+        [$ok, $runTs, $st] = generate_payout_report($date);
+        if (!$ok || !$st['created']) {
+            flash('warning', 'Payout report for ' . dmy($date) . ': no eligible members found (eligible income = Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus, minimum ' . money(get_plan()['payout_min']) . ', bank account required).');
+            redirect('payouts.php');
+        }
+        flash('success',
+            'Payout report for ' . dmy($date) . ' generated: ' . number_format($st['created']) . ' member(s), '
+            . money($st['total']) . ' gross, ' . money($st['net']) . ' net after TDS + admin charge'
+            . ($st['skipped'] ? ' (' . $st['skipped'] . ' skipped — wallet below minimum)' : '')
+            . '. Each member now sees the payout as IN PROCESS in their dashboard.');
+        redirect('payouts.php?run=' . urlencode($runTs));
+    }
     redirect('payouts.php' . (get_str('status') ? '?status=' . urlencode(get_str('status')) : ''));
+}
+
+/* report run view / bank-report CSV download */
+$runTs = get_str('run');
+$runRows = [];
+if ($runTs !== '') {
+    $runRows = payout_report_rows($runTs);
+}
+if (get_str('download') !== '' && $runTs !== '') {
+    $out = [];
+    foreach ($runRows as $r) {
+        $out[] = [$r['request_no'], $r['username'], $r['full_name'], $r['mobile'],
+                  $r['bank_name'], $r['bank_account_no'], $r['bank_ifsc'], $r['bank_holder'],
+                  $r['amount'], $r['tds_amount'], $r['admin_charge'], $r['net_amount'],
+                  $r['status'], $r['created_at'], $r['paid_at']];
+    }
+    output_csv('payout-report-' . date('Ymd', strtotime($runTs)) . '.csv',
+        ['Request No', 'User ID', 'Name', 'Mobile', 'Bank Name', 'Account No', 'IFSC', 'Account Holder',
+         'Gross Amount', 'TDS', 'Admin Charge', 'Net Payable', 'Status', 'Generated On', 'Paid On'], $out);
 }
 
 $status = get_str('status');
@@ -42,6 +81,54 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="stat-card gold"><div class="st-ico">⏳</div><div><b><?= money($sumPending) ?></b><span>Pending Payout Amount</span></div></div>
     <div class="stat-card"><div class="st-ico">✅</div><div><b><?= money($sumPaid) ?></b><span>Total Paid Till Date</span></div></div>
 </div>
+
+<div class="card" style="border:1.5px dashed var(--accent)">
+    <div class="card-title">📅 Generate Payout Report (date-wise)</div>
+    <p style="font-size:13px;color:var(--ink-soft)">
+        Creates a <b>pending payout for every eligible member</b> as of the chosen date and produces a
+        downloadable report with <b>all banking information</b>. Eligible income =
+        <b>Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus</b> only (other amounts are never added
+        to a member's payout), minimum <?= money(get_plan()['payout_min']) ?>, bank account required.
+        <?= e(get_plan()['tds_percent']) ?>% TDS and <?= e(get_plan()['admin_charge_percent']) ?>% admin charge are deducted from the final payout amount.
+        After generation every member sees the payout as <b>in process</b> in their dashboard; after you mark
+        it paid they see <b>Payment is done</b>.
+    </p>
+    <form method="post" class="filter-form" data-confirm="Generate the payout report for this date? Pending payouts will be created and the wallets of all eligible members will be debited.">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="generate">
+        <div class="form-group">
+            <label>Report date (income up to this date)</label>
+            <input class="form-control" type="date" name="date" value="<?= e(date('Y-m-d')) ?>" max="<?= e(date('Y-m-d')) ?>" required>
+        </div>
+        <button class="btn btn-primary" type="submit">📅 Generate Report</button>
+    </form>
+</div>
+
+<?php if ($runRows): ?>
+<div class="card" style="border:1.5px solid var(--accent)">
+    <div class="card-title">
+        📄 Payout Report — <?= dmy($runTs, true) ?>
+        <span class="right"><a class="btn btn-outline btn-sm" href="payouts.php?download=1&run=<?= e(urlencode($runTs)) ?>">⬇ Download Bank Report (CSV)</a></span>
+    </div>
+    <div class="table-wrap" style="box-shadow:none">
+        <table class="table">
+            <tr><th>Request</th><th>User</th><th>Bank</th><th>Gross</th><th>TDS</th><th>Admin</th><th>Net Payable</th><th>Status</th></tr>
+            <?php foreach ($runRows as $r): ?>
+            <tr>
+                <td><b><?= e($r['request_no']) ?></b></td>
+                <td><b><?= e($r['username']) ?></b><br><small style="color:#000"><?= e($r['full_name']) ?> · <?= e($r['mobile']) ?></small></td>
+                <td><small><?= e($r['bank_name'] ?: '—') ?><br><?= e($r['bank_account_no']) ?><br><?= e($r['bank_ifsc'] ?: '') ?></small></td>
+                <td><?= money($r['amount']) ?></td>
+                <td><?= money($r['tds_amount']) ?></td>
+                <td><?= money($r['admin_charge']) ?></td>
+                <td><b><?= money($r['net_amount']) ?></b></td>
+                <td><?= status_badge($r['status']) ?></td>
+            </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <div class="card-title">

@@ -25,6 +25,10 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
      * Safety cap for extreme networks: beyond it the top levels are shown
      * and the viewer drills down with "view subtree". */
     $cap = 4000;
+
+    /* joining BV requirement (3,000 BV on the current plan) — members who
+     * have NOT completed it are shown in RED in the tree */
+    $actBv = (float)get_plan()['activation_bv'];
     $rows = q_all("SELECT id, username, full_name, leg, placement_id, left_bv, right_bv,
                    is_active, status, rank_id, self_bv, created_at, sponsor_id, path, depth
                    FROM users WHERE path LIKE ? AND id != ?
@@ -85,7 +89,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
     };
 
     $node = function ($user, $isRoot, $parentUser = null, $leg = null, $level = 1)
-        use ($linkBase, $addBase, $viewUserBase, $byParent, $rankNames, $sponsorNames, $legCounts) {
+        use ($linkBase, $addBase, $viewUserBase, $byParent, $rankNames, $sponsorNames, $legCounts, $actBv) {
         if (!$user) {
             // Empty position directly below a REAL member — clickable add slot
             if ($parentUser && $leg) {
@@ -101,15 +105,19 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             return '';
         }
 
-        // Member node — visible: ID pill only; everything else in the click tooltip
-        $on = (int)$user['is_active'] === 1;
+        // Member node — visible: ID pill only; everything else in the click tooltip.
+        // Icon colour = joining BV completion: GREEN when the member has
+        // completed the plan's joining BV (3,000 BV on the current plan),
+        // RED when it is not completed yet.
+        $on = (float)$user['self_bv'] >= $actBv;
         $blocked = $user['status'] === 'blocked';
         $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
         // first free leg under this member (for the add action); spillover if full
         $tagLeg = !isset($kids['L']) ? 'L' : (!isset($kids['R']) ? 'R' : 'L');
         $addHref = $addBase . '?ref=' . urlencode($user['username']) . '&leg=' . $tagLeg;
         $viewHref = $linkBase . '?root=' . (int)$user['id'];
-        $statusTxt = $blocked ? 'Blocked' : ($on ? 'Active' : 'Inactive');
+        $statusTxt = $blocked ? 'Blocked' : ((int)$user['is_active'] === 1 ? 'Active' : 'Inactive');
+        $bvTxt = $on ? '✅ Completed' : '❌ Not completed';
         $upline = $parentUser ? $parentUser['username'] : 'Company Root';
         $rank = isset($rankNames[$user['rank_id']]) ? $rankNames[$user['rank_id']] : '—';
 
@@ -131,7 +139,8 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             . '<dt>Right members</dt><dd>' . number_format($cnt['R']) . '</dd>'
             . '<dt>Left BV</dt><dd>' . e(number_format((float)$user['left_bv'], 0)) . '</dd>'
             . '<dt>Right BV</dt><dd>' . e(number_format((float)$user['right_bv'], 0)) . '</dd>'
-            . '<dt>Self BV</dt><dd>' . e(number_format((float)$user['self_bv'], 0)) . '</dd>'
+            . '<dt>Self BV</dt><dd>' . e(number_format((float)$user['self_bv'], 0)) . ' / ' . e(number_format($actBv, 0)) . '</dd>'
+            . '<dt>Joining BV</dt><dd>' . $bvTxt . '</dd>'
             . '<dt>Rank</dt><dd>' . e($rank) . '</dd>'
             . '</dl>'
             . '<div class="t-tip-actions">'
@@ -292,8 +301,8 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                 . 'on any member to continue deeper into that branch.</div>'
             : '')
         . '<div class="tree-legends">
-                <span class="lg"><span class="dot" style="background:#43a047"></span> Active member (green icon)</span>
-                <span class="lg"><span class="dot" style="background:#e53935"></span> Inactive member (red icon)</span>
+                <span class="lg"><span class="dot" style="background:#43a047"></span> Joining BV completed (green icon)</span>
+                <span class="lg"><span class="dot" style="background:#e53935"></span> Joining BV not completed (red icon)</span>
                 <span class="lg"><span class="dot" style="background:#fff;box-shadow:0 0 0 2px #d6a83c inset"></span> Root</span>
                 <span class="lg">📜 First frame shows up to <b>level 7</b> — scroll for the rest; members stay full size</span>
                 <span class="lg">➡️ Single-child legs render as straight vertical lines — the ➕ chip beside the line is that free position</span>

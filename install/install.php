@@ -91,7 +91,7 @@ $CFG = [
     \'ALLOWED_IMG_EXT\'   => \'jpg,jpeg,png,webp,gif\',
     \'ALLOWED_DOC_EXT\'   => \'pdf\',
 
-    \'APP_VERSION\'    => \'1.8.24\',
+    \'APP_VERSION\'    => \'1.8.25\',
     \'APP_TIMEZONE\'   => \'Asia/Kolkata\',
     \'ITEMS_PER_PAGE\' => 12,
 ];

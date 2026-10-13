@@ -116,6 +116,37 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
 
         <div class="card">
+            <div class="card-title">💳 Payout Status <a class="right" href="payout.php">View all →</a></div>
+            <?php $payouts = q_all("SELECT * FROM payouts WHERE user_id = ? ORDER BY id DESC LIMIT 4", [$u['id']]); ?>
+            <?php if (!$payouts): ?>
+                <div class="empty-state"><span class="es-ico">🏦</span>No payouts yet. Eligible payout income:
+                    <b><?= money(payout_eligible_amount($u['id'])) ?></b></div>
+            <?php else: ?>
+            <table class="kv-table" style="width:100%">
+                <?php foreach ($payouts as $p): ?>
+                <tr>
+                    <td>
+                        <b><?= e($p['request_no']) ?></b> · <?= dmy($p['created_at']) ?><br>
+                        <small style="color:#000">Gross <?= money($p['amount']) ?> · TDS <?= money($p['tds_amount']) ?>
+                            · Charge <?= money($p['admin_charge']) ?></small>
+                    </td>
+                    <td style="text-align:right">
+                        <b><?= money($p['net_amount']) ?></b><br>
+                        <?php if ($p['status'] === 'pending'): ?>
+                            <?= badge('⏳ Payout in process', 'warning') ?>
+                        <?php elseif ($p['status'] === 'paid'): ?>
+                            <?= badge('✅ Payment is done ' . ($p['paid_at'] ? dmy($p['paid_at']) : ''), 'success') ?>
+                        <?php else: ?>
+                            <?= status_badge($p['status']) ?>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </table>
+            <?php endif; ?>
+        </div>
+
+        <div class="card">
             <div class="card-title">👛 Recent Wallet Activity <a class="right" href="wallet.php">View all →</a></div>
             <?php if (!$recentTx): ?>
                 <p style="color:var(--ink-soft)">No transactions yet.</p>

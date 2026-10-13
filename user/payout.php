@@ -16,6 +16,7 @@ if (is_post() && post_str('action') === 'request') {
     redirect('payout.php');
 }
 
+$eligible = payout_eligible_amount($u['id']);   /* three plan incomes only */
 $total = (int)q_val("SELECT COUNT(*) FROM payouts WHERE user_id = ?", [$u['id']]);
 [$per, $offset] = paginate($total, 15, $links);
 $rows = q_all("SELECT * FROM payouts WHERE user_id = ? ORDER BY id DESC LIMIT $per OFFSET $offset", [$u['id']]);
@@ -32,19 +33,23 @@ $adminFee = (float)$plan['admin_charge_percent'];
 <div class="two-col">
     <div class="card">
         <div class="card-title">🏦 Request a Payout</div>
-        <?php if ((float)$u['wallet_balance'] < (float)$plan['payout_min']): ?>
+        <p style="font-size:12.5px;color:var(--ink-soft)">
+            Payable income = <b>Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus</b> only;
+            other amounts are not added to payouts.
+        </p>
+        <?php if ($eligible < (float)$plan['payout_min']): ?>
             <div class="alert alert-warning">
-                You need at least <b><?= money($plan['payout_min']) ?></b> in your wallet to request a payout.
-                Current balance: <b><?= money($u['wallet_balance']) ?></b>.
+                You need at least <b><?= money($plan['payout_min']) ?></b> of eligible payout income to request a payout.
+                Current eligible income: <b><?= money($eligible) ?></b> (wallet balance: <?= money($u['wallet_balance']) ?>).
             </div>
         <?php else: ?>
         <form method="post">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="request">
             <div class="form-group">
-                <label>Amount (available: <?= money($u['wallet_balance']) ?>)</label>
+                <label>Amount (eligible: <?= money($eligible) ?>)</label>
                 <input class="form-control" type="number" step="0.01" min="<?= e($plan['payout_min']) ?>"
-                       max="<?= e($u['wallet_balance']) ?>" name="amount" required
+                       max="<?= e(min($eligible, (float)$u['wallet_balance'])) ?>" name="amount" required
                        placeholder="Min <?= e($plan['payout_min']) ?>">
             </div>
             <table class="kv-table" style="width:100%;margin:12px 0">
@@ -94,7 +99,15 @@ $adminFee = (float)$plan['admin_charge_percent'];
                 <td><?= money($r['tds_amount']) ?></td>
                 <td><?= money($r['admin_charge']) ?></td>
                 <td><b><?= money($r['net_amount']) ?></b></td>
-                <td><?= status_badge($r['status']) ?></td>
+                <td>
+                    <?php if ($r['status'] === 'pending'): ?>
+                        <?= badge('⏳ Payout in process', 'warning') ?>
+                    <?php elseif ($r['status'] === 'paid'): ?>
+                        <?= badge('✅ Payment is done', 'success') ?>
+                    <?php else: ?>
+                        <?= status_badge($r['status']) ?>
+                    <?php endif; ?>
+                </td>
                 <td><?= $r['paid_at'] ? dmy($r['paid_at']) : ($r['reject_reason'] ? '<small style="color:#000">' . e($r['reject_reason']) . '</small>' : '—') ?></td>
             </tr>
             <?php endforeach; ?>

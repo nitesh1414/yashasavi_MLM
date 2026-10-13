@@ -869,6 +869,12 @@ function request_payout($userId, $amount)
         return [false, 'Minimum payout amount is ' . money($plan['payout_min']) . '.'];
     }
     $u = q_row("SELECT * FROM users WHERE id = ?", [$userId]);
+    /* only the three plan incomes are payable — rank rewards, car fund,
+     * award rewards, level income etc. are NOT added to a member's payout */
+    $eligible = payout_eligible_amount($userId);
+    if ($amount > $eligible) {
+        return [false, 'Amount exceeds your eligible payout income (' . money($eligible) . '). Only Direct Sponsor, Matching Bonus and 50% Direct Sponsor Bonus incomes are payable.'];
+    }
     if ($amount > (float)$u['wallet_balance']) {
         return [false, 'Amount exceeds your wallet balance.'];
     }
@@ -886,6 +892,105 @@ function request_payout($userId, $amount)
         debit_wallet($u['id'], $amount, 'payout', $pid, 'Payout request ' . $no);
         return [true, $pid];
     });
+}
+
+/**
+ * Amount currently eligible for payout: ONLY the three plan incomes —
+ * Direct Sponsor Income, Matching Bonus Income and 50% Direct Sponsor
+ * Bonus Income — minus payouts already generated / paid. All other
+ * amounts (rank rewards, car fund, award rewards, level income, manual
+ * entries) are NOT added to a member's payout.
+ * $upto (optional 'YYYY-MM-DD HH:MM:SS') limits the income side to that
+ * moment — used by date-wise payout reports.
+ */
+function payout_eligible_amount($userId, $upto = null)
+{
+    $sql = "SELECT COALESCE(SUM(amount), 0) FROM commissions
+            WHERE user_id = ? AND status = 'credited'
+              AND type IN ('sponsor','binary','sponsor_matching')";
+    $params = [(int)$userId];
+    if ($upto) {
+        $sql .= " AND created_at <= ?";
+        $params[] = $upto;
+    }
+    $gross = (float)q_val($sql, $params);
+    $taken = (float)q_val(
+        "SELECT COALESCE(SUM(amount), 0) FROM payouts
+         WHERE user_id = ? AND status IN ('pending','paid')", [(int)$userId]);
+    return max(0.0, round($gross - $taken, 2));
+}
+
+/**
+ * Generate the date-wise payout report (super admin): creates a pending
+ * payout for every member whose eligible income — the three plan incomes
+ * only — has reached the payout minimum as of the END of $date, debits
+ * their wallet, and returns the run timestamp that identifies the rows
+ * (payout_report_rows). TDS and admin charge are the plan percentages
+ * (5% / 5% on the current plan). Members immediately see the payout as
+ * "in process"; marking it paid shows "Payment is done".
+ *
+ * Returns [ok(bool), runTs(string|null), stats(array)].
+ */
+function generate_payout_report($date)
+{
+    $plan = get_plan();
+    $cut = $date . ' 23:59:59';
+    $min = (float)$plan['payout_min'];
+    $tdsPct = (float)$plan['tds_percent'];
+    $admPct = (float)$plan['admin_charge_percent'];
+
+    $stats = ['created' => 0, 'skipped' => 0, 'total' => 0.0, 'net' => 0.0];
+    $runTs = null;
+
+    db_tx(function () use ($cut, $min, $tdsPct, $admPct, &$stats, &$runTs) {
+        $cands = q_all(
+            "SELECT u.id, u.wallet_balance,
+                    COALESCE(c.gross, 0) AS gross, COALESCE(p.taken, 0) AS taken
+             FROM users u
+             LEFT JOIN (SELECT user_id, SUM(amount) AS gross FROM commissions
+                        WHERE status = 'credited' AND type IN ('sponsor','binary','sponsor_matching')
+                          AND created_at <= ? GROUP BY user_id) c ON c.user_id = u.id
+             LEFT JOIN (SELECT user_id, SUM(amount) AS taken FROM payouts
+                        WHERE status IN ('pending','paid') GROUP BY user_id) p ON p.user_id = u.id
+             WHERE u.status = 'active' AND u.bank_account_no IS NOT NULL AND u.bank_account_no <> ''",
+            [$cut]);
+        $runTs = now();
+        foreach ($cands as $x) {
+            $amount = round((float)$x['gross'] - (float)$x['taken'], 2);
+            if ($amount < $min) { continue; }
+            /* the wallet may hold less if the member spent it on purchases */
+            if ($amount > (float)$x['wallet_balance']) {
+                $amount = round((float)$x['wallet_balance'], 2);
+                if ($amount < $min) { $stats['skipped']++; continue; }
+            }
+            $tds = round($amount * $tdsPct / 100, 2);
+            $adm = round($amount * $admPct / 100, 2);
+            $net = round($amount - $tds - $adm, 2);
+            $u = q_row("SELECT username, bank_name, bank_account_no, bank_ifsc, bank_holder FROM users WHERE id = ?", [$x['id']]);
+            $no = 'RPT' . date('ymd', strtotime($cut)) . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
+            q("INSERT INTO payouts (user_id, request_no, amount, tds_amount, admin_charge, net_amount,
+               status, bank_name, bank_account_no, bank_ifsc, bank_holder, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
+              [$x['id'], $no, $amount, $tds, $adm, $net,
+               $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'], $runTs]);
+            $pid = (int)db()->lastInsertId();
+            debit_wallet($x['id'], $amount, 'payout', $pid,
+                'Payout report ' . $no . ' (' . date('d M Y', strtotime($cut)) . ')');
+            $stats['created']++;
+            $stats['total'] = round($stats['total'] + $amount, 2);
+            $stats['net'] = round($stats['net'] + $net, 2);
+        }
+    });
+
+    return [!empty($runTs), $runTs, $stats];
+}
+
+/** All payout rows of one report run (same creation timestamp). */
+function payout_report_rows($runTs)
+{
+    return q_all("SELECT p.*, u.username, u.full_name, u.mobile
+                  FROM payouts p JOIN users u ON u.id = p.user_id
+                  WHERE p.created_at = ? ORDER BY u.username ASC", [$runTs]);
 }
 
 /** Super admin marks a payout as paid or rejects it (refund). */
