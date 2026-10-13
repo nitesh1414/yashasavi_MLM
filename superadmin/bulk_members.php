@@ -5,6 +5,11 @@ require_once __DIR__ . '/../includes/init.php';
 $a = require_superadmin();
 set_time_limit(0);
 
+/* joining BV (3,000 on the current plan) — used by the "Self BV" option
+ * on both generator forms; guarded like the tree colour rule */
+$joinBv = (float)get_plan()['activation_bv'];
+if ($joinBv <= 0) { $joinBv = 3000.0; }
+
 $root = q_row("SELECT * FROM users WHERE sponsor_id IS NULL OR sponsor_id = 0 ORDER BY id ASC LIMIT 1");
 $rootUser = q_val("SELECT username FROM users WHERE sponsor_id IS NULL OR sponsor_id = 0 ORDER BY id ASC LIMIT 1");
 
@@ -91,6 +96,7 @@ if (is_post()) {
         $mobile = post_str('mobile') ?: '9529512562';
         $email = post_str('email');
         $activate = post_str('activate') === '1';
+        $selfbv = post_str('selfbv') === '1';
 
         $sponsor = find_user($sponsorCode);
         if (!$sponsor) {
@@ -155,12 +161,18 @@ if (is_post()) {
             if ($activate) {
                 q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
             }
+            /* optional: give the member their completed joining BV (3,000)
+             * so they count as joining completed and show GREEN in the tree */
+            if ($selfbv) {
+                q("UPDATE users SET self_bv = ? WHERE id = ?", [$joinBv, $uid]);
+            }
             /* the next member goes directly below this one */
             $anchor = q_row("SELECT * FROM users WHERE id = ?", [$uid]);
         }
         flash('success', $made . ' member' . ($made === 1 ? '' : 's') . ' created'
             . ($firstCode ? ' (' . e($firstCode) . ' … ' . e($lastCode) . ')' : '')
             . ($activate ? ' — all ACTIVE and KYC-verified' : '')
+            . ($selfbv ? ' — self BV ' . number_format($joinBv, 0) . ' (joining completed, GREEN in tree)' : '')
             . '. First-time password: each member\'s own User ID.');
         redirect('bulk_members.php');
     }
@@ -178,6 +190,7 @@ if (is_post()) {
         $mobile = post_str('mobile') ?: '9529512562';
         $email = post_str('email');
         $activate = post_str('activate') === '1';
+        $selfbv = post_str('selfbv') === '1';
 
         $sponsor = find_user($sponsorCode);
         if (!$sponsor) {
@@ -257,6 +270,10 @@ if (is_post()) {
                   [password_hash($code, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
                 if ($activate) {
                     q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
+                }
+                /* optional: completed joining BV (3,000) — GREEN in the tree */
+                if ($selfbv) {
+                    q("UPDATE users SET self_bv = ? WHERE id = ?", [$joinBv, $uid]);
                 }
                 $anchor = q_row("SELECT * FROM users WHERE id = ?", [$uid]);
             }
@@ -363,6 +380,13 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
                 <label style="font-weight:400;display:flex;align-items:center;gap:8px">
                     <input type="checkbox" name="activate" value="1" checked> Active + KYC verified
                 </label>
+                <label style="font-weight:400;display:flex;align-items:center;gap:8px;margin-top:6px">
+                    <input type="checkbox" name="selfbv" value="1"> Self BV <?= number_format($joinBv, 0) ?> (joining completed — GREEN icon in tree)
+                </label>
+                <div class="form-hint" style="margin-top:6px">
+                    Checked: every generated member gets Self BV <?= number_format($joinBv, 0) ?> and shows green in the tree right away.
+                    (The 🔄 Recalculate button on Plan Settings rebuilds BV from real orders only.)
+                </div>
             </div>
         </div>
         <button class="btn btn-primary" type="submit" data-confirm="Create these members now?">➕ Generate Members</button>
@@ -438,6 +462,12 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
                     <input type="checkbox" name="activate" value="1" checked> Active + KYC verified
                     <span style="font-size:12px;color:var(--ink-soft)">(needed for matching income)</span>
                 </label>
+                <label style="font-weight:400;display:flex;align-items:center;gap:8px;margin-top:6px">
+                    <input type="checkbox" name="selfbv" value="1"> Self BV <?= number_format($joinBv, 0) ?> (joining completed — GREEN icon in tree)
+                </label>
+                <div class="form-hint" style="margin-top:6px">
+                    Checked: every line member gets Self BV <?= number_format($joinBv, 0) ?> and shows green in the tree right away.
+                </div>
             </div>
         </div>
         <button class="btn btn-primary" type="submit" data-confirm="Create the LEFT and RIGHT straight lines now? One-time setup — every member is placed directly below the previous one, with the member above as sponsor.">➖ Create Straight Lines</button>
