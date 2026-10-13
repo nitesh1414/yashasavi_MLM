@@ -27,8 +27,11 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
     $cap = 4000;
 
     /* joining BV requirement (3,000 BV on the current plan) — members who
-     * have NOT completed it are shown in RED in the tree */
+     * have NOT completed it are shown in RED in the tree. Guard: if the
+     * plan setting is ever saved as 0/empty, fall back to the plan's
+     * 3,000 BV joining rule so the tree never turns everyone green. */
     $actBv = (float)get_plan()['activation_bv'];
+    if ($actBv <= 0) { $actBv = 3000.0; }
     $rows = q_all("SELECT id, username, full_name, leg, placement_id, left_bv, right_bv,
                    is_active, status, rank_id, self_bv, created_at, sponsor_id, path, depth
                    FROM users WHERE path LIKE ? AND id != ?

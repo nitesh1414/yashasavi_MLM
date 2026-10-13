@@ -9,7 +9,7 @@ if (is_post()) {
 
     if ($tab === 'main') {
         $fields = [
-            'activation_bv' => 'float',
+            'activation_bv' => 'float_pos',
             'sponsor_percent' => 'float',
             'pair_unit_bv' => 'float_pos',
             'binary_type' => 'enum:percent,fixed',
