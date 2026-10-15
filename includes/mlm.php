@@ -383,7 +383,7 @@ function check_special_rewards($userId, $orderId = null)
     }
 }
 
-function check_rank($userId, $orderId = null)
+function check_rank($userId, $orderId = null, $withReward = true)
 {
     $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
     if (!$u) {
@@ -404,7 +404,7 @@ function check_rank($userId, $orderId = null)
         return null; // already at or above this rank
     }
     q("UPDATE users SET rank_id = ? WHERE id = ?", [$best['id'], $userId]);
-    if ((float)$best['reward_amount'] > 0) {
+    if ($withReward && (float)$best['reward_amount'] > 0) {
         $pointBv = max(1, (float)(isset(get_plan()['point_bv']) ? get_plan()['point_bv'] : 400));
         $pts = (int)floor($teamBv / $pointBv);
         add_commission($userId, $orderId, 'rank', $best['reward_amount'], $teamBv, null,
@@ -690,7 +690,14 @@ function approve_order($orderId, $adminId)
  * (recalculate_all_incomes()); payment status, order status and stock
  * are the caller's business. Returns false when the buyer is missing.
  */
-function apply_order_business_effects(array $order)
+/**
+ * $payoutOnly = true replays an order for the PAYOUT recalculation:
+ * only the three payout incomes are generated (Direct Sponsor, binary
+ * Matching Bonus and the 50% Direct Sponsor Bonus). Level income, rank
+ * rewards, car fund and award rewards are NEVER part of a member's
+ * payout commission and are skipped; rank titles still upgrade.
+ */
+function apply_order_business_effects(array $order, $payoutOnly = false)
 {
     $totalBv = (float)$order['total_bv'];
     $buyer = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$order['user_id']]);
@@ -722,7 +729,7 @@ function apply_order_business_effects(array $order)
     /* 3) level income along the sponsor chain */
     $levelPercents = get_plan_levels();
     $depth = (int)$plan['level_depth'];
-    if ($depth > 0) {
+    if ($depth > 0 && !$payoutOnly) {
         $uplineId = $buyer['sponsor_id'];
         $level = 1;
         while ($uplineId && $level <= $depth) {
@@ -756,12 +763,14 @@ function apply_order_business_effects(array $order)
         $leg = $anc['leg']; // leg of this ancestor relative to its own parent
     }
 
-    /* 5) rank check + special rewards (car fund, award rewards) for buyer and ancestors */
-    check_rank($buyer['id'], $order['id']);
-    check_special_rewards($buyer['id'], $order['id']);
+    /* 5) rank check + special rewards (car fund, award rewards) for buyer and ancestors.
+     * Payout-only replays upgrade rank TITLES but never create reward
+     * commissions — those are not part of members' payout income. */
+    check_rank($buyer['id'], $order['id'], !$payoutOnly);
+    if (!$payoutOnly) { check_special_rewards($buyer['id'], $order['id']); }
     foreach ($chain as $anc) {
-        check_rank($anc['id'], $order['id']);
-        check_special_rewards($anc['id'], $order['id']);
+        check_rank($anc['id'], $order['id'], !$payoutOnly);
+        if (!$payoutOnly) { check_special_rewards($anc['id'], $order['id']); }
     }
 
     return true;
@@ -772,13 +781,17 @@ function apply_order_business_effects(array $order)
  * order history using the CURRENT plan settings. Run from the MLM plan
  * settings page after the admin changes any plan value.
  *
- * Wipes and rebuilds: left / right / self BV, matched pairs, ranks and
- * every automatic commission (direct sponsor, binary matching, level,
- * 50% sponsor match, rank rewards, car fund, award rewards) together
- * with their wallet ledger rows. Manual commissions ('other', 'retail')
- * and the payout history are kept. Wallet balances are rebuilt from the
- * complete ledger afterwards. Members are only ever ACTIVATED by the
- * replay, never de-activated — manual activations survive.
+ * PAYOUT COMMISSIONS ONLY: the rebuild generates exactly the three
+ * payout incomes — Direct Sponsor, binary Matching Bonus and the 50%
+ * Direct Sponsor Bonus. Level income, rank rewards, car fund and award
+ * rewards are NOT part of a member's payout commission: any old entries
+ * are cleared and NOT rebuilt. Rank TITLES are still recomputed (no
+ * reward money), and left / right / self BV, matched pairs, activation
+ * and wallet ledger rows for the three payout incomes are rebuilt.
+ * Manual commissions ('other', 'retail') and the payout history are
+ * kept. Wallet balances are rebuilt from the complete ledger afterwards.
+ * Members are only ever ACTIVATED by the replay, never de-activated —
+ * manual activations survive.
  *
  * Returns [ok(bool), stats(array)].
  */
@@ -808,7 +821,7 @@ function recalculate_all_incomes()
                          ORDER BY COALESCE(approved_at, created_at) ASC, id ASC");
         foreach ($orders as $order) {
             $GLOBALS['__commission_clock'] = $order['approved_at'] ?: $order['created_at'];
-            apply_order_business_effects($order);
+            apply_order_business_effects($order, true);   /* payout incomes only */
             $stats['orders']++;
         }
         $GLOBALS['__commission_clock'] = null;

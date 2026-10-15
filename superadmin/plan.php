@@ -85,9 +85,10 @@ if (is_post()) {
          * order history under the CURRENT plan settings */
         [$ok, $st] = recalculate_all_incomes();
         flash('success',
-            'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed under the current settings — '
-            . number_format($st['commissions']) . ' income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total) for '
+            'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed from zero under the current settings — '
+            . number_format($st['commissions']) . ' payout income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total) for '
             . number_format($st['members']) . ' member(s) in ' . $st['seconds'] . 's. '
+            . 'Payout commission = Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus only — rank / car fund / award / level reward amounts are NOT added. '
             . 'Wallet balances were rebuilt from the ledger; manual entries and payouts were kept.');
         redirect('plan.php');
     }
@@ -237,10 +238,14 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="card" style="margin-top:18px;border:1.5px dashed var(--accent)">
         <div class="card-title">🔄 Recalculate Total Income &amp; BV of all members</div>
         <p style="font-size:13px;color:var(--ink-soft)">
-            After changing any setting above, run this to recompute <b>every member's Total Income and
-            BV</b> from the full <b>approved order history</b> using the NEW settings: Left / Right / Self
-            BV, matched pairs, ranks, Direct Sponsor Income, Matching Bonus, level income, 50% Direct
-            Sponsor Bonus, rank rewards, car fund and award rewards.
+            After changing any setting above, run this to recompute <b>every member's payout commission,
+            Total Income and BV</b> from zero, using the full <b>approved order history</b> under the NEW
+            settings: Left / Right / Self BV, matched pairs, rank titles and the three payout incomes —
+            <b>Direct Sponsor Income, Matching Bonus and 50% Direct Sponsor Bonus</b>.
+        </p>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0">
+            <b>Rest all amounts are NOT added to a member's payout commission:</b> level income, rank
+            rewards, car fund and award rewards are cleared and not rebuilt.
         </p>
         <ul style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 14px 18px">
             <li>All automatic income entries are wiped and rebuilt chronologically; daily / monthly caps apply to each order's original day.</li>
