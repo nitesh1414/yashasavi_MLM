@@ -483,17 +483,24 @@ function run_binary_matching($user, $orderId)
         add_commission($user['id'], $orderId, 'binary', $income, $paidUnits * $unit, null,
             $paidUnits . ' pair(s) matched @ ' . bv($unit));
 
-        /* direct sponsor matching income: the sponsor of the member who just
-           earned matching income receives a percentage of it (no level limit) */
+        /* 50% Direct Sponsor Bonus: when a member completes a matching pair,
+           their L1 (direct sponsor) AND their L2 (sponsor's sponsor) each
+           receive the percentage of that matching income — commission is
+           added for L1 and L2 only; after L2 no commission is added. */
         $smPct = isset($plan['sponsor_matching_percent']) ? (float)$plan['sponsor_matching_percent'] : 0.0;
-        if ($smPct > 0 && $user['sponsor_id']) {
-            $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$user['sponsor_id']]);
-            if ($sponsor && $sponsor['status'] === 'active' && (int)$sponsor['is_active'] === 1) {
-                $smAmt = round($income * $smPct / 100, 2);
-                if ($smAmt > 0) {
-                    add_commission($sponsor['id'], $orderId, 'sponsor_matching', $smAmt, 0, null,
-                        $smPct . '% of matching income of direct ' . $user['username']);
+        if ($smPct > 0) {
+            $smAmt = round($income * $smPct / 100, 2);
+            $uplineId = $user['sponsor_id'];
+            $level = 1;
+            while ($uplineId && $level <= 2) {
+                $up = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$uplineId]);
+                if (!$up) { break; }
+                if ($smAmt > 0 && $up['status'] === 'active' && (int)$up['is_active'] === 1) {
+                    add_commission($up['id'], $orderId, 'sponsor_matching', $smAmt, 0, $level,
+                        $smPct . '% of matching income of ' . ($level === 1 ? 'direct ' : 'L2 ') . $user['username']);
                 }
+                $uplineId = $up['sponsor_id'] ?: null;
+                $level++;
             }
         }
     }

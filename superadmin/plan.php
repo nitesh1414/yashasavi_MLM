@@ -88,7 +88,7 @@ if (is_post()) {
             'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed from zero under the current settings — '
             . number_format($st['commissions']) . ' payout income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total) for '
             . number_format($st['members']) . ' member(s) in ' . $st['seconds'] . 's. '
-            . 'Payout commission = Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus only — rank / car fund / award / level reward amounts are NOT added. '
+            . 'Payout commission = Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus (paid at L1 and L2 only) — rank / car fund / award / level reward amounts are NOT added. '
             . 'Wallet balances were rebuilt from the ledger; manual entries and payouts were kept.');
         redirect('plan.php');
     }
@@ -137,7 +137,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <input class="form-control" type="number" step="0.01" name="sponsor_percent" value="<?= e($plan['sponsor_percent']) ?>">
             </div>
             <div class="form-group">
-                <label>Direct Sponsor Matching Income (% of matching income earned by your directs)</label>
+                <label>50% Direct Sponsor Bonus (% of matching income of your L1 and L2 members)</label>
                 <input class="form-control" type="number" step="0.01" name="sponsor_matching_percent" value="<?= e($plan['sponsor_matching_percent']) ?>">
             </div>
         </div>
@@ -241,7 +241,8 @@ require __DIR__ . '/../includes/dash_header.php';
             After changing any setting above, run this to recompute <b>every member's payout commission,
             Total Income and BV</b> from zero, using the full <b>approved order history</b> under the NEW
             settings: Left / Right / Self BV, matched pairs, rank titles and the three payout incomes —
-            <b>Direct Sponsor Income, Matching Bonus and 50% Direct Sponsor Bonus</b>.
+            <b>Direct Sponsor Income, Matching Bonus and 50% Direct Sponsor Bonus</b> — the bonus pays
+            when your <b>L1 or L2</b> member completes matching (after L2 no commission is added).
         </p>
         <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0">
             <b>Rest all amounts are NOT added to a member's payout commission:</b> level income, rank

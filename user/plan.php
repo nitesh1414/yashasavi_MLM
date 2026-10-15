@@ -38,8 +38,8 @@ $pairPay = $plan['binary_type'] === 'percent'
                 <div class="pt-stem"></div>
                 <div class="pt-node">
                     <i class="pt-ico fas fa-user" aria-hidden="true"></i>
-                    <span class="pt-name">Direct Member</span>
-                    <span class="pt-sub">directly sponsored by you</span>
+                    <span class="pt-name">L1 · Direct Member</span>
+                    <span class="pt-sub">directly sponsored by you — earns you the bonus</span>
                 </div>
             </div>
             <div class="pt-chips">
@@ -147,11 +147,12 @@ $pairPay = $plan['binary_type'] === 'percent'
                 <span class="pt-chip gold">Your 50% Direct Sponsor Bonus: <b><?= money($pairPay * $plan['sponsor_matching_percent'] / 100) ?></b></span>
             </div>
             <div class="plan-box">
-                When <b>one of the legs</b> of your directly sponsored member completes a Matching Bonus Income
+                When <b>one of the legs</b> of your <b>L1 member</b> (directly sponsored) <b>or your L2 member</b>
+                (sponsored by your direct) completes a Matching Bonus Income
                 (<?= money($pairPay) ?> in the example), you receive
                 <b><?= e($plan['sponsor_matching_percent']) ?>%</b> of that matching income —
                 <b><?= money($pairPay * $plan['sponsor_matching_percent'] / 100) ?></b> — as your Direct Sponsor Bonus.
-                It applies to <b>every matching payout</b> of every directly sponsored member, with <b>no level limit</b>.
+                Commission is added for <b>L1 and L2 only</b> — after that no commission is added.
                 <table class="kv-table" style="width:100%;margin-top:10px">
                     <tr><td>Sponsor matching earned</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
                 </table>
