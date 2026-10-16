@@ -40,7 +40,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="stat-card"><div class="st-ico">👥</div><div><b><?= $stats['users'] ?></b><span>Distributors (<?= $stats['active_users'] ?> active)</span></div></div>
     <div class="stat-card teal"><div class="st-ico">📦</div><div><b><?= $stats['orders'] ?></b><span>Orders (<?= $stats['pending_orders'] ?> pending)</span></div></div>
     <div class="stat-card gold"><div class="st-ico">💠</div><div><b><?= bv($stats['sales_bv']) ?></b><span>Business Volume (approved)</span></div></div>
-    <div class="stat-card blue"><div class="st-ico">💰</div><div><b><?= money($stats['commission']) ?></b><span>Commissions Paid Out</span></div></div>
+    <div class="stat-card blue"><div class="st-ico">💰</div><div><b><?= money($stats['commission']) ?></b><span>Commission Income (gross, before TDS + admin)</span></div></div>
 </div>
 
 <div class="two-col">

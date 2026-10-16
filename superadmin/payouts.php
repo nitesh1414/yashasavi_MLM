@@ -13,7 +13,8 @@ if (is_post()) {
     }
     if ($action === 'generate') {
         /* date-wise payout report: pending payouts for every eligible member
-         * (three plan incomes only), TDS + admin charge deducted */
+         * (three plan incomes only, net of TDS + admin already deducted
+         * at income credit) */
         $date = post_str('date');
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             flash('error', 'Please choose a valid report date.');
@@ -26,7 +27,7 @@ if (is_post()) {
         }
         flash('success',
             'Payout report for ' . dmy($date) . ' generated: ' . number_format($st['created']) . ' member(s), '
-            . money($st['total']) . ' gross, ' . money($st['net']) . ' net after TDS + admin charge'
+            . money($st['total']) . ' net (TDS + admin charge were already deducted when the income was credited)'
             . ($st['skipped'] ? ' (' . $st['skipped'] . ' skipped — wallet below minimum)' : '')
             . '. Each member now sees the payout as IN PROCESS in their dashboard.');
         redirect('payouts.php?run=' . urlencode($runTs));
@@ -89,7 +90,7 @@ require __DIR__ . '/../includes/dash_header.php';
         downloadable report with <b>all banking information</b>. Eligible income =
         <b>Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus</b> only (other amounts are never added
         to a member's payout), minimum <?= money(get_plan()['payout_min']) ?>, bank account required.
-        <?= e(get_plan()['tds_percent']) ?>% TDS and <?= e(get_plan()['admin_charge_percent']) ?>% admin charge are deducted from the final payout amount.
+        <?= e(get_plan()['tds_percent']) ?>% TDS and <?= e(get_plan()['admin_charge_percent']) ?>% admin charge are deducted whenever commission income is credited to a member's wallet — payout requests release the <b>net</b> wallet balance with no further deduction (new requests show ₹0 in the TDS / Admin columns).
         After generation every member sees the payout as <b>in process</b> in their dashboard; after you mark
         it paid they see <b>Payment is done</b>.
     </p>

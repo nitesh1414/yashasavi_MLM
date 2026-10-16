@@ -283,16 +283,19 @@ function commission_now()
     return (!empty($GLOBALS['__commission_clock'])) ? $GLOBALS['__commission_clock'] : now();
 }
 
-function credit_wallet($userId, $amount, $refType, $refId, $note)
+function credit_wallet($userId, $amount, $refType, $refId, $note, $grossIncome = null)
 {
     $amount = round((float)$amount, 2);
     if ($amount <= 0) {
         return null;
     }
+    /* $grossIncome: when the wallet receives a NET amount (TDS + admin
+     * already deducted) this is the GROSS income counted in total_earned. */
+    $earned = ($grossIncome !== null && (float)$grossIncome > 0) ? round((float)$grossIncome, 2) : $amount;
     $u = q_row("SELECT wallet_balance FROM users WHERE id = ? FOR UPDATE", [$userId]);
     $newBal = round((float)$u['wallet_balance'] + $amount, 2);
     q("UPDATE users SET wallet_balance = ?, total_earned = total_earned + ? WHERE id = ?",
-      [$newBal, $amount, $userId]);
+      [$newBal, $earned, $userId]);
     q("INSERT INTO wallet_transactions (user_id, type, amount, balance_after, ref_type, ref_id, note, created_at)
        VALUES (?, 'credit', ?, ?, ?, ?, ?, ?)",
       [$userId, $amount, $newBal, $refType, $refId, $note, commission_now()]);
@@ -318,14 +321,35 @@ function debit_wallet($userId, $amount, $refType, $refId, $note)
     return $newBal;
 }
 
-/** Record a commission row and credit the wallet. */
+/**
+ * Record a commission row (GROSS amount) and credit the wallet.
+ *
+ * TDS (5%) and admin charge (5%) are deducted right here — when the
+ * income is credited — so the wallet balance always shows the NET amount.
+ * The commissions table keeps the gross plan income for the income
+ * statement; total_earned tracks gross as well. Manual entries
+ * ('other' / 'retail') are credited in full without deduction.
+ */
 function add_commission($userId, $orderId, $type, $amount, $bvAmount, $level = null, $note = '')
 {
+    $amount = round((float)$amount, 2);
     q("INSERT INTO commissions (user_id, order_id, type, amount, bv, level, note, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'credited', ?)",
-      [$userId, $orderId, $type, round((float)$amount, 2), round((float)$bvAmount, 2), $level, $note, commission_now()]);
+      [$userId, $orderId, $type, $amount, round((float)$bvAmount, 2), $level, $note, commission_now()]);
     $cid = (int)db()->lastInsertId();
-    credit_wallet($userId, $amount, 'commission', $cid, ucfirst($type) . ' income' . ($note ? ' — ' . $note : ''));
+
+    $walletNote = ucfirst($type) . ' income' . ($note ? ' — ' . $note : '');
+    if (in_array($type, ['sponsor', 'binary', 'sponsor_matching', 'rank', 'award'], true)) {
+        $plan = get_plan();
+        $tds = round($amount * (float)$plan['tds_percent'] / 100, 2);
+        $adm = round($amount * (float)$plan['admin_charge_percent'] / 100, 2);
+        $net = round($amount - $tds - $adm, 2);
+        $walletNote .= ' · TDS ' . money($tds) . ' + admin ' . money($adm) . ' deducted'
+            . ($net > 0 ? '' : ' (net rounded to 0)');
+        credit_wallet($userId, max(0.0, $net), 'commission', $cid, $walletNote, $amount);
+    } else {
+        credit_wallet($userId, $amount, 'commission', $cid, $walletNote);
+    }
     return $cid;
 }
 
@@ -921,20 +945,20 @@ function request_payout($userId, $amount)
      * award rewards, level income etc. are NOT added to a member's payout */
     $eligible = payout_eligible_amount($userId);
     if ($amount > $eligible) {
-        return [false, 'Amount exceeds your eligible payout income (' . money($eligible) . '). Only Direct Sponsor, Matching Bonus and 50% Direct Sponsor Bonus incomes are payable.'];
+        return [false, 'Amount exceeds your eligible payout income (' . money($eligible) . '). Only Leg Completion, Matching Bonus and 50% Direct Sponsor Bonus incomes are payable.'];
     }
     if ($amount > (float)$u['wallet_balance']) {
         return [false, 'Amount exceeds your wallet balance.'];
     }
     return db_tx(function () use ($u, $amount, $plan) {
-        $tds   = round($amount * (float)$plan['tds_percent'] / 100, 2);
-        $admin = round($amount * (float)$plan['admin_charge_percent'] / 100, 2);
-        $net   = round($amount - $tds - $admin, 2);
-        $no    = payout_no();
+        /* TDS + admin charge were already deducted when the income was
+         * credited to the wallet — the payout releases NET wallet money
+         * with no further deduction */
+        $no = payout_no();
         q("INSERT INTO payouts (user_id, request_no, amount, tds_amount, admin_charge, net_amount,
            status, bank_name, bank_account_no, bank_ifsc, bank_holder, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
-          [$u['id'], $no, $amount, $tds, $admin, $net,
+           VALUES (?, ?, ?, 0, 0, ?, 'pending', ?, ?, ?, ?, ?)",
+          [$u['id'], $no, $amount, $amount,
            $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'], now()]);
         $pid = (int)db()->lastInsertId();
         debit_wallet($u['id'], $amount, 'payout', $pid, 'Payout request ' . $no);
@@ -943,7 +967,8 @@ function request_payout($userId, $amount)
 }
 
 /**
- * Amount currently eligible for payout: ONLY the three plan incomes —
+ * Amount currently eligible for payout: the NET value (TDS + admin
+ * charge already deducted at credit time) of the three plan incomes —
  * Leg Completion Income (once per leg), Matching Bonus Income (first
  * pair) and 50% Direct Sponsor Bonus Income — minus payouts already
  * generated / paid. All other
@@ -963,20 +988,25 @@ function payout_eligible_amount($userId, $upto = null)
         $params[] = $upto;
     }
     $gross = (float)q_val($sql, $params);
+    $plan = get_plan();
+    /* the wallet already received this income NET of TDS + admin charge
+     * (deducted at credit time) — so the payable amount is net too */
+    $net = round($gross * (100 - (float)$plan['tds_percent'] - (float)$plan['admin_charge_percent']) / 100, 2);
     $taken = (float)q_val(
         "SELECT COALESCE(SUM(amount), 0) FROM payouts
          WHERE user_id = ? AND status IN ('pending','paid')", [(int)$userId]);
-    return max(0.0, round($gross - $taken, 2));
+    return max(0.0, round($net - $taken, 2));
 }
 
 /**
  * Generate the date-wise payout report (super admin): creates a pending
- * payout for every member whose eligible income — the three plan incomes
- * only — has reached the payout minimum as of the END of $date, debits
- * their wallet, and returns the run timestamp that identifies the rows
- * (payout_report_rows). TDS and admin charge are the plan percentages
- * (5% / 5% on the current plan). Members immediately see the payout as
- * "in process"; marking it paid shows "Payment is done".
+ * payout for every member whose NET eligible income — the three plan
+ * incomes only, already reduced by TDS + admin charge at credit time —
+ * has reached the payout minimum as of the END of $date, debits their
+ * wallet, and returns the run timestamp that identifies the rows
+ * (payout_report_rows). No further deduction happens at payout.
+ * Members immediately see the payout as "in process"; marking it paid
+ * shows "Payment is done".
  *
  * Returns [ok(bool), runTs(string|null), stats(array)].
  */
@@ -1004,30 +1034,29 @@ function generate_payout_report($date)
              WHERE u.status = 'active' AND u.bank_account_no IS NOT NULL AND u.bank_account_no <> ''",
             [$cut]);
         $runTs = now();
+        $keepPct = 100 - $tdsPct - $admPct;
         foreach ($cands as $x) {
-            $amount = round((float)$x['gross'] - (float)$x['taken'], 2);
+            /* wallets hold NET income (TDS + admin deducted at credit) */
+            $amount = round(round((float)$x['gross'] * $keepPct / 100, 2) - (float)$x['taken'], 2);
             if ($amount < $min) { continue; }
             /* the wallet may hold less if the member spent it on purchases */
             if ($amount > (float)$x['wallet_balance']) {
                 $amount = round((float)$x['wallet_balance'], 2);
                 if ($amount < $min) { $stats['skipped']++; continue; }
             }
-            $tds = round($amount * $tdsPct / 100, 2);
-            $adm = round($amount * $admPct / 100, 2);
-            $net = round($amount - $tds - $adm, 2);
             $u = q_row("SELECT username, bank_name, bank_account_no, bank_ifsc, bank_holder FROM users WHERE id = ?", [$x['id']]);
             $no = 'RPT' . date('ymd', strtotime($cut)) . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
             q("INSERT INTO payouts (user_id, request_no, amount, tds_amount, admin_charge, net_amount,
                status, bank_name, bank_account_no, bank_ifsc, bank_holder, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
-              [$x['id'], $no, $amount, $tds, $adm, $net,
+               VALUES (?, ?, ?, 0, 0, ?, 'pending', ?, ?, ?, ?, ?)",
+              [$x['id'], $no, $amount, $amount,
                $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'], $runTs]);
             $pid = (int)db()->lastInsertId();
             debit_wallet($x['id'], $amount, 'payout', $pid,
                 'Payout report ' . $no . ' (' . date('d M Y', strtotime($cut)) . ')');
             $stats['created']++;
             $stats['total'] = round($stats['total'] + $amount, 2);
-            $stats['net'] = round($stats['net'] + $net, 2);
+            $stats['net'] = round($stats['net'] + $amount, 2);
         }
     });
 
