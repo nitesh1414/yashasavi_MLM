@@ -33,7 +33,7 @@ require __DIR__ . '/includes/site_header.php';
         </div>
         <div class="income-grid">
             <div class="income-card"><div class="i-ico">🛍️</div><h3>01 · Retail Income</h3><p>Buy at the special distributor price (DP) and sell at MRP — keep <b>30% to 45%</b> retail margin on every product.</p></div>
-            <div class="income-card"><div class="i-ico">🤝</div><h3>02 · Direct Sponsor Income</h3><p>Every directly sponsored member — left or right — who completes <b>3,000 BV joining</b> pays you <b>₹300, one time per direct</b>.</p></div>
+            <div class="income-card"><div class="i-ico">🤝</div><h3>02 · Leg Completion Income</h3><p>When your <b>left leg's total business</b> — all downline members, any depth — completes <b>3,000 BV</b> you earn <b>₹300 once</b>; when your <b>right leg</b> completes 3,000 BV, another <b>₹300 once</b>. Maximum ₹600.</p></div>
             <div class="income-card"><div class="i-ico">⚖️</div><h3>03 · 50% Direct Sponsor Bonus</h3><p>When your direct member completes their first matching pair, you receive <b>₹225 (50%)</b> — once per direct, left or right leg.</p></div>
             <div class="income-card"><div class="i-ico">🔁</div><h3>04 · Binary Matching Bonus</h3><p><b>3,000 BV left + 3,000 BV right</b> = 1 pair → <b><?= money($plan['binary_value']) ?></b> for your <b>first matching pair</b>. Every further pair adds points.</p></div>
             <div class="income-card"><div class="i-ico">⭐</div><h3>05 · Points</h3><p><b>1 point = 3,000 BV left + 3,000 BV right</b>. Points collect from every matched pair — the more your team grows, the more points you earn.</p></div>

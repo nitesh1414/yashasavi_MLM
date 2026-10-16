@@ -4,16 +4,20 @@
  *  MLM ENGINE
  * ---------------------------------------------------------------------
  *  Binary tree (left / right placement) with:
- *   - Sponsor (direct referral) bonus  : % of order BV to the sponsor
- *   - Binary pair matching income      : 1:1 BV matching on weaker leg,
- *                                        unmatched BV carries forward
- *   - Level income                     : % of order BV up to N sponsor
- *                                        levels
- *   - Rank achievements                : team BV + direct members
+ *   - Leg completion bonus             : Rs 300 once when the LEFT leg's
+ *                                        total team business completes
+ *                                        3,000 BV, Rs 300 once for the
+ *                                        RIGHT leg (max Rs 600 / member)
+ *   - Binary pair matching income      : first matching pair only
+ *                                        (3,000 + 3,000 BV = Rs 450),
+ *                                        further pairs add POINTS
+ *   - 50% direct sponsor bonus         : Rs 225 when a direct member
+ *                                        completes their first pair
+ *   - Points / ranks / awards          : 1 point per matched pair unit
  *   - E-wallet, commissions & payouts
  *
  *  Every amount/rate above is configurable from the Super Admin panel
- *  (plan settings, level table, rank table).
+ *  (plan settings, rank table, award rewards).
  * =====================================================================
  */
 
@@ -485,12 +489,40 @@ function update_reward_points($userId, $orderId = null, $withRewards = true)
 }
 
 /**
- * Direct Sponsor Income catch-up: ₹300 is paid once per direct member
- * when that direct completes 3,000 BV in total purchases. If the SPONSOR
- * had not completed their own 3,000 BV at that moment, the pending ₹300s
- * are paid as soon as the sponsor activates.
+ * Left / Right Leg Completion Bonus: Rs 300 is paid ONCE per leg when
+ * that leg's TOTAL team business — every downline member in the leg, at
+ * any depth — first completes the joining threshold (3,000 BV). Maximum
+ * Rs 600 per member: one payment for the left leg, one for the right.
+ * Called from the placement-tree loop with the leg's BV before and after
+ * this order, so the payment fires exactly at the crossing order.
  */
-function pay_pending_sponsor_commissions($sponsorId, $orderId = null)
+function pay_leg_completion_bonus(array $user, $legCol, $preBv, $orderId, array $plan)
+{
+    $threshold = (float)$plan['activation_bv'];
+    $amt = round($threshold * (float)$plan['sponsor_percent'] / 100, 2);
+    if ($amt <= 0 || $preBv >= $threshold || (float)$user[$legCol] < $threshold) {
+        return false; // leg already crossed earlier, or still below the threshold
+    }
+    $lvl = ($legCol === 'right_bv') ? 2 : 1; // commissions.level: 1 = left leg, 2 = right leg
+    $already = (int)q_val(
+        "SELECT COUNT(*) FROM commissions WHERE type = 'sponsor' AND user_id = ? AND level = ?",
+        [$user['id'], $lvl]
+    );
+    if ($already || $user['status'] !== 'active' || (int)$user['is_active'] !== 1) {
+        return false; // already paid for this leg, or member not yet eligible
+    }
+    add_commission($user['id'], $orderId, 'sponsor', $amt, $threshold, $lvl,
+        ($lvl === 2 ? 'Right' : 'Left') . ' leg completed ' . bv($threshold) . ' — one-time leg bonus');
+    return true;
+}
+
+/**
+ * Leg Completion Bonus catch-up: if a leg completed 3,000 BV while the
+ * member was not yet eligible (own 3,000 BV joining not complete), the
+ * pending Rs 300 per completed leg is paid as soon as the member
+ * activates. Maximum one left + one right payment, ever.
+ */
+function pay_pending_leg_commissions($userId, $orderId = null)
 {
     $plan = get_plan();
     $threshold = (float)$plan['activation_bv'];
@@ -498,18 +530,24 @@ function pay_pending_sponsor_commissions($sponsorId, $orderId = null)
     if ($amt <= 0) {
         return 0;
     }
+    $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
+    if (!$u) {
+        return 0;
+    }
     $paid = 0;
-    foreach (q_all("SELECT id, username FROM users WHERE sponsor_id = ? AND self_bv >= ?", [$sponsorId, $threshold]) as $d) {
+    foreach ([1 => 'left_bv', 2 => 'right_bv'] as $lvl => $col) {
+        if ((float)$u[$col] < $threshold) {
+            continue;
+        }
         $already = (int)q_val(
-            "SELECT COUNT(*) FROM commissions c JOIN orders o ON o.id = c.order_id
-             WHERE c.type = 'sponsor' AND c.user_id = ? AND o.user_id = ?",
-            [$sponsorId, $d['id']]
+            "SELECT COUNT(*) FROM commissions WHERE type = 'sponsor' AND user_id = ? AND level = ?",
+            [$userId, $lvl]
         );
         if ($already) {
             continue;
         }
-        add_commission($sponsorId, $orderId, 'sponsor', $amt, $threshold, null,
-            'Direct sponsor income — ' . $d['username'] . ' completed ' . bv($threshold) . ' joining BV');
+        add_commission($userId, $orderId, 'sponsor', $amt, $threshold, $lvl,
+            ($lvl === 2 ? 'Right' : 'Left') . ' leg completed ' . bv($threshold) . ' — one-time leg bonus');
         $paid++;
     }
     return $paid;
@@ -703,8 +741,9 @@ function approve_order($orderId, $adminId)
  *     self BV is never counted in any commission or points calculation).
  *     Completing Self 3,000 BV makes the member eligible for commission
  *     and points.
- *  2. Direct Sponsor Income ₹300 — paid ONCE per direct member, when
- *     that direct completes 3,000 BV in total purchases.
+ *  2. Leg Completion Bonus ₹300 — paid ONCE per leg (left and right),
+ *     when that leg's TOTAL team business — all downline members in the
+ *     leg, at any depth — first completes 3,000 BV. Max ₹600 / member.
  *  3. BV propagates up the placement tree (logged in bv_logs).
  *  4. Matching Bonus ₹450 — paid ONCE, for the member's FIRST matching
  *     pair (3,000 BV left + 3,000 BV right). Further pairs add POINTS.
@@ -738,43 +777,28 @@ function apply_order_business_effects(array $order, $payoutOnly = false)
     if ((int)$buyer['is_active'] !== 1 && $buyer['self_bv'] >= (float)$plan['activation_bv']) {
         q("UPDATE users SET is_active = 1, activated_at = ? WHERE id = ?", [now(), $buyer['id']]);
         $buyer['is_active'] = 1;
-        /* the buyer is now eligible: pay any ₹300s pending from directs who
-         * completed 3,000 BV earlier, and grant points for already-matched
-         * leg BV (retroactive eligibility) */
-        pay_pending_sponsor_commissions($buyer['id'], $order['id']);
+        /* the buyer is now eligible: pay any ₹300 leg bonuses pending from
+         * legs that completed 3,000 BV earlier, and grant points for
+         * already-matched leg BV (retroactive eligibility) */
+        pay_pending_leg_commissions($buyer['id'], $order['id']);
         update_reward_points($buyer['id'], $order['id'], !$payoutOnly);
     }
 
-    /* 2) Direct Sponsor Income: ₹300 once, when this direct completes
-     *    3,000 BV in total purchases */
-    if ($buyer['sponsor_id'] && $buyer['self_bv'] >= (float)$plan['activation_bv']) {
-        $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$buyer['sponsor_id']]);
-        $already = (int)q_val(
-            "SELECT COUNT(*) FROM commissions c JOIN orders o ON o.id = c.order_id
-             WHERE c.type = 'sponsor' AND c.user_id = ? AND o.user_id = ?",
-            [$buyer['sponsor_id'], $buyer['id']]
-        );
-        $amt = round((float)$plan['activation_bv'] * (float)$plan['sponsor_percent'] / 100, 2);
-        if (!$already && $amt > 0 && $sponsor
-            && $sponsor['status'] === 'active' && (int)$sponsor['is_active'] === 1) {
-            add_commission($sponsor['id'], $order['id'], 'sponsor', $amt, (float)$plan['activation_bv'], null,
-                'Direct sponsor income — ' . $buyer['username'] . ' completed ' . bv((float)$plan['activation_bv']) . ' joining BV');
-        } elseif (!$already && $amt > 0 && $sponsor && (int)$sponsor['is_active'] !== 1) {
-            /* sponsor not eligible yet — the catch-up pays it on activation */
-        }
-    }
-
-    /* 3) propagate BV up the placement tree (logged) + matching + points */
+    /* 2) propagate BV up the placement tree (logged) + leg bonus +
+     *    matching + points — the ₹300 leg bonus fires when an ancestor's
+     *    left or right leg first completes 3,000 BV total team business */
     $chain = ancestor_chain($buyer); // nearest first
     $leg = $buyer['leg'];            // leg of buyer relative to its parent
     foreach ($chain as $anc) {
         $col = ($leg === 'R') ? 'right_bv' : 'left_bv';
+        $preLegBv = (float)$anc[$col];
         q("UPDATE users SET $col = $col + ? WHERE id = ?", [$totalBv, $anc['id']]);
-        $anc[$col] = (float)$anc[$col] + $totalBv;
+        $anc[$col] = $preLegBv + $totalBv;
         q("INSERT INTO bv_logs (user_id, order_id, kind, bv, balance_after, note, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)",
           [$anc['id'], $order['id'], $leg === 'R' ? 'right' : 'left', $totalBv, $anc[$col],
            'Team BV from ' . $buyer['username'] . ' (' . ($leg === 'R' ? 'right' : 'left') . ' leg)', commission_now()]);
+        pay_leg_completion_bonus($anc, $col, $preLegBv, $order['id'], $plan);
         run_binary_matching($anc, $order['id']);
         update_reward_points($anc['id'], $order['id'], !$payoutOnly);
         $leg = $anc['leg']; // leg of this ancestor relative to its own parent
@@ -920,8 +944,9 @@ function request_payout($userId, $amount)
 
 /**
  * Amount currently eligible for payout: ONLY the three plan incomes —
- * Direct Sponsor Income, Matching Bonus Income and 50% Direct Sponsor
- * Bonus Income — minus payouts already generated / paid. All other
+ * Leg Completion Income (once per leg), Matching Bonus Income (first
+ * pair) and 50% Direct Sponsor Bonus Income — minus payouts already
+ * generated / paid. All other
  * amounts (rank rewards, car fund, award rewards, level income, manual
  * entries) are NOT added to a member's payout.
  * $upto (optional 'YYYY-MM-DD HH:MM:SS') limits the income side to that

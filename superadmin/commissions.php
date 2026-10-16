@@ -81,7 +81,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= dmy($r['created_at'], true) ?></td>
                 <td><a href="user_view.php?id=<?= (int)$r['user_id'] ?>"><b><?= e($r['username']) ?></b></a><br>
                     <small style="color:#000"><?= e($r['full_name']) ?></small></td>
-                <td><?php $tLabels = ['sponsor' => 'Direct Sponsor', 'binary' => 'Matching', 'level' => 'Level', 'rank' => 'Cash Reward', 'sponsor_matching' => 'Sponsor Matching', 'car_fund' => 'Car Fund', 'award' => 'Award Reward', 'retail' => 'Retail', 'other' => 'Other']; ?>
+                <td><?php $tLabels = ['sponsor' => 'Leg Bonus (L/R)', 'binary' => 'Matching', 'level' => 'Level', 'rank' => 'Cash Reward', 'sponsor_matching' => 'Sponsor Matching', 'car_fund' => 'Car Fund', 'award' => 'Award Reward', 'retail' => 'Retail', 'other' => 'Other']; ?>
                     <?= badge($tLabels[$r['type']] ?? ucfirst($r['type']), $r['type'] === 'binary' ? 'info' : 'primary') ?><?= $r['level'] && $r['type'] === 'level' ? ' L' . (int)$r['level'] : '' ?></td>
                 <td><?= e($r['order_no'] ?: '—') ?></td>
                 <td><?= e($r['bv']) ?></td>

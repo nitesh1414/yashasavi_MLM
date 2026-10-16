@@ -51,7 +51,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php foreach ($rows as $r): ?>
             <tr>
                 <td><?= dmy($r['created_at'], true) ?></td>
-                <td><?php $tLabels = ['sponsor' => 'Direct Sponsor', 'binary' => 'Matching', 'level' => 'SP Match', 'rank' => 'Cash Reward', 'sponsor_matching' => 'Sponsor Matching', 'car_fund' => 'Car Fund', 'award' => 'Award Reward', 'retail' => 'Retail', 'other' => 'Other']; ?>
+                <td><?php $tLabels = ['sponsor' => 'Leg Bonus (L/R)', 'binary' => 'Matching', 'level' => 'SP Match', 'rank' => 'Cash Reward', 'sponsor_matching' => 'Sponsor Matching', 'car_fund' => 'Car Fund', 'award' => 'Award Reward', 'retail' => 'Retail', 'other' => 'Other']; ?>
                     <?= badge($tLabels[$r['type']] ?? ucfirst($r['type']), $r['type'] === 'binary' ? 'info' : ($r['type'] === 'rank' || $r['type'] === 'car_fund' || $r['type'] === 'award' ? 'warning' : 'primary')) ?></td>
                 <td><?= e($r['order_no'] ?: '—') ?></td>
                 <td><?= $r['level'] ? 'L' . (int)$r['level'] : '—' ?></td>

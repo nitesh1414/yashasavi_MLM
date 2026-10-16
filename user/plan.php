@@ -25,33 +25,47 @@ $pairPay = $plan['binary_type'] === 'percent'
 <div class="two-col">
     <div>
         <div class="card">
-            <div class="card-title">1. 🤝 Direct Sponsor Income</div>
+            <div class="card-title">1. 🤝 Leg Completion Income (Left + Right)</div>
             <div class="plan-tree">
                 <div class="pt-node you">
                     <i class="pt-ico fas fa-user" aria-hidden="true"></i>
                     <span class="pt-name">YOU</span>
-                    <span class="pt-sub">Sponsor</span>
                 </div>
-                <div class="pt-stem"></div>
-                <div class="pt-node">
-                    <i class="pt-ico fas fa-user" aria-hidden="true"></i>
-                    <span class="pt-name">L1 · Direct Member</span>
-                    <span class="pt-sub">directly sponsored by you — earns you the bonus</span>
+                <div class="pt-branch"></div>
+                <div class="pt-kids">
+                    <div class="pt-kid">
+                        <div class="pt-node">
+                            <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                            <span class="pt-name">LEFT LEG</span>
+                            <span class="pt-sub">all downline members</span>
+                        </div>
+                    </div>
+                    <div class="pt-kid">
+                        <div class="pt-node">
+                            <i class="pt-ico fas fa-user" aria-hidden="true"></i>
+                            <span class="pt-name">RIGHT LEG</span>
+                            <span class="pt-sub">all downline members</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="pt-chips">
                 <span class="pt-chip">Joining amount: <b>₹6,000</b></span>
                 <span class="pt-chip">Business Volume: <b>3,000 BV</b></span>
-                <span class="pt-chip green">Your Direct Sponsor commission: <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b></span>
+                <span class="pt-chip green">Left leg completes 3,000 BV: <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b></span>
+                <span class="pt-chip green">Right leg completes 3,000 BV: <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b></span>
             </div>
             <div class="plan-box">
-                Every member you <b>directly sponsor</b> — in your <b>left</b> or <b>right</b> leg — who completes
-                <b>3,000 BV in total purchases</b> (the ₹6,000 joining) pays you a one-time
-                <b>direct sponsor commission of <?= money(3000 * $plan['sponsor_percent'] / 100) ?></b>
-                (<?= e($plan['sponsor_percent']) ?>% of the joining BV). It is paid <b>once per direct member</b> —
-                ₹300 for a left direct, ₹300 for a right direct.
+                When the <b>total business of your LEFT leg</b> — every downline member in it, at any depth —
+                first completes <b>3,000 BV</b>, you receive a one-time <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b>.
+                When your <b>RIGHT leg</b> completes <b>3,000 BV</b>, you receive another one-time
+                <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b> (<?= e($plan['sponsor_percent']) ?>% of 3,000 BV). Maximum
+                <b>₹600</b> from this income — one payment per leg, forever. The business can come from
+                <b>any downline member</b> in that leg: your direct, or their team below.
                 <table class="kv-table" style="width:100%;margin-top:10px">
-                    <tr><td>Direct sponsor income earned</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
+                    <tr><td>Your left leg BV</td><td><b><?= bv($u['left_bv']) ?></b><?= (float)$u['left_bv'] >= 3000 ? ' ✓ paid' : '' ?></td></tr>
+                    <tr><td>Your right leg BV</td><td><b><?= bv($u['right_bv']) ?></b><?= (float)$u['right_bv'] >= 3000 ? ' ✓ paid' : '' ?></td></tr>
+                    <tr><td>Leg completion income earned</td><td><b><?= money($earn['sponsor']) ?></b> (max <?= money(2 * 3000 * $plan['sponsor_percent'] / 100) ?>)</td></tr>
                 </table>
             </div>
         </div>
@@ -233,7 +247,7 @@ $pairPay = $plan['binary_type'] === 'percent'
                 <tr><td>Joining / eligibility BV</td><td><?= e($plan['activation_bv']) ?> BV self purchase</td></tr>
                 <tr><td>Point value (1 point)</td><td>3,000 BV left + 3,000 BV right</td></tr>
                 <tr><td>Points per matched pair</td><td><?= (int)$plan['points_per_unit'] ?> P</td></tr>
-                <tr><td>Payout commission</td><td>₹300 sponsor + ₹450 first pair + ₹225 bonus only</td></tr>
+                <tr><td>Payout commission</td><td>₹300 per completed leg (L+R) + ₹450 first pair + ₹225 bonus only</td></tr>
                 <tr><td>Payout minimum</td><td><?= money($plan['payout_min']) ?></td></tr>
                 <tr><td>TDS on payout</td><td><?= e($plan['tds_percent']) ?>%</td></tr>
                 <tr><td>Admin charge on payout</td><td><?= e($plan['admin_charge_percent']) ?>%</td></tr>

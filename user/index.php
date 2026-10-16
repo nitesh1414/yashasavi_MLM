@@ -104,7 +104,7 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="card">
             <div class="card-title">💹 Income Breakdown</div>
             <table class="kv-table" style="width:100%">
-                <tr><td>Direct Sponsor Income (₹300 × directs)</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
+                <tr><td>Leg Completion Income (₹300 L + ₹300 R)</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
                 <tr><td>Matching Bonus (first pair ₹450)</td><td><b><?= money($earn['binary']) ?></b></td></tr>
                 <tr><td>50% Direct Sponsor Bonus (₹225)</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
                 <tr><td>Rank Cash Rewards (not in payout)</td><td><b><?= money($earn['rank']) ?></b></td></tr>

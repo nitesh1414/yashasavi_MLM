@@ -72,7 +72,7 @@ if (is_post()) {
             'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed from zero under the current settings — '
             . number_format($st['commissions']) . ' payout income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total) for '
             . number_format($st['members']) . ' member(s), ' . number_format($st['points']) . ' points awarded, in ' . $st['seconds'] . 's. '
-            . 'Payout commission = ₹300 Direct Sponsor + ₹450 first Matching Pair + ₹225 Direct Sponsor Bonus only — rank and award rewards are NOT added. '
+            . 'Payout commission = ₹300 per completed Leg (L+R, once each) + ₹450 first Matching Pair + ₹225 Direct Sponsor Bonus only — rank and award rewards are NOT added. '
             . 'Wallet balances were rebuilt from the ledger; manual entries and payouts were kept.');
         redirect('plan.php');
     }
@@ -122,12 +122,12 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">1 · Direct Sponsor Income (one time per direct)</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">1 · Leg Completion Income (one time per leg, ₹300 + ₹300)</h4>
         <div class="form-grid2">
             <div class="form-group">
                 <label>Sponsor income — % of joining BV</label>
                 <input class="form-control" type="number" step="0.01" name="sponsor_percent" value="<?= e($plan['sponsor_percent']) ?>">
-                <div class="form-hint" style="margin-top:6px">10% × 3,000 BV = <b>₹300</b> — paid <b>once per direct member</b>, when that direct completes 3,000 BV in total purchases (₹300 for a left direct, ₹300 for a right direct).</div>
+                <div class="form-hint" style="margin-top:6px">10% × 3,000 BV = <b>₹300 per leg</b> — paid <b>once</b> when the member's LEFT leg total (all downline, any depth) completes 3,000 BV, and once when the RIGHT leg completes 3,000 BV. Maximum ₹600 per member.</div>
             </div>
         </div>
 
@@ -195,7 +195,7 @@ require __DIR__ . '/../includes/dash_header.php';
             Total Income, BV and points</b> from zero, using the full <b>approved order history</b> under
             the NEW settings: Left / Right / Self BV, matched pairs, points, rank titles, BV / points logs
             and the three one-time payout incomes —
-            <b>₹300 Direct Sponsor (per direct completing 3,000 BV), ₹450 first Matching Pair and
+            <b>₹300 per completed Leg (left + right, once each), ₹450 first Matching Pair and
             ₹225 Direct Sponsor Bonus</b>.
         </p>
         <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0">

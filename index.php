@@ -153,7 +153,7 @@ require __DIR__ . '/includes/site_header.php';
         </div>
         <div class="income-grid">
             <div class="income-card"><div class="i-ico">🛍️</div><h3>Retail Income</h3><p>30% to 45% margin between DP and MRP.</p></div>
-            <div class="income-card"><div class="i-ico">🤝</div><h3>Direct Sponsor Income</h3><p>10% of BV on every purchase by your directs.</p></div>
+            <div class="income-card"><div class="i-ico">🤝</div><h3>Leg Completion Income</h3><p>₹300 when your left leg completes 3,000 BV, ₹300 when your right leg completes 3,000 BV — once per leg.</p></div>
             <div class="income-card"><div class="i-ico">🔁</div><h3>Binary Matching Income</h3><p>₹450 per 3000:3000 BV pair, with carry forward.</p></div>
             <div class="income-card"><div class="i-ico">⚖️</div><h3>Sponsor Matching Income</h3><p>50% of the matching income earned by your directs.</p></div>
             <div class="income-card"><div class="i-ico">🏅</div><h3>Cash Rewards</h3><p>15 ranks — from Silver Star to Chairman (₹25 crore).</p></div>
