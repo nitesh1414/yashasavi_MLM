@@ -10,20 +10,13 @@ if (is_post()) {
     if ($tab === 'main') {
         $fields = [
             'activation_bv' => 'float_pos',
-            'sponsor_percent' => 'float',
+            'sponsor_percent' => 'float_pos',
             'pair_unit_bv' => 'float_pos',
             'binary_type' => 'enum:percent,fixed',
             'binary_value' => 'float_pos',
-            'level_depth' => 'int:0:10',
-            'daily_cap' => 'float',
-            'monthly_cap' => 'float',
-            'carry_forward' => 'bool',
             'matching_requires_active' => 'bool',
-            'level_requires_active' => 'bool',
-            'sponsor_matching_percent' => 'float',
-            'point_bv' => 'float_pos',
-            'car_fund_points' => 'int:0:100000000',
-            'car_fund_amount' => 'float',
+            'sponsor_matching_percent' => 'float_pos',
+            'points_per_unit' => 'int:0:1000',
             'tds_percent' => 'float',
             'admin_charge_percent' => 'float',
             'payout_min' => 'float_pos',
@@ -70,15 +63,6 @@ if (is_post()) {
         redirect('plan.php');
     }
 
-    if ($tab === 'levels') {
-        foreach (range(1, 10) as $ln) {
-            $pct = max(0, min(100, (float)post_str('level_' . $ln, 0)));
-            q("INSERT INTO plan_levels (level_no, percent) VALUES (?, ?)
-               ON DUPLICATE KEY UPDATE percent = VALUES(percent)", [$ln, $pct]);
-        }
-        flash('success', 'Level income percentages saved.');
-        redirect('plan.php?tab=levels');
-    }
 
     if ($tab === 'recalc') {
         /* recompute Total Income + BV of ALL members from the approved
@@ -87,8 +71,8 @@ if (is_post()) {
         flash('success',
             'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed from zero under the current settings — '
             . number_format($st['commissions']) . ' payout income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total) for '
-            . number_format($st['members']) . ' member(s) in ' . $st['seconds'] . 's. '
-            . 'Payout commission = Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus (paid at L1 and L2 only) — rank / car fund / award / level reward amounts are NOT added. '
+            . number_format($st['members']) . ' member(s), ' . number_format($st['points']) . ' points awarded, in ' . $st['seconds'] . 's. '
+            . 'Payout commission = ₹300 Direct Sponsor + ₹450 first Matching Pair + ₹225 Direct Sponsor Bonus only — rank and award rewards are NOT added. '
             . 'Wallet balances were rebuilt from the ledger; manual entries and payouts were kept.');
         redirect('plan.php');
     }
@@ -96,7 +80,6 @@ if (is_post()) {
 
 $cur = get_str('tab', 'main');
 $plan = get_plan();
-$levels = get_plan_levels();
 
 $activeKey = 'plan';
 $pageTitle = 'MLM Plan Settings';
@@ -109,7 +92,8 @@ require __DIR__ . '/../includes/dash_header.php';
         ⚙️ MLM Plan Settings
         <span class="right">
             <a class="btn <?= $cur === 'main' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="plan.php">Main Settings</a>
-            <a class="btn <?= $cur === 'levels' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="plan.php?tab=levels">Level Percentages</a>
+            <a class="btn btn-light btn-sm" href="ranks.php">🏅 Ranks (Points)</a>
+            <a class="btn btn-light btn-sm" href="rewards.php">🎁 Awards (Points)</a>
         </span>
     </div>
     <p class="form-hint" style="margin-bottom:16px">
@@ -122,27 +106,32 @@ require __DIR__ . '/../includes/dash_header.php';
         <?= csrf_field() ?>
         <input type="hidden" name="tab" value="main">
 
-        <h4 style="font-size:14px;margin:6px 0 12px">Activation</h4>
+        <h4 style="font-size:14px;margin:6px 0 12px">Joining &amp; Eligibility</h4>
         <div class="form-grid2">
             <div class="form-group">
-                <label>Activation BV (lifetime self-purchase to start earning)</label>
+                <label>Joining BV (Self BV a member must complete to earn commission &amp; points)</label>
                 <input class="form-control" type="number" step="0.01" name="activation_bv" value="<?= e($plan['activation_bv']) ?>">
+                <div class="form-hint" style="margin-top:6px">Self BV is shown on the member dashboard but is never counted in any commission or points calculation — it only makes the member eligible.</div>
+            </div>
+            <div class="form-group">
+                <label>Matching requires eligible member (completed joining BV)</label>
+                <select class="form-control" name="matching_requires_active">
+                    <option value="1" <?= (int)$plan['matching_requires_active'] === 1 ? 'selected' : '' ?>>Yes</option>
+                    <option value="0" <?= (int)$plan['matching_requires_active'] === 0 ? 'selected' : '' ?>>No</option>
+                </select>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">Direct Sponsor Income</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">1 · Direct Sponsor Income (one time per direct)</h4>
         <div class="form-grid2">
             <div class="form-group">
-                <label>Sponsor Income (% of order BV)</label>
+                <label>Sponsor income — % of joining BV</label>
                 <input class="form-control" type="number" step="0.01" name="sponsor_percent" value="<?= e($plan['sponsor_percent']) ?>">
-            </div>
-            <div class="form-group">
-                <label>50% Direct Sponsor Bonus (% of matching income of your L1 and L2 members)</label>
-                <input class="form-control" type="number" step="0.01" name="sponsor_matching_percent" value="<?= e($plan['sponsor_matching_percent']) ?>">
+                <div class="form-hint" style="margin-top:6px">10% × 3,000 BV = <b>₹300</b> — paid <b>once per direct member</b>, when that direct completes 3,000 BV in total purchases (₹300 for a left direct, ₹300 for a right direct).</div>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">Binary Matching Income</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">2 · Matching Bonus Income (first pair only)</h4>
         <div class="form-grid3">
             <div class="form-group">
                 <label>BV per pair unit (1:1 matching unit)</label>
@@ -158,61 +147,25 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="form-group">
                 <label>Value (% or ₹)</label>
                 <input class="form-control" type="number" step="0.01" name="binary_value" value="<?= e($plan['binary_value']) ?>">
-            </div>
-        </div>
-        <div class="form-grid3">
-            <div class="form-group">
-                <label>Daily Capping (₹, 0 = no cap)</label>
-                <input class="form-control" type="number" step="0.01" name="daily_cap" value="<?= e($plan['daily_cap']) ?>">
-            </div>
-            <div class="form-group">
-                <label>Monthly Capping (₹, 0 = no cap)</label>
-                <input class="form-control" type="number" step="0.01" name="monthly_cap" value="<?= e($plan['monthly_cap']) ?>">
-            </div>
-            <div class="form-group">
-                <label>Carry forward unmatched BV / pairs</label>
-                <select class="form-control" name="carry_forward">
-                    <option value="1" <?= (int)$plan['carry_forward'] === 1 ? 'selected' : '' ?>>Yes (recommended)</option>
-                    <option value="0" <?= (int)$plan['carry_forward'] === 0 ? 'selected' : '' ?>>No (flush unmatched)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Matching requires active member</label>
-                <select class="form-control" name="matching_requires_active">
-                    <option value="1" <?= (int)$plan['matching_requires_active'] === 1 ? 'selected' : '' ?>>Yes</option>
-                    <option value="0" <?= (int)$plan['matching_requires_active'] === 0 ? 'selected' : '' ?>>No</option>
-                </select>
+                <div class="form-hint" style="margin-top:6px">3,000 BV left + 3,000 BV right = <b>₹450, paid ONCE for the member's FIRST matching pair</b>. Every further pair adds points only.</div>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">Level Income</h4>
-        <div class="form-grid3">
+        <h4 style="font-size:14px;margin:16px 0 12px">3 · 50% Direct Sponsor Bonus (one time per direct)</h4>
+        <div class="form-grid2">
             <div class="form-group">
-                <label>Paid levels (1–10)</label>
-                <input class="form-control" type="number" min="1" max="10" name="level_depth" value="<?= e($plan['level_depth']) ?>">
-            </div>
-            <div class="form-group">
-                <label>Level income requires active member</label>
-                <select class="form-control" name="level_requires_active">
-                    <option value="1" <?= (int)$plan['level_requires_active'] === 1 ? 'selected' : '' ?>>Yes</option>
-                    <option value="0" <?= (int)$plan['level_requires_active'] === 0 ? 'selected' : '' ?>>No</option>
-                </select>
+                <label>Bonus — % of the direct's first matching income</label>
+                <input class="form-control" type="number" step="0.01" name="sponsor_matching_percent" value="<?= e($plan['sponsor_matching_percent']) ?>">
+                <div class="form-hint" style="margin-top:6px">50% × ₹450 = <b>₹225</b> — paid <b>once</b> to the direct sponsor when a direct member in the <b>left</b> or <b>right</b> leg completes their first matching pair.</div>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">Points, Rewards &amp; Car Fund</h4>
-        <div class="form-grid3">
+        <h4 style="font-size:14px;margin:16px 0 12px">4 · Points, Ranks &amp; Awards</h4>
+        <div class="form-grid2">
             <div class="form-group">
-                <label>BV per Point (1 Point = ? BV)</label>
-                <input class="form-control" type="number" step="0.01" name="point_bv" value="<?= e($plan['point_bv']) ?>">
-            </div>
-            <div class="form-group">
-                <label>Car Fund — points required</label>
-                <input class="form-control" type="number" min="0" name="car_fund_points" value="<?= e($plan['car_fund_points']) ?>">
-            </div>
-            <div class="form-group">
-                <label>Car Fund amount (₹, one time)</label>
-                <input class="form-control" type="number" step="0.01" name="car_fund_amount" value="<?= e($plan['car_fund_amount']) ?>">
+                <label>Points per matched pair unit</label>
+                <input class="form-control" type="number" min="0" name="points_per_unit" value="<?= e($plan['points_per_unit']) ?>">
+                <div class="form-hint" style="margin-top:6px">1 point = 3,000 BV left + 3,000 BV right (both sides). Points need completed joining BV. Manage the <a href="ranks.php">rank cash rewards</a> and <a href="rewards.php">award milestones</a> on their pages.</div>
             </div>
         </div>
 
@@ -239,17 +192,19 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="card-title">🔄 Recalculate Total Income &amp; BV of all members</div>
         <p style="font-size:13px;color:var(--ink-soft)">
             After changing any setting above, run this to recompute <b>every member's payout commission,
-            Total Income and BV</b> from zero, using the full <b>approved order history</b> under the NEW
-            settings: Left / Right / Self BV, matched pairs, rank titles and the three payout incomes —
-            <b>Direct Sponsor Income, Matching Bonus and 50% Direct Sponsor Bonus</b> — the bonus pays
-            when your <b>L1 or L2</b> member completes matching (after L2 no commission is added).
+            Total Income, BV and points</b> from zero, using the full <b>approved order history</b> under
+            the NEW settings: Left / Right / Self BV, matched pairs, points, rank titles, BV / points logs
+            and the three one-time payout incomes —
+            <b>₹300 Direct Sponsor (per direct completing 3,000 BV), ₹450 first Matching Pair and
+            ₹225 Direct Sponsor Bonus</b>.
         </p>
         <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0">
-            <b>Rest all amounts are NOT added to a member's payout commission:</b> level income, rank
-            rewards, car fund and award rewards are cleared and not rebuilt.
+            <b>Rest all amounts are NOT added to a member's payout commission:</b> rank cash rewards and
+            award rewards are wallet income only (cleared by the rebuild, not re-paid). There is no level
+            income, car fund or any other commission in this plan.
         </p>
         <ul style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 14px 18px">
-            <li>All automatic income entries are wiped and rebuilt chronologically; daily / monthly caps apply to each order's original day.</li>
+            <li>All automatic income entries, points and BV / points logs are wiped and rebuilt chronologically.</li>
             <li>Wallet balances are rebuilt from the complete ledger — <b>manual income entries and payout history are kept</b>.</li>
             <li>Members are only ever <b>activated</b> by the recalculation, never de-activated (manual activations survive).</li>
             <li>Pending / rejected orders are ignored; product stock and order statuses are not touched.</li>
@@ -262,25 +217,6 @@ require __DIR__ . '/../includes/dash_header.php';
         </form>
     </div>
 
-    <?php else: ?>
-    <form method="post">
-        <?= csrf_field() ?>
-        <input type="hidden" name="tab" value="levels">
-        <p class="form-hint" style="margin-bottom:14px">
-            Percentages apply to the <b>BV</b> of each approved order. Set 0 to disable a level.
-            Levels are counted along the sponsor chain (level 1 = direct sponsor).
-        </p>
-        <div class="form-grid2">
-            <?php foreach (range(1, 10) as $ln): ?>
-            <div class="form-group">
-                <label>Level <?= $ln ?> (%)</label>
-                <input class="form-control" type="number" step="0.01" min="0" max="100" name="level_<?= $ln ?>"
-                       value="<?= e($levels[$ln] ?? 0) ?>" <?= $ln > (int)$plan['level_depth'] ? 'disabled' : '' ?>>
-            </div>
-            <?php endforeach; ?>
-        </div>
-        <button class="btn btn-primary" type="submit">💾 Save Level Percentages</button>
-    </form>
     <?php endif; ?>
 </div>
 

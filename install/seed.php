@@ -64,13 +64,13 @@ function seed_database($fresh = false)
     $plan = $D['plan'];
     q("INSERT INTO plan_settings (id, activation_bv, sponsor_percent, pair_unit_bv, binary_type,
        binary_value, level_depth, daily_cap, monthly_cap, carry_forward, matching_requires_active,
-       level_requires_active, sponsor_matching_percent, point_bv, car_fund_points, car_fund_amount,
+       level_requires_active, sponsor_matching_percent, points_per_unit, point_bv, car_fund_points, car_fund_amount,
        tds_percent, admin_charge_percent, payout_min, updated_at)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [$plan['activation_bv'], $plan['sponsor_percent'], $plan['pair_unit_bv'], $plan['binary_type'],
        $plan['binary_value'], $plan['level_depth'], $plan['daily_cap'], $plan['monthly_cap'],
        $plan['carry_forward'], $plan['matching_requires_active'], $plan['level_requires_active'],
-       $plan['sponsor_matching_percent'], $plan['point_bv'], $plan['car_fund_points'],
+       $plan['sponsor_matching_percent'], $plan['points_per_unit'], $plan['point_bv'], $plan['car_fund_points'],
        $plan['car_fund_amount'], $plan['tds_percent'], $plan['admin_charge_percent'],
        $plan['payout_min'], $now]);
 
@@ -79,9 +79,9 @@ function seed_database($fresh = false)
     }
 
     foreach ($D['ranks'] as $r) {
-        q("INSERT INTO ranks (name, min_team_bv, min_directs, reward_amount, badge, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?)",
-          [$r[0], $r[1] * 400, $r[2], $r[3], strtolower(str_replace(' ', '-', $r[0])), $r[4]]);
+        q("INSERT INTO ranks (name, min_points, reward_amount, badge, sort_order)
+           VALUES (?, ?, ?, ?, ?)",
+          [$r[0], $r[1], $r[2], strtolower(str_replace(' ', '-', $r[0])), $r[3]]);
     }
 
     $s = 1;

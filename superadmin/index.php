@@ -98,6 +98,38 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
 
         <div class="card">
+            <div class="card-title">📋 System Log — BV, Commissions &amp; Points</div>
+            <?php
+            $saLogs = [];
+            foreach (q_all("SELECT b.*, u.username FROM bv_logs b JOIN users u ON u.id = b.user_id ORDER BY b.id DESC LIMIT 8") as $b) {
+                $saLogs[] = ['d' => $b['created_at'], 'ico' => $b['kind'] === 'self' ? '🛒' : ($b['kind'] === 'left' ? '⬅️' : '➡️'),
+                    'txt' => '+' . bv($b['bv']) . ' ' . $b['kind'] . ' BV — ' . e($b['username']) . ' (total ' . bv($b['balance_after']) . ')'];
+            }
+            foreach (q_all("SELECT c.*, u.username FROM commissions c JOIN users u ON u.id = c.user_id ORDER BY c.id DESC LIMIT 8") as $c) {
+                $saLogs[] = ['d' => $c['created_at'], 'ico' => '💰',
+                    'txt' => money($c['amount']) . ' ' . str_replace('_', ' ', $c['type']) . ' — ' . e($c['username']) . ' (' . e($c['note']) . ')'];
+            }
+            foreach (q_all("SELECT p.*, u.username FROM points_logs p JOIN users u ON u.id = p.user_id ORDER BY p.id DESC LIMIT 8") as $p) {
+                $saLogs[] = ['d' => $p['created_at'], 'ico' => '⭐',
+                    'txt' => '+' . (int)$p['points'] . ' points — ' . e($p['username']) . ' (total ' . number_format((int)$p['total_points']) . ' P)'];
+            }
+            usort($saLogs, function ($x, $y) { return strcmp($y['d'], $x['d']); });
+            ?>
+            <?php if (!$saLogs): ?>
+                <div class="empty-state"><span class="es-ico">📋</span>No activity yet.</div>
+            <?php else: ?>
+            <table class="kv-table" style="width:100%">
+                <?php foreach (array_slice($saLogs, 0, 12) as $l): ?>
+                <tr>
+                    <td style="white-space:normal"><?= $l['ico'] ?> <?= $l['txt'] ?></td>
+                    <td style="text-align:right;color:var(--ink-soft);white-space:nowrap"><?= dmy($l['d'], true) ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </table>
+            <?php endif; ?>
+        </div>
+
+        <div class="card">
             <div class="card-title">👥 Newest Distributors <a class="right" href="users.php">View all →</a></div>
             <div class="table-wrap" style="box-shadow:none">
                 <table class="table">

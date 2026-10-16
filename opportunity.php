@@ -5,9 +5,8 @@
 require_once __DIR__ . '/includes/init.php';
 
 $plan = get_plan();
-$ranks = q_all("SELECT * FROM ranks ORDER BY sort_order, min_team_bv ASC");
+$ranks = q_all("SELECT * FROM ranks ORDER BY min_points ASC, id ASC");
 $awards = q_all("SELECT * FROM award_rewards WHERE status='active' ORDER BY points ASC");
-$pointBv = max(1, (float)$plan['point_bv']);
 
 $pageTitle = 'Business Opportunity — Marketing Plan';
 $pageDesc = 'The complete Yashasavi income plan: retail income, direct sponsor income, binary matching income, sponsor matching income, cash rewards, car fund and award rewards — from ₹3,000 up to ₹25 crore.';
@@ -34,12 +33,12 @@ require __DIR__ . '/includes/site_header.php';
         </div>
         <div class="income-grid">
             <div class="income-card"><div class="i-ico">🛍️</div><h3>01 · Retail Income</h3><p>Buy at the special distributor price (DP) and sell at MRP — keep <b>30% to 45%</b> retail margin on every product.</p></div>
-            <div class="income-card"><div class="i-ico">🤝</div><h3>02 · Direct Sponsor Income</h3><p>Earn <b><?= e(rtrim(rtrim((string)(float)$plan['sponsor_percent'], '0'), '.')) ?>% of BV</b> on every purchase by members you directly sponsored. No level limit.</p></div>
-            <div class="income-card"><div class="i-ico">⚖️</div><h3>03 · Direct Sponsor Matching Income</h3><p>When your direct members earn binary matching income, you receive <b><?= e(rtrim(rtrim((string)(float)$plan['sponsor_matching_percent'], '0'), '.')) ?>%</b> of it — unlimited depth.</p></div>
-            <div class="income-card"><div class="i-ico">🔁</div><h3>04 · Binary Matching Bonus</h3><p>Every <b><?= e(bv($plan['pair_unit_bv'])) ?> : <?= e(bv($plan['pair_unit_bv'])) ?> BV</b> pair (left : right) pays <b><?= money($plan['binary_value']) ?></b> with carry forward.</p></div>
-            <div class="income-card"><div class="i-ico">🏅</div><h3>05 · Cash Rewards</h3><p>Achieve rank points (1 point = <?= e(bv($pointBv)) ?>) and win cash rewards from ₹3,000 up to ₹25 crore.</p></div>
-            <div class="income-card"><div class="i-ico">🏆</div><h3>06 · Award &amp; Rewards</h3><p>Next-to-next matching rewards — dinner set, mixer grinder, cash funds and more as your team grows.</p></div>
-            <div class="income-card"><div class="i-ico">🚗</div><h3>07 · Car Fund</h3><p>Reach <b><?= (int)$plan['car_fund_points'] ?> points</b> and receive a <b><?= money($plan['car_fund_amount']) ?></b> car fund — paid directly at the showroom within 60 days.</p></div>
+            <div class="income-card"><div class="i-ico">🤝</div><h3>02 · Direct Sponsor Income</h3><p>Every directly sponsored member — left or right — who completes <b>3,000 BV joining</b> pays you <b>₹300, one time per direct</b>.</p></div>
+            <div class="income-card"><div class="i-ico">⚖️</div><h3>03 · 50% Direct Sponsor Bonus</h3><p>When your direct member completes their first matching pair, you receive <b>₹225 (50%)</b> — once per direct, left or right leg.</p></div>
+            <div class="income-card"><div class="i-ico">🔁</div><h3>04 · Binary Matching Bonus</h3><p><b>3,000 BV left + 3,000 BV right</b> = 1 pair → <b><?= money($plan['binary_value']) ?></b> for your <b>first matching pair</b>. Every further pair adds points.</p></div>
+            <div class="income-card"><div class="i-ico">⭐</div><h3>05 · Points</h3><p><b>1 point = 3,000 BV left + 3,000 BV right</b>. Points collect from every matched pair — the more your team grows, the more points you earn.</p></div>
+            <div class="income-card"><div class="i-ico">🏅</div><h3>06 · Rank Cash Rewards</h3><p>Rank points from 20 P (Silver Star ₹3,000) up to 30,00,000 P (Chairman ₹25 crore) — automatic cash rewards.</p></div>
+            <div class="income-card"><div class="i-ico">🏆</div><h3>07 · Award &amp; Rewards</h3><p>Lifetime points milestones — dinner set, mixer grinder, mobile, laptop, scooter, cash funds, car funds, house fund, plot fund and bungalow fund.</p></div>
             <div class="income-card"><div class="i-ico">👑</div><h3>08 · Royalty Income</h3><p>Top leaders share in the company's growth through the royalty pool.</p></div>
             <div class="income-card"><div class="i-ico">🏠</div><h3>09 · House Fund</h3><p>Consistent achievers become eligible for the house fund support program.</p></div>
             <div class="income-card"><div class="i-ico">✈️</div><h3>10 · Tour &amp; Vacation</h3><p>Qualify for domestic and international company tours with your family.</p></div>
@@ -90,20 +89,20 @@ require __DIR__ . '/includes/site_header.php';
         <div class="sec-head">
             <span class="sec-kicker">Cash Reward Plan</span>
             <h2>Recognising Your Performance, Rewarding Your Success</h2>
-            <p>1 Point (P) = <?= e(bv($pointBv)) ?> of team business BV. Rewards are awarded within 15 days of achieving.</p>
+            <p>1 Point (P) = 3,000 BV on the left + 3,000 BV on the right. Rewards are awarded within 15 days of achieving.</p>
         </div>
         <div class="table-wrap plan-table-wrap">
             <table class="plan-rank-table">
                 <thead>
-                    <tr><th>#</th><th>Rank</th><th>Points</th><th>Team Business</th><th>Cash Reward</th></tr>
+                    <tr><th>#</th><th>Rank</th><th>Points Required</th><th>Matched Business (L + R)</th><th>Cash Reward</th></tr>
                 </thead>
                 <tbody>
                     <?php $i = 1; foreach ($ranks as $r): ?>
                     <tr>
                         <td><?= $i++ ?></td>
                         <td><b>🏅 <?= e($r['name']) ?></b></td>
-                        <td><?= number_format((float)$r['min_team_bv'] / $pointBv) ?> P</td>
-                        <td><?= e(bv($r['min_team_bv'])) ?></td>
+                        <td><?= number_format((int)$r['min_points']) ?> P</td>
+                        <td><?= e(bv((float)$r['min_points'] * 6000)) ?></td>
                         <td class="gold"><b><?= money($r['reward_amount']) ?></b></td>
                     </tr>
                     <?php endforeach; ?>
@@ -135,21 +134,6 @@ require __DIR__ . '/includes/site_header.php';
     </div>
 </section>
 <?php endif; ?>
-
-<!-- car fund -->
-<section class="section">
-    <div class="container">
-        <div class="car-fund-band">
-            <div class="car-emoji">🚗</div>
-            <div>
-                <span class="sec-kicker">Car Fund</span>
-                <h2><?= money($plan['car_fund_amount']) ?> Car Fund at <?= (int)$plan['car_fund_points'] ?> Points</h2>
-                <p>The car fund amount is given <b>directly at the car showroom</b> within 60 days of achieving.
-                   Points keep adding to the cash bonus. No monthly product purchase condition.</p>
-            </div>
-        </div>
-    </div>
-</section>
 
 <!-- steps CTA -->
 <section class="section section-soft">

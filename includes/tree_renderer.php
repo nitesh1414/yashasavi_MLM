@@ -33,7 +33,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
     $actBv = (float)get_plan()['activation_bv'];
     if ($actBv <= 0) { $actBv = 3000.0; }
     $rows = q_all("SELECT id, username, full_name, leg, placement_id, left_bv, right_bv,
-                   is_active, status, rank_id, self_bv, created_at, sponsor_id, path, depth
+                   is_active, status, rank_id, self_bv, reward_points, created_at, sponsor_id, path, depth
                    FROM users WHERE path LIKE ? AND id != ?
                    ORDER BY depth, id LIMIT " . ($cap + 1),
                    [$rootUser['path'] . '%', (int)$rootUser['id']]);
@@ -144,6 +144,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             . '<dt>Right BV</dt><dd>' . e(number_format((float)$user['right_bv'], 0)) . '</dd>'
             . '<dt>Self BV</dt><dd>' . e(number_format((float)$user['self_bv'], 0)) . ' / ' . e(number_format($actBv, 0)) . '</dd>'
             . '<dt>Joining BV</dt><dd>' . $bvTxt . '</dd>'
+            . '<dt>Points</dt><dd><b>' . number_format((int)$user['reward_points']) . '</b></dd>'
             . '<dt>Rank</dt><dd>' . e($rank) . '</dd>'
             . '</dl>'
             . '<div class="t-tip-actions">'

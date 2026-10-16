@@ -59,6 +59,7 @@ return [
     right_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
     self_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
     matched_pairs INT UNSIGNED NOT NULL DEFAULT 0,
+    reward_points INT UNSIGNED NOT NULL DEFAULT 0,
     rank_id INT UNSIGNED NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 0,
     activated_at DATETIME NULL,
@@ -297,6 +298,7 @@ return [
     matching_requires_active TINYINT(1) NOT NULL DEFAULT 1,
     level_requires_active TINYINT(1) NOT NULL DEFAULT 1,
     sponsor_matching_percent DECIMAL(6,2) NOT NULL DEFAULT 0,
+    points_per_unit INT UNSIGNED NOT NULL DEFAULT 1,
     point_bv DECIMAL(10,2) NOT NULL DEFAULT 400,
     car_fund_points INT UNSIGNED NOT NULL DEFAULT 500,
     car_fund_amount DECIMAL(12,2) NOT NULL DEFAULT 150000,
@@ -318,6 +320,32 @@ return [
     created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
+"CREATE TABLE IF NOT EXISTS bv_logs (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    order_id INT UNSIGNED NULL,
+    kind ENUM('self','left','right') NOT NULL,
+    bv DECIMAL(12,2) NOT NULL DEFAULT 0,
+    balance_after DECIMAL(14,2) NOT NULL DEFAULT 0,
+    note VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_bl_user (user_id),
+    INDEX idx_bl_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS points_logs (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    order_id INT UNSIGNED NULL,
+    points INT NOT NULL DEFAULT 0,
+    total_points INT NOT NULL DEFAULT 0,
+    left_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    right_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    INDEX idx_pl_user (user_id),
+    INDEX idx_pl_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
 "CREATE TABLE IF NOT EXISTS plan_levels (
     level_no TINYINT UNSIGNED NOT NULL PRIMARY KEY,
     percent DECIMAL(6,2) NOT NULL DEFAULT 0
@@ -326,6 +354,7 @@ return [
 "CREATE TABLE IF NOT EXISTS ranks (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(80) NOT NULL,
+    min_points INT UNSIGNED NOT NULL DEFAULT 0,
     min_team_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
     min_directs TINYINT UNSIGNED NOT NULL DEFAULT 0,
     reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0,

@@ -94,6 +94,9 @@ function ug_column_fixes()
         ['users',         'left_bv',                "`left_bv` DECIMAL(12,2) NOT NULL DEFAULT 0"],
         ['users',         'right_bv',               "`right_bv` DECIMAL(12,2) NOT NULL DEFAULT 0"],
         ['users',         'matched_pairs',          "`matched_pairs` INT UNSIGNED NOT NULL DEFAULT 0"],
+        ['users',         'reward_points',          "`reward_points` INT UNSIGNED NOT NULL DEFAULT 0"],
+        ['ranks',         'min_points',             "`min_points` INT UNSIGNED NOT NULL DEFAULT 0"],
+        ['plan_settings', 'points_per_unit',        "`points_per_unit` INT UNSIGNED NOT NULL DEFAULT 1"],
         ['users',         'rank_id',                "`rank_id` INT UNSIGNED NULL"],
         ['users',         'wallet_balance',         "`wallet_balance` DECIMAL(12,2) NOT NULL DEFAULT 0"],
         ['products',      'mrp',                    "`mrp` DECIMAL(10,2) NOT NULL DEFAULT 0"],
@@ -268,35 +271,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->exec("INSERT IGNORE INTO plan_levels (level_no, percent) VALUES ($ln, 0)");
         }
 
-        /* 5 — ranks (insert missing, sync official thresholds by name) */
+        /* 5 — ranks (insert missing, sync official POINTS thresholds by name) */
         $rankInserts = 0; $rankUpdates = 0;
         foreach ($D['ranks'] as $r) {
             $ex = q_row("SELECT * FROM ranks WHERE name = ?", [$r[0]]);
             if (!$ex) {
-                q("INSERT INTO ranks (name, min_team_bv, min_directs, reward_amount, badge, sort_order)
-                   VALUES (?, ?, ?, ?, ?, ?)",
-                  [$r[0], $r[1] * 400, $r[2], $r[3], strtolower(str_replace(' ', '-', $r[0])), $r[4]]);
+                q("INSERT INTO ranks (name, min_points, reward_amount, badge, sort_order)
+                   VALUES (?, ?, ?, ?, ?)",
+                  [$r[0], $r[1], $r[2], strtolower(str_replace(' ', '-', $r[0])), $r[3]]);
                 $rankInserts++;
-            } elseif ((float)$ex['min_team_bv'] !== (float)($r[1] * 400) || (float)$ex['reward_amount'] !== (float)$r[3]) {
-                q("UPDATE ranks SET min_team_bv = ?, min_directs = ?, reward_amount = ?, badge = ?, sort_order = ? WHERE id = ?",
-                  [$r[1] * 400, $r[2], $r[3], strtolower(str_replace(' ', '-', $r[0])), $r[4], $ex['id']]);
+            } elseif ((int)$ex['min_points'] !== (int)$r[1] || (float)$ex['reward_amount'] !== (float)$r[2]) {
+                q("UPDATE ranks SET min_points = ?, reward_amount = ?, badge = ?, sort_order = ? WHERE id = ?",
+                  [$r[1], $r[2], strtolower(str_replace(' ', '-', $r[0])), $r[3], $ex['id']]);
                 $rankUpdates++;
             }
         }
-        $log[] = "Ranks: $rankInserts added, $rankUpdates synced to the official plan (1P = 400 BV).";
+        $log[] = "Ranks: $rankInserts added, $rankUpdates synced to the official plan (1 point = 3,000 BV left + 3,000 BV right).";
 
-        /* 6 — award rewards (insert by title if missing) */
-        $awardInserts = 0;
+        /* 6 — award rewards: replace the old 3-row seed with the official
+         *     12 lifetime-points milestones from the MLM points PDF */
+        $awardInserts = 0; $awardUpdates = 0;
+        /* drop rows that still carry the OLD seed values (safe: identified
+         * by exact old title+points), so the new milestone list applies */
+        q("DELETE FROM award_rewards WHERE reward_title IN ('Cash Fund ₹1,00,000') AND points = 800");
         $s = 1;
         foreach ($D['awards'] as $a) {
-            if (!(int)q_val("SELECT COUNT(*) FROM award_rewards WHERE reward_title = ?", [$a[1]])) {
+            $ex = q_row("SELECT * FROM award_rewards WHERE reward_title = ?", [$a[1]]);
+            if (!$ex) {
                 q("INSERT INTO award_rewards (points, reward_title, reward_type, amount, description, status, sort_order, created_at)
                    VALUES (?, ?, ?, ?, ?, 'active', ?, NOW())", [$a[0], $a[1], $a[2], $a[3], $a[4], $s]);
                 $awardInserts++;
+            } elseif ((int)$ex['points'] !== (int)$a[0] || (float)$ex['amount'] !== (float)$a[3]) {
+                q("UPDATE award_rewards SET points = ?, reward_type = ?, amount = ?, description = ?, sort_order = ? WHERE id = ?",
+                  [$a[0], $a[2], $a[3], $a[4], $s, $ex['id']]);
+                $awardUpdates++;
             }
             $s++;
         }
-        $log[] = $awardInserts ? "Award rewards: $awardInserts added (Dinner Set, Mixer Grinder, cash fund…)." : 'Award rewards already present.';
+        $log[] = $awardInserts || $awardUpdates
+            ? "Award rewards: $awardInserts added, $awardUpdates synced to the official lifetime-points milestones."
+            : 'Award rewards already present.';
 
         /* 7 — site settings */
         $setInserts = 0; $setUpdates = 0;

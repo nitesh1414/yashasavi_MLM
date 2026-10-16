@@ -20,37 +20,48 @@ function seed_data()
         'binary_type' => 'fixed', 'binary_value' => 450, 'level_depth' => 0,
         'daily_cap' => 320000, 'monthly_cap' => 800000, 'carry_forward' => 1,
         'matching_requires_active' => 1, 'level_requires_active' => 1,
-        'sponsor_matching_percent' => 50, 'point_bv' => 400,
+        'sponsor_matching_percent' => 50, 'points_per_unit' => 1, 'point_bv' => 400,
         'car_fund_points' => 500, 'car_fund_amount' => 150000,
         'tds_percent' => 5, 'admin_charge_percent' => 5, 'payout_min' => 500,
     ],
 
-    /* Cash reward ranks — 1 Point = 400 BV team business (min_team_bv = points x 400) */
+    /* Cash reward ranks — 1 Point = 3,000 BV left + 3,000 BV right matched
+     * (see MLM points PDF: rank points are matched-pair points) */
     'ranks' => [
-        // name, points, directs, cash reward, sort
-        ['Silver Star',          20, 0,       3000.00,  1],
-        ['Gold',                 50, 0,       9000.00,  2],
-        ['Director',            250, 0,      20000.00,  3],
-        ['Platinum',            900, 0,      60000.00,  4],
-        ['Emerald',            2100, 0,     140000.00,  5],
-        ['Ruby',               3600, 0,     220000.00,  6],
-        ['Sapphire',           6000, 0,     400000.00,  7],
-        ['Diamond',           13000, 0,    1000000.00,  8],
-        ['Crown Diamond',     25000, 0,    2000000.00,  9],
-        ['Black Diamond',     60000, 0,    7500000.00, 10],
-        ['Ambassador',       150000, 0,   15000000.00, 11],
-        ['Brand Ambassador', 300000, 0,   30000000.00, 12],
-        ['President',       1000000, 0,  120000000.00, 13],
-        ['President Director', 1500000, 0, 150000000.00, 14],
-        ['Chairman',        3000000, 0,  250000000.00, 15],
+        // name, points, cash reward, sort
+        ['Silver Star',          20,       3000.00,  1],
+        ['Gold',                 50,       9000.00,  2],
+        ['Director',            250,      20000.00,  3],
+        ['Platinum',            900,      60000.00,  4],
+        ['Emerald',            2100,     140000.00,  5],
+        ['Ruby',               3600,     220000.00,  6],
+        ['Sapphire',           6000,     400000.00,  7],
+        ['Diamond',           13000,    1000000.00,  8],
+        ['Crown Diamond',     25000,    2000000.00,  9],
+        ['Black Diamond',     60000,    7500000.00, 10],
+        ['Ambassador',       150000,   15000000.00, 11],
+        ['Brand Ambassador', 300000,   30000000.00, 12],
+        ['President',       1000000,  120000000.00, 13],
+        ['President Director', 1500000, 150000000.00, 14],
+        ['Chairman',        3000000,  250000000.00, 15],
     ],
 
-    /* Next-to-next matching award rewards (points based) */
+    /* Award & rewards — lifetime POINTS milestones (MLM points PDF:
+     * each reward unlocks at the CUMULATIVE points total shown below) */
     'awards' => [
-        // points, title, type, amount, description
-        [20,   'Dinner Set',   'item', 0,        'Achieve 20 points to win a premium dinner set.'],
-        [40,   'Mixer Grinder', 'item', 0,       'Achieve 40 points to win a mixer grinder.'],
-        [800,  'Cash Fund ₹1,00,000', 'cash', 100000.00, 'Achieve 800 points to win a ₹1,00,000 cash fund.'],
+        // lifetime points, title, type, amount, description
+        [20,     'Dinner Set',                 'item', 0,          'Achieve 20 lifetime points to win a premium dinner set.'],
+        [60,     'Mixer Grinder',              'item', 0,          'Achieve 60 lifetime points to win a mixer grinder.'],
+        [160,    'Mobile',                     'item', 0,          'Achieve 160 lifetime points to win a mobile phone.'],
+        [360,    'Laptop',                     'item', 0,          'Achieve 360 lifetime points to win a laptop.'],
+        [760,    'Scooter (Activa / EV)',      'item', 0,          'Achieve 760 lifetime points to win a scooter.'],
+        [1560,   '₹1 Lakh Cash Fund',          'cash', 100000.00,  'Achieve 1,560 lifetime points to win a ₹1 lakh cash fund.'],
+        [3160,   '₹2 Lakh Car Down Payment',   'cash', 200000.00,  'Achieve 3,160 lifetime points to win a ₹2 lakh car down payment.'],
+        [6360,   '₹5 Lakh Car Fund',           'cash', 500000.00,  'Achieve 6,360 lifetime points to win a ₹5 lakh car fund.'],
+        [12860,  '₹8 Lakh Car Fund',           'cash', 800000.00,  'Achieve 12,860 lifetime points to win a ₹8 lakh car fund.'],
+        [27860,  'House Fund ₹20 Lakh',        'cash', 2000000.00, 'Achieve 27,860 lifetime points to win a ₹20 lakh house fund.'],
+        [57860,  'Luxury Plot Fund ₹60 Lakh',  'cash', 6000000.00, 'Achieve 57,860 lifetime points to win a ₹60 lakh luxury plot fund.'],
+        [107860, 'Bungalow ₹1 Cr+ Fund',       'cash', 10000000.00, 'Achieve 1,07,860 lifetime points to win a ₹1 crore+ bungalow fund.'],
     ],
 
     /* Site settings (key => value) */

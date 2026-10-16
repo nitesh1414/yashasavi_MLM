@@ -60,7 +60,7 @@ if (is_post()) {
 $rewards = q_all("SELECT r.*,
                   (SELECT COUNT(*) FROM commissions c WHERE c.type='award' AND c.level = r.id AND c.status='credited') AS awarded
                   FROM award_rewards r ORDER BY r.points ASC");
-$pointBv = (float)get_plan()['point_bv'];
+/* points are matched-pair points: 1 P = 3,000 BV left + 3,000 BV right */
 
 $activeKey = 'rewards';
 $pageTitle = 'Award & Rewards';
@@ -73,7 +73,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="card-title">🏆 <?= $editing ? 'Edit Award Reward' : 'Add Award Reward' ?>
         <span class="right"><a class="btn btn-light btn-sm" href="rewards.php">← Back to list</a></span>
     </div>
-    <p class="form-hint">Awards are granted automatically when a member's team business reaches the required points (1 point = <?= e(bv($pointBv)) ?> of team BV). Each reward is given once per member.</p>
+    <p class="form-hint">Awards are granted automatically when a member's LIFETIME points reach the milestone (1 point = 3,000 BV left + 3,000 BV right). Each reward is given once per member.</p>
     <form method="post">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="save">
@@ -127,14 +127,14 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="table-wrap">
         <table class="table">
             <thead>
-                <tr><th>#</th><th>Points</th><th>Team BV needed</th><th>Reward</th><th>Type</th><th>Cash</th><th>Awarded to</th><th>Status</th><th></th></tr>
+                <tr><th>#</th><th>Lifetime Points</th><th>Matched Business</th><th>Reward</th><th>Type</th><th>Cash</th><th>Awarded to</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
                 <?php foreach ($rewards as $r): ?>
                     <tr>
                         <td><?= (int)$r['id'] ?></td>
                         <td><b><?= (int)$r['points'] ?> P</b></td>
-                        <td><?= e(bv((int)$r['points'] * $pointBv)) ?></td>
+                        <td><?= e(bv((int)$r['points'] * 6000)) ?> matched L+R</td>
                         <td><?= e($r['reward_title']) ?></td>
                         <td><?= $r['reward_type'] === 'cash' ? '💰 Cash' : '🎁 Item' ?></td>
                         <td><?= $r['reward_type'] === 'cash' ? '₹' . number_format((float)$r['amount'], 0) : '—' ?></td>

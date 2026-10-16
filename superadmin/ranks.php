@@ -10,25 +10,24 @@ if (is_post()) {
     $action = post_str('action');
     if ($action === 'save') {
         $name = post_str('name');
-        $minTeamBv = (float)post_str('min_team_bv');
-        $minDirects = (int)post_str('min_directs');
+        $minPoints = (int)post_str('min_points');
         $reward = (float)post_str('reward_amount');
         $sort = (int)post_str('sort_order');
         $errors = [];
         if (strlen($name) < 2) { $errors[] = 'Rank name required.'; }
-        if ($minTeamBv < 0 || $minDirects < 0) { $errors[] = 'Requirements cannot be negative.'; }
+        if ($minPoints < 0) { $errors[] = 'Points cannot be negative.'; }
         if (q_val("SELECT COUNT(*) FROM ranks WHERE name = ? AND id != ?", [$name, $editId])) { $errors[] = 'Rank name already exists.'; }
         if ($errors) {
             foreach ($errors as $er) { flash('error', $er); }
         } else {
             $badgeSlug = strtolower(str_replace(' ', '-', $name));
             if ($editId) {
-                q("UPDATE ranks SET name=?, min_team_bv=?, min_directs=?, reward_amount=?, badge=?, sort_order=? WHERE id=?",
-                  [$name, $minTeamBv, $minDirects, $reward, $badgeSlug, $sort, $editId]);
+                q("UPDATE ranks SET name=?, min_points=?, reward_amount=?, badge=?, sort_order=? WHERE id=?",
+                  [$name, $minPoints, $reward, $badgeSlug, $sort, $editId]);
                 flash('success', 'Rank updated.');
             } else {
-                q("INSERT INTO ranks (name, min_team_bv, min_directs, reward_amount, badge, sort_order)
-                   VALUES (?, ?, ?, ?, ?, ?)", [$name, $minTeamBv, $minDirects, $reward, $badgeSlug, $sort]);
+                q("INSERT INTO ranks (name, min_points, reward_amount, badge, sort_order)
+                   VALUES (?, ?, ?, ?, ?)", [$name, $minPoints, $reward, $badgeSlug, $sort]);
                 flash('success', 'Rank created.');
             }
             redirect('ranks.php');
@@ -61,12 +60,11 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="card-title">🏅 Rank Ladder</div>
         <div class="table-wrap" style="box-shadow:none">
             <table class="table">
-                <tr><th>Rank</th><th>Min Team BV</th><th>Min Active Directs</th><th>Reward</th><th>Holders</th><th>Actions</th></tr>
+                <tr><th>Rank</th><th>Points Required</th><th>Cash Reward</th><th>Holders</th><th>Actions</th></tr>
                 <?php foreach ($ranks as $r): ?>
                 <tr>
                     <td><b><?= e($r['name']) ?></b></td>
-                    <td><b><?= bv($r['min_team_bv']) ?></b></td>
-                    <td><?= (int)$r['min_directs'] ?></td>
+                    <td><b><?= number_format((int)$r['min_points']) ?> pts</b></td>
                     <td><?= money($r['reward_amount']) ?></td>
                     <td><?= (int)$r['holders'] ?></td>
                     <td>
@@ -84,7 +82,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <?php endforeach; ?>
             </table>
         </div>
-        <p class="form-hint">Team BV = left leg BV + right leg BV. Ranks are re-checked automatically whenever an order is approved; the one-time reward is paid as a rank commission on promotion.</p>
+        <p class="form-hint">1 point = 3,000 BV left + 3,000 BV right (matched pair). Ranks are re-checked automatically whenever points grow; the one-time cash reward is paid as wallet income on promotion (never part of the payout commission).</p>
     </div>
 
     <div class="card">
@@ -98,21 +96,17 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
             <div class="form-grid3">
                 <div class="form-group">
-                    <label>Min Team BV</label>
-                    <input class="form-control" type="number" step="0.01" min="0" name="min_team_bv" value="<?= e($editRank['min_team_bv'] ?? 0) ?>">
+                    <label>Points Required (1 point = 3,000 BV left + 3,000 BV right)</label>
+                    <input class="form-control" type="number" min="0" name="min_points" value="<?= (int)($editRank['min_points'] ?? 0) ?>">
                 </div>
                 <div class="form-group">
-                    <label>Min Active Directs</label>
-                    <input class="form-control" type="number" min="0" name="min_directs" value="<?= (int)($editRank['min_directs'] ?? 0) ?>">
+                    <label>Cash Reward (₹, one time)</label>
+                    <input class="form-control" type="number" step="0.01" min="0" name="reward_amount" value="<?= e($editRank['reward_amount'] ?? 0) ?>">
                 </div>
                 <div class="form-group">
                     <label>Sort Order</label>
                     <input class="form-control" type="number" name="sort_order" value="<?= (int)($editRank['sort_order'] ?? 10) ?>">
                 </div>
-            </div>
-            <div class="form-group">
-                <label>One-time Achievement Reward (₹)</label>
-                <input class="form-control" type="number" step="0.01" min="0" name="reward_amount" value="<?= e($editRank['reward_amount'] ?? 0) ?>">
             </div>
             <button class="btn btn-primary" type="submit"><?= $editRank ? 'Update Rank' : 'Add Rank' ?></button>
             <?php if ($editRank): ?><a class="btn btn-light" href="ranks.php">Cancel</a><?php endif; ?>
