@@ -21,8 +21,8 @@ require __DIR__ . '/../includes/dash_header.php';
 ?>
 
 <div class="stat-grid">
-    <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Current Balance (after TDS + Admin)</span></div></div>
-    <div class="stat-card gold"><div class="st-ico">💰</div><div><b><?= money($u['total_earned']) ?></b><span>Total Earned — gross (all time)</span></div></div>
+    <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Current Balance<br>(before deduction)</span></div></div>
+    <div class="stat-card gold"><div class="st-ico">💰</div><div><b><?= money($u['total_earned']) ?></b><span>Total Earned (all time)</span></div></div>
     <div class="stat-card red"><div class="st-ico">🏦</div><div><b><?= money($u['total_withdrawn']) ?></b><span>Total Withdrawn</span></div></div>
 </div>
 

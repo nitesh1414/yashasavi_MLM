@@ -249,8 +249,8 @@ $pairPay = $plan['binary_type'] === 'percent'
                 <tr><td>Points per matched pair</td><td><?= (int)$plan['points_per_unit'] ?> P</td></tr>
                 <tr><td>Payout commission</td><td>₹300 per completed leg (L+R) + ₹450 first pair + ₹225 bonus only</td></tr>
                 <tr><td>Payout minimum</td><td><?= money($plan['payout_min']) ?></td></tr>
-                <tr><td>TDS (deducted at income credit)</td><td><?= e($plan['tds_percent']) ?>%</td></tr>
-                <tr><td>Admin charge (deducted at income credit)</td><td><?= e($plan['admin_charge_percent']) ?>%</td></tr>
+                <tr><td>TDS on payout</td><td><?= e($plan['tds_percent']) ?>%</td></tr>
+                <tr><td>Admin charge on payout</td><td><?= e($plan['admin_charge_percent']) ?>%</td></tr>
                 <tr><td>Matching requires joining completed</td><td><?= (int)$plan['matching_requires_active'] ? 'Yes' : 'No' ?></td></tr>
             </table>
         </div>

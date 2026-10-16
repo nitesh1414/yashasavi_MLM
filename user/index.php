@@ -32,7 +32,7 @@ require __DIR__ . '/../includes/dash_header.php';
 <div class="stat-grid">
     <div class="stat-card">
         <div class="st-ico">👛</div>
-        <div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance (after TDS + Admin)</span></div>
+        <div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(before deduction)</span></div>
     </div>
     <div class="stat-card gold">
         <div class="st-ico">💰</div>
@@ -110,22 +110,16 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Rank Cash Rewards (not in payout)</td><td><b><?= money($earn['rank']) ?></b></td></tr>
                 <tr><td>Award Rewards (not in payout)</td><td><b><?= money($earn['award']) ?></b></td></tr>
                 <?php
-                $ded = q_row(
-                    "SELECT COALESCE(SUM(amount), 0) g,
-                            COALESCE(SUM(ROUND(amount * " . (float)$plan['tds_percent'] . " / 100, 2)), 0) t,
-                            COALESCE(SUM(ROUND(amount * " . (float)$plan['admin_charge_percent'] . " / 100, 2)), 0) a
-                     FROM commissions
-                     WHERE user_id = ? AND status = 'credited'
-                       AND type IN ('sponsor','binary','sponsor_matching','rank','award')",
-                    [$u['id']]
-                );
+                $bal = (float)$u['wallet_balance'];
+                $tdsAmt = round($bal * (float)$plan['tds_percent'] / 100, 2);
+                $admAmt = round($bal * (float)$plan['admin_charge_percent'] / 100, 2);
                 ?>
-                <tr><td><b>Gross Income (above incomes)</b></td><td><b><?= money($ded['g']) ?></b></td></tr>
-                <tr><td>TDS Deducted (<?= e($plan['tds_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($ded['t']) ?></b></td></tr>
-                <tr><td>Admin Charges Deducted (<?= e($plan['admin_charge_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($ded['a']) ?></b></td></tr>
-                <tr><td><b>Net Credited to Wallet</b></td><td><b><?= money((float)$ded['g'] - (float)$ded['t'] - (float)$ded['a']) ?></b></td></tr>
+                <tr><td><b>Wallet Balance (before deduction)</b></td><td><b><?= money($bal) ?></b></td></tr>
+                <tr><td>TDS (<?= e($plan['tds_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($tdsAmt) ?></b></td></tr>
+                <tr><td>Admin Charges (<?= e($plan['admin_charge_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($admAmt) ?></b></td></tr>
+                <tr><td><b>Net Payable After Deduction</b></td><td><b><?= money($bal - $tdsAmt - $admAmt) ?></b></td></tr>
             </table>
-            <p class="form-hint" style="margin-top:8px">TDS <?= e($plan['tds_percent']) ?>% + Admin <?= e($plan['admin_charge_percent']) ?>% are deducted every time income is credited to your wallet — the wallet balance always shows the net amount. Payouts are paid from this net balance with <b>no further deduction</b>.</p>
+            <p class="form-hint" style="margin-top:8px">Your wallet balance is shown <b>before deduction</b>. TDS <?= e($plan['tds_percent']) ?>% + Admin <?= e($plan['admin_charge_percent']) ?>% are deducted from the payout amount when the payout is generated.</p>
             <a class="btn btn-outline btn-sm mt-2" href="earnings.php">Full Statement →</a>
         </div>
 

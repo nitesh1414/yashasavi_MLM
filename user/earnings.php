@@ -42,7 +42,7 @@ require __DIR__ . '/../includes/dash_header.php';
         </span>
     </div>
 
-    <p class="form-hint" style="margin:6px 0 10px">Amounts below are <b>gross</b> plan income. TDS <?= e(get_plan()['tds_percent']) ?>% + Admin <?= e(get_plan()['admin_charge_percent']) ?>% are deducted when each income is credited to your wallet — the <a href="wallet.php">Wallet page</a> shows the net credits.</p>
+    <p class="form-hint" style="margin:6px 0 10px">TDS <?= e(get_plan()['tds_percent']) ?>% + Admin <?= e(get_plan()['admin_charge_percent']) ?>% are deducted from the payout amount when a payout is generated — your <a href="wallet.php">wallet balance</a> is before deduction.</p>
     <?php if (!$rows): ?>
         <div class="empty-state"><span class="es-ico">💰</span>No commissions yet. Commissions appear here when orders in your team are approved.</div>
     <?php else: ?>

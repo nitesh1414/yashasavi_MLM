@@ -35,9 +35,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
         <div class="card-title">🏦 Request a Payout</div>
         <p style="font-size:12.5px;color:var(--ink-soft)">
             Payable income = <b>Leg Completion + Matching Bonus + 50% Direct Sponsor Bonus</b> only;
-            other amounts are not added to payouts. TDS <?= e($tds) ?>% + Admin <?= e($adminFee) ?>% are
-            <b>already deducted</b> when income is credited to your wallet — payouts are paid from the
-            net balance with no further deduction.
+            other amounts are not added to payouts.
         </p>
         <?php if ($eligible < (float)$plan['payout_min']): ?>
             <div class="alert alert-warning">
@@ -55,9 +53,9 @@ $adminFee = (float)$plan['admin_charge_percent'];
                        placeholder="Min <?= e($plan['payout_min']) ?>">
             </div>
             <table class="kv-table" style="width:100%;margin:12px 0">
-                <tr><td>TDS (<?= e($tds) ?>%)</td><td>already deducted at income credit</td></tr>
-                <tr><td>Admin charge (<?= e($adminFee) ?>%)</td><td>already deducted at income credit</td></tr>
-                <tr><td><b>Amount payable to bank</b></td><td id="net-row"><b>—</b></td></tr>
+                <tr><td>TDS (<?= e($tds) ?>%)</td><td id="tds-row">—</td></tr>
+                <tr><td>Admin charge (<?= e($adminFee) ?>%)</td><td id="admin-row">—</td></tr>
+                <tr><td><b>Net payable to bank</b></td><td id="net-row"><b>—</b></td></tr>
             </table>
             <p class="form-hint" style="margin-bottom:12px">
                 Payout will be transferred to your registered bank account:
@@ -74,8 +72,8 @@ $adminFee = (float)$plan['admin_charge_percent'];
         <div class="card-title">ℹ️ Payout Rules</div>
         <table class="kv-table" style="width:100%">
             <tr><td>Minimum request</td><td><?= money($plan['payout_min']) ?></td></tr>
-            <tr><td>TDS (<?= e($tds) ?>%)</td><td>deducted when income is credited to your wallet</td></tr>
-            <tr><td>Admin charge (<?= e($adminFee) ?>%)</td><td>deducted when income is credited to your wallet</td></tr>
+            <tr><td>TDS deduction</td><td><?= e($tds) ?>%</td></tr>
+            <tr><td>Admin / processing charge</td><td><?= e($adminFee) ?>%</td></tr>
             <tr><td>Processing time</td><td>Within 3–5 working days</td></tr>
         </table>
         <p class="form-hint" style="margin-top:10px">
@@ -125,7 +123,11 @@ var amt = document.querySelector('input[name=amount]');
 if (amt) {
     amt.addEventListener('input', function () {
         var v = parseFloat(this.value) || 0;
-        document.getElementById('net-row').innerHTML = '<b>₹' + v.toFixed(2) + '</b>';
+        var tds = Math.round(v * $tds / 100 * 100) / 100;
+        var adm = Math.round(v * $adminFee / 100 * 100) / 100;
+        document.getElementById('tds-row').textContent = '- ₹' + tds.toFixed(2);
+        document.getElementById('admin-row').textContent = '- ₹' + adm.toFixed(2);
+        document.getElementById('net-row').innerHTML = '<b>₹' + (v - tds - adm).toFixed(2) + '</b>';
     });
 }
 JS;
