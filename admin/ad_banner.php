@@ -1,5 +1,5 @@
 <?php
-/** Ad banner popup management — the popup shown when the website is first opened. */
+/** Ad banner popup management — popup on the public website and the member dashboard. */
 require_once __DIR__ . '/../includes/init.php';
 $a = require_admin();
 
@@ -20,8 +20,17 @@ if (is_post()) {
             }
             save_setting('ad_banner_image', $image);
             save_setting('ad_banner_active', '1');
-            flash('success', 'Ad banner saved and set LIVE — it now pops up when the website is first opened.');
+            flash('success', 'Ad banner saved and set LIVE — it now pops up on the website and the member dashboard.');
         }
+        redirect('ad_banner.php');
+    }
+
+    if ($action === 'frequency') {
+        $freq = post_str('frequency') === 'always' ? 'always' : 'first';
+        save_setting('ad_banner_frequency', $freq);
+        flash('success', $freq === 'always'
+            ? 'Popup frequency: EVERY page refresh shows the popup.'
+            : 'Popup frequency: only the FIRST page view of a visit shows the popup.');
         redirect('ad_banner.php');
     }
 
@@ -36,7 +45,7 @@ if (is_post()) {
         delete_upload(setting('ad_banner_image'));
         save_setting('ad_banner_image', '');
         save_setting('ad_banner_active', '0');
-        flash('success', 'Ad banner removed — no popup will be shown.');
+        flash('success', 'Ad banner removed — no popup will be shown anywhere.');
         redirect('ad_banner.php');
     }
 }
@@ -60,8 +69,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <img src="<?= e(upload_url($banner)) ?>" alt="Ad banner preview"
                      style="max-width:100%;max-height:420px;border-radius:12px;border:1px solid var(--line);box-shadow:0 8px 28px rgba(0,0,0,.14)">
             </div>
-            <p class="form-hint" style="margin-top:10px">This image pops up over the website when a visitor opens it for the
-                first time. Clicking the banner (or the ✕) closes the popup and shows the normal website.</p>
+            <p class="form-hint" style="margin-top:10px">This image pops up over the website and over the member
+                dashboard after login. Clicking the banner (or the ✕) closes the popup and shows the normal page.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
                 <form method="post" class="inline-form">
                     <?= csrf_field() ?>
@@ -78,8 +87,32 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
         <?php else: ?>
             <div class="empty-state"><span class="es-ico">📢</span>No ad banner uploaded yet. Upload one below — it will pop
-                up when the website is first opened.</div>
+                up on the website and on the member dashboard after login.</div>
         <?php endif; ?>
+    </div>
+
+    <div class="card">
+        <div class="card-title">🔁 Popup Frequency</div>
+        <?php $freq = setting('ad_banner_frequency') === 'always' ? 'always' : 'first'; ?>
+        <form method="post">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="frequency">
+            <div class="form-group">
+                <label>When should the popup appear?</label>
+                <select class="form-control" name="frequency">
+                    <option value="first" <?= $freq === 'first' ? 'selected' : '' ?>>Only the first page view of a visit (once per visit)</option>
+                    <option value="always" <?= $freq === 'always' ? 'selected' : '' ?>>Every time the page is refreshed (every page load)</option>
+                </select>
+                <div class="form-hint"><b>First page view:</b> the popup shows once when the visitor opens the site / logs in —
+                    not again while they browse. <b>Every refresh:</b> the popup shows again on every page load.</div>
+            </div>
+            <button class="btn btn-primary" type="submit">Save Frequency</button>
+            <?php if ($freq === 'always'): ?>
+                <?= badge('Current: EVERY refresh', 'warning') ?>
+            <?php else: ?>
+                <?= badge('Current: first view only', 'info') ?>
+            <?php endif; ?>
+        </form>
     </div>
 
     <div class="card">

@@ -14,6 +14,9 @@
     </nav>
 <?php endif; ?>
 
+<?php /* Ad banner popup on the member dashboard (never on admin / superadmin panels) */ ?>
+<?php if (current_user()) { include __DIR__ . '/ad_banner_popup.php'; } ?>
+
 <script src="<?= url('assets/js/dash.js') ?>?v=<?= APP_VERSION ?>"></script>
 <script>
 if ('serviceWorker' in navigator) {
