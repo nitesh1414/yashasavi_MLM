@@ -6,6 +6,7 @@ $nav = [
     ['label2' => 'Website Content'],
     ['icon' => '📄', 'label' => 'Pages', 'href' => 'pages.php', 'active' => $activeKey === 'pages'],
     ['icon' => '🖼️', 'label' => 'Home Slider', 'href' => 'sliders.php', 'active' => $activeKey === 'sliders'],
+    ['icon' => '📢', 'label' => 'Ad Banner Popup', 'href' => 'ad_banner.php', 'active' => $activeKey === 'ad_banner'],
     ['icon' => '⭐', 'label' => 'Testimonials', 'href' => 'testimonials.php', 'active' => $activeKey === 'testimonials'],
     ['icon' => '📑', 'label' => 'Legal Docs & Downloads', 'href' => 'documents.php', 'active' => $activeKey === 'documents'],
     ['label2' => 'Catalogue'],
