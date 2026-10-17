@@ -20,16 +20,17 @@ if (is_post()) {
             redirect('payouts.php');
         }
         [$ok, $runTs, $st] = generate_payout_report($date);
-        if (!$ok || !$st['created']) {
-            flash('warning', 'Payout report for ' . dmy($date) . ': no eligible members found (eligible income = Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus, minimum ' . money(get_plan()['payout_min']) . ', bank account required).');
+        if (!$ok || (!$st['created'] && !$st['blocked'] && !$st['skipped'])) {
+            flash('warning', 'Payout report for ' . dmy($date) . ': no eligible members found (eligible income = Leg Completion + Matching Bonus + 50% Direct Sponsor Bonus, minimum ' . money(get_plan()['payout_min']) . ').');
             redirect('payouts.php');
         }
         flash('success',
-            'Payout report for ' . dmy($date) . ' generated: ' . number_format($st['created']) . ' member(s), '
-            . money($st['total']) . ' gross, ' . money($st['net']) . ' net after TDS + admin charge'
-            . ($st['skipped'] ? ' (' . $st['skipped'] . ' skipped — wallet below minimum)' : '')
-            . '. Each member now sees the payout as IN PROCESS in their dashboard.');
-        redirect('payouts.php?run=' . urlencode($runTs));
+            'Weekly payout statement for ' . dmy($date) . ' generated: ' . number_format($st['created']) . ' payout(s) '
+            . money($st['total']) . ' gross → ' . money($st['net']) . ' net'
+            . ($st['blocked'] ? ' · ' . number_format($st['blocked']) . ' member(s) listed as PAYOUT WILL NOT BE DONE (KYC / bank details incomplete)' : '')
+            . ($st['skipped'] ? ' · ' . number_format($st['skipped']) . ' skipped (wallet below minimum)' : '')
+            . '. Members now see the statement in their dashboard.');
+        redirect('payouts.php?statement=' . (int)$st['statement_id']);
     }
     redirect('payouts.php' . (get_str('status') ? '?status=' . urlencode(get_str('status')) : ''));
 }
@@ -40,6 +41,25 @@ $runRows = [];
 if ($runTs !== '') {
     $runRows = payout_report_rows($runTs);
 }
+
+/* payout statement view */
+$statementId = (int)get_str('statement');
+$statement = $statementId ? payout_statement($statementId) : null;
+$statementRows = $statement ? payout_statement_rows($statement['id']) : [];
+if ($statement && get_str('download') !== '') {
+    $out = [];
+    foreach ($statementRows as $r) {
+        $out[] = [$r['username'], $r['full_name'], $r['mobile'],
+                  $r['bank_name'], $r['bank_account_no'], $r['bank_ifsc'],
+                  $r['kyc_status'], $r['bank_ok'] ? 'Completed' : 'Not completed',
+                  $r['gross'], $r['tds'], $r['admin_charge'], $r['net'],
+                  $r['payout_done'] ? 'Payout will be done' : ($r['reason'] ?: 'Payout will not be done')];
+    }
+    output_csv('payout-statement-' . date('Ymd', strtotime($statement['run_ts'])) . '.csv',
+        ['User ID', 'Name', 'Mobile', 'Bank Name', 'Account No', 'IFSC', 'KYC', 'Bank Details',
+         'Gross Amount', 'TDS', 'Admin Charge', 'Net Payable', 'Payout Status'], $out);
+}
+$recentStatements = q_all("SELECT * FROM payout_statements ORDER BY id DESC LIMIT 8");
 if (get_str('download') !== '' && $runTs !== '') {
     $out = [];
     foreach ($runRows as $r) {
@@ -83,26 +103,122 @@ require __DIR__ . '/../includes/dash_header.php';
 </div>
 
 <div class="card" style="border:1.5px dashed var(--accent)">
-    <div class="card-title">📅 Generate Payout Report (date-wise)</div>
+    <div class="card-title">📅 Generate Weekly Payout Report &amp; Statement</div>
     <p style="font-size:13px;color:var(--ink-soft)">
-        Creates a <b>pending payout for every eligible member</b> as of the chosen date and produces a
-        downloadable report with <b>all banking information</b>. Eligible income =
-        <b>Direct Sponsor + Matching Bonus + 50% Direct Sponsor Bonus</b> only (other amounts are never added
-        to a member's payout), minimum <?= money(get_plan()['payout_min']) ?>, bank account required.
-        <?= e(get_plan()['tds_percent']) ?>% TDS and <?= e(get_plan()['admin_charge_percent']) ?>% admin charge are deducted from the final payout amount. Member wallets hold the balance <b>before deduction</b>.
-        After generation every member sees the payout as <b>in process</b> in their dashboard; after you mark
-        it paid they see <b>Payment is done</b>.
+        Run this <b>every Monday</b>. It creates the <b>weekly payout statement</b> listing every eligible
+        member with amounts, KYC status and bank details. Members with <b>completed KYC + bank details</b>
+        get a pending payout (wallet debited) — <b>payout will be done</b>. Members with incomplete KYC or
+        bank details are listed as <b>payout will not be done</b> and keep their balance for the next week.
+        Eligible income = <b>Leg Completion + Matching Bonus + 50% Direct Sponsor Bonus</b> only, minimum
+        <?= money(get_plan()['payout_min']) ?>. <?= e(get_plan()['tds_percent']) ?>% TDS and
+        <?= e(get_plan()['admin_charge_percent']) ?>% admin charge are deducted from the payout amount.
     </p>
-    <form method="post" class="filter-form" data-confirm="Generate the payout report for this date? Pending payouts will be created and the wallets of all eligible members will be debited.">
+    <form method="post" class="filter-form" data-confirm="Generate the weekly payout report? Pending payouts will be created for all eligible members with completed KYC + bank details.">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="generate">
         <div class="form-group">
-            <label>Report date (income up to this date)</label>
-            <input class="form-control" type="date" name="date" value="<?= e(date('Y-m-d')) ?>" max="<?= e(date('Y-m-d')) ?>" required>
+            <label>Week (Monday)</label>
+            <?php $monday = date('Y-m-d', strtotime('monday this week')); /* most recent Monday (today if Monday) */ ?>
+            <input class="form-control" type="date" name="date" value="<?= e($monday) ?>" max="<?= e(date('Y-m-d')) ?>" required>
+            <div class="form-hint">Income is counted up to the chosen Monday 11:59 PM. Generate it only here at the Superadmin end.</div>
         </div>
-        <button class="btn btn-primary" type="submit">📅 Generate Report</button>
+        <button class="btn btn-primary" type="submit">📅 Generate Report &amp; Statement</button>
     </form>
 </div>
+
+<?php if ($statement): ?>
+<style>
+@media print{
+    .sidebar,.topbar,.app-tabbar,.filter-form,form,.btn,.flash-wrap,.stat-grid,.card-title .right,.no-print{display:none!important}
+    .main,.content,main{margin:0!important;padding:0!important}
+    body{background:#fff}
+    .print-statement{box-shadow:none!important;border:none!important}
+    .print-statement table{font-size:11px}
+}
+</style>
+<div class="card print-statement" id="payoutStatement" style="border:1.5px solid var(--accent)">
+    <div class="card-title no-print">
+        📄 Payout Statement #<?= (int)$statement['id'] ?>
+        <span class="right">
+            <a class="btn btn-outline btn-sm" href="payouts.php?statement=<?= (int)$statement['id'] ?>&download=1">⬇ Download (CSV)</a>
+            <button class="btn btn-primary btn-sm" type="button" onclick="window.print()">🖨 Print Statement</button>
+        </span>
+    </div>
+    <div style="text-align:center;border-bottom:2px solid var(--line);padding-bottom:12px;margin-bottom:14px">
+        <h2 style="margin:0;font-size:20px">Yashasavi Veda Herbals Private Limited</h2>
+        <div style="font-size:15px;font-weight:700;margin-top:6px">WEEKLY PAYOUT STATEMENT</div>
+        <div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px">
+            Week: <b><?= dmy($statement['period_date']) ?></b> (Monday)
+            &nbsp;·&nbsp; Generated: <b><?= dmy($statement['run_ts'], true) ?></b>
+            &nbsp;·&nbsp; Statement #<?= (int)$statement['id'] ?>
+        </div>
+    </div>
+    <div class="table-wrap" style="box-shadow:none">
+        <table class="table">
+            <tr>
+                <th>#</th><th>Member</th><th>Bank Details</th><th>KYC</th><th>Bank</th>
+                <th>Gross</th><th>TDS</th><th>Admin</th><th>Net Payable</th><th>Payout Status</th>
+            </tr>
+            <?php $i = 1; foreach ($statementRows as $r): ?>
+            <tr>
+                <td><?= $i++ ?></td>
+                <td><b><?= e($r['username']) ?></b><br><small style="color:#000"><?= e($r['full_name']) ?><br><?= e($r['mobile']) ?></small></td>
+                <td><small><?= e($r['bank_name'] ?: '—') ?><br><?= e($r['bank_account_no'] ?: '—') ?><br><?= e($r['bank_ifsc'] ?: '—') ?></small></td>
+                <td><?= $r['kyc_status'] === 'verified' ? badge('Completed', 'success') : badge('Not completed', 'danger') ?></td>
+                <td><?= (int)$r['bank_ok'] ? badge('Completed', 'success') : badge('Not completed', 'danger') ?></td>
+                <td><?= money($r['gross']) ?></td>
+                <td><?= money($r['tds']) ?></td>
+                <td><?= money($r['admin_charge']) ?></td>
+                <td><b><?= money($r['net']) ?></b></td>
+                <td>
+                    <?php if ((int)$r['payout_done']): ?>
+                        <?= badge('✔ Payout will be done', 'success') ?>
+                    <?php else: ?>
+                        <?= badge('✖ Payout will not be done', 'danger') ?>
+                        <br><small style="color:#000"><?= e($r['reason']) ?></small>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+            <tr style="background:var(--soft,#f6f8f6)">
+                <th colspan="5">TOTAL (payouts done)</th>
+                <th><?= money($statement['total_gross']) ?></th>
+                <th><?= money($statement['total_tds']) ?></th>
+                <th><?= money($statement['total_admin']) ?></th>
+                <th><?= money($statement['total_net']) ?></th>
+                <th><?= (int)$statement['members_done'] ?> done · <?= (int)$statement['members_blocked'] ?> not done</th>
+            </tr>
+        </table>
+    </div>
+    <p class="form-hint" style="margin-top:10px">
+        <?= (int)$statement['members_done'] ?> member(s) with completed KYC &amp; bank details — payout will be done.
+        <?= (int)$statement['members_blocked'] ? (int)$statement['members_blocked'] . ' member(s) — payout will not be done (complete KYC / bank details; the amount stays in the wallet for the next week).' : '' ?>
+    </p>
+</div>
+<?php endif; ?>
+
+<?php if ($recentStatements && !$statement): ?>
+<div class="card">
+    <div class="card-title">📄 Weekly Payout Statements</div>
+    <div class="table-wrap" style="box-shadow:none">
+        <table class="table">
+            <tr><th>Statement</th><th>Week (Monday)</th><th>Generated</th><th>Members</th><th>Gross</th><th>Net Paid</th><th>Not done</th><th></th></tr>
+            <?php foreach ($recentStatements as $st): ?>
+            <tr>
+                <td><b>#<?= (int)$st['id'] ?></b></td>
+                <td><?= dmy($st['period_date']) ?></td>
+                <td><?= dmy($st['run_ts'], true) ?></td>
+                <td><?= (int)$st['members_done'] + (int)$st['members_blocked'] ?></td>
+                <td><?= money($st['total_gross']) ?></td>
+                <td><b><?= money($st['total_net']) ?></b></td>
+                <td><?= (int)$st['members_blocked'] ? badge((int)$st['members_blocked'] . ' will not be done', 'warning') : '—' ?></td>
+                <td><a class="btn btn-outline btn-sm" href="payouts.php?statement=<?= (int)$st['id'] ?>">View Statement →</a></td>
+            </tr>
+            <?php endforeach; ?>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php if ($runRows): ?>
 <div class="card" style="border:1.5px solid var(--accent)">

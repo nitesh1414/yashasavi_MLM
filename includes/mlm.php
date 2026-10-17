@@ -917,6 +917,13 @@ function request_payout($userId, $amount)
         return [false, 'Minimum payout amount is ' . money($plan['payout_min']) . '.'];
     }
     $u = q_row("SELECT * FROM users WHERE id = ?", [$userId]);
+    /* payout is only done when KYC and bank details are completed */
+    if ($u['kyc_status'] !== 'verified') {
+        return [false, 'Your KYC is not completed yet — the payout cannot be done. Please complete your KYC.'];
+    }
+    if (trim((string)$u['bank_name']) === '' || trim((string)$u['bank_account_no']) === '' || trim((string)$u['bank_ifsc']) === '') {
+        return [false, 'Your bank details are not completed — the payout cannot be done. Please add your bank details in your profile.'];
+    }
     /* only the three plan incomes are payable — rank rewards, car fund,
      * award rewards, level income etc. are NOT added to a member's payout */
     $eligible = payout_eligible_amount($userId);
@@ -970,16 +977,18 @@ function payout_eligible_amount($userId, $upto = null)
 }
 
 /**
- * Generate the date-wise payout report (super admin): creates a pending
- * payout for every member whose eligible income — the three plan incomes
- * only — has reached the payout minimum as of the END of $date, debits
- * their wallet, and returns the run timestamp that identifies the rows
- * (payout_report_rows). TDS and admin charge are the plan percentages
- * (5% / 5% on the current plan) and are deducted from the payout amount.
- * Members immediately see the payout as "in process"; marking it paid
- * shows "Payment is done".
+ * Generate the WEEKLY payout report + payout statement (super admin only,
+ * run every Monday): every member whose eligible income — the three plan
+ * incomes only — has reached the payout minimum as of the END of $date is
+ * listed on a payout statement. Members with completed KYC and bank
+ * details get a pending payout (wallet debited, TDS + admin charge
+ * deducted from the payout amount); members with incomplete KYC or bank
+ * details are listed with "payout will not be done" and keep their
+ * balance for the next week. Returns the run timestamp identifying the
+ * rows (payout_report_rows) plus the created statement id.
  *
- * Returns [ok(bool), runTs(string|null), stats(array)].
+ * Returns [ok(bool), runTs(string|null), stats(array)] with
+ * stats = [created, blocked, skipped, total, net, statement_id].
  */
 function generate_payout_report($date)
 {
@@ -989,12 +998,13 @@ function generate_payout_report($date)
     $tdsPct = (float)$plan['tds_percent'];
     $admPct = (float)$plan['admin_charge_percent'];
 
-    $stats = ['created' => 0, 'skipped' => 0, 'total' => 0.0, 'net' => 0.0];
+    $stats = ['created' => 0, 'blocked' => 0, 'skipped' => 0, 'total' => 0.0, 'net' => 0.0, 'statement_id' => 0];
     $runTs = null;
 
     db_tx(function () use ($cut, $min, $tdsPct, $admPct, &$stats, &$runTs) {
         $cands = q_all(
-            "SELECT u.id, u.wallet_balance,
+            "SELECT u.id, u.username, u.full_name, u.mobile, u.wallet_balance, u.kyc_status,
+                    u.bank_name, u.bank_account_no, u.bank_ifsc, u.bank_holder,
                     COALESCE(c.gross, 0) AS gross, COALESCE(p.taken, 0) AS taken
              FROM users u
              LEFT JOIN (SELECT user_id, SUM(amount) AS gross FROM commissions
@@ -1002,37 +1012,120 @@ function generate_payout_report($date)
                           AND created_at <= ? GROUP BY user_id) c ON c.user_id = u.id
              LEFT JOIN (SELECT user_id, SUM(amount) AS taken FROM payouts
                         WHERE status IN ('pending','paid') GROUP BY user_id) p ON p.user_id = u.id
-             WHERE u.status = 'active' AND u.bank_account_no IS NOT NULL AND u.bank_account_no <> ''",
+             WHERE u.status = 'active'",
             [$cut]);
         $runTs = now();
-        foreach ($cands as $x) {
-            $amount = round((float)$x['gross'] - (float)$x['taken'], 2);
-            if ($amount < $min) { continue; }
+
+        /* statement header — one per report run */
+        q("INSERT INTO payout_statements (run_ts, period_date, total_gross, total_tds, total_admin, total_net, members_done, members_blocked, created_at)
+           VALUES (?, ?, 0, 0, 0, 0, 0, 0, ?)", [$runTs, substr($cut, 0, 10), $runTs]);
+        $statementId = (int)db()->lastInsertId();
+        $stats['statement_id'] = $statementId;
+        $totGross = $totTds = $totAdm = $totNet = 0.0;
+
+        foreach ($cands as $u) {
+            $amount = round((float)$u['gross'] - (float)$u['taken'], 2);
+            if ($amount < $min) { continue; } /* not payout-eligible this week */
+
             /* the wallet may hold less if the member spent it on purchases */
-            if ($amount > (float)$x['wallet_balance']) {
-                $amount = round((float)$x['wallet_balance'], 2);
-                if ($amount < $min) { $stats['skipped']++; continue; }
+            if ($amount > (float)$u['wallet_balance']) {
+                $amount = round((float)$u['wallet_balance'], 2);
             }
             $tds = round($amount * $tdsPct / 100, 2);
             $adm = round($amount * $admPct / 100, 2);
             $net = round($amount - $tds - $adm, 2);
-            $u = q_row("SELECT username, bank_name, bank_account_no, bank_ifsc, bank_holder FROM users WHERE id = ?", [$x['id']]);
+
+            $kycOk = $u['kyc_status'] === 'verified';
+            $bankOk = trim((string)$u['bank_name']) !== '' && trim((string)$u['bank_account_no']) !== ''
+                   && trim((string)$u['bank_ifsc']) !== '';
+
+            if ($amount < $min) {
+                /* wallet below minimum after the cap — listed, but no payout */
+                $stats['skipped']++;
+                q("INSERT INTO payout_statement_rows
+                   (statement_id, user_id, username, full_name, mobile, bank_name, bank_account_no, bank_ifsc, bank_holder,
+                    kyc_status, bank_ok, gross, tds, admin_charge, net, payout_done, payout_id, reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, NULL, ?)",
+                  [$statementId, $u['id'], $u['username'], $u['full_name'], $u['mobile'],
+                   $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'],
+                   $u['kyc_status'], (int)$bankOk, $amount, 'Wallet balance below minimum — payout will not be done']);
+                continue;
+            }
+
+            $reason = null;
+            if (!$kycOk && !$bankOk) { $reason = 'KYC and bank details not completed — payout will not be done'; }
+            elseif (!$kycOk) { $reason = 'KYC not completed — payout will not be done'; }
+            elseif (!$bankOk) { $reason = 'Bank details not completed — payout will not be done'; }
+
+            if ($reason !== null) {
+                /* incomplete KYC / bank — on the statement, balance stays in the wallet */
+                $stats['blocked']++;
+                q("INSERT INTO payout_statement_rows
+                   (statement_id, user_id, username, full_name, mobile, bank_name, bank_account_no, bank_ifsc, bank_holder,
+                    kyc_status, bank_ok, gross, tds, admin_charge, net, payout_done, payout_id, reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)",
+                  [$statementId, $u['id'], $u['username'], $u['full_name'], $u['mobile'],
+                   $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'],
+                   $u['kyc_status'], (int)$bankOk, $amount, $tds, $adm, $net, $reason]);
+                continue;
+            }
+
+            /* KYC + bank completed — the payout will be done */
             $no = 'RPT' . date('ymd', strtotime($cut)) . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
             q("INSERT INTO payouts (user_id, request_no, amount, tds_amount, admin_charge, net_amount,
                status, bank_name, bank_account_no, bank_ifsc, bank_holder, created_at)
                VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
-              [$x['id'], $no, $amount, $tds, $adm, $net,
+              [$u['id'], $no, $amount, $tds, $adm, $net,
                $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'], $runTs]);
             $pid = (int)db()->lastInsertId();
-            debit_wallet($x['id'], $amount, 'payout', $pid,
+            debit_wallet($u['id'], $amount, 'payout', $pid,
                 'Payout report ' . $no . ' (' . date('d M Y', strtotime($cut)) . ')');
+
+            q("INSERT INTO payout_statement_rows
+               (statement_id, user_id, username, full_name, mobile, bank_name, bank_account_no, bank_ifsc, bank_holder,
+                kyc_status, bank_ok, gross, tds, admin_charge, net, payout_done, payout_id, reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 1, ?, NULL)",
+              [$statementId, $u['id'], $u['username'], $u['full_name'], $u['mobile'],
+               $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'],
+               $u['kyc_status'], $amount, $tds, $adm, $net, $pid]);
+
             $stats['created']++;
             $stats['total'] = round($stats['total'] + $amount, 2);
             $stats['net'] = round($stats['net'] + $net, 2);
+            $totGross = round($totGross + $amount, 2);
+            $totTds = round($totTds + $tds, 2);
+            $totAdm = round($totAdm + $adm, 2);
+            $totNet = round($totNet + $net, 2);
         }
+
+        q("UPDATE payout_statements SET total_gross = ?, total_tds = ?, total_admin = ?, total_net = ?,
+           members_done = ?, members_blocked = ? WHERE id = ?",
+          [$totGross, $totTds, $totAdm, $totNet, $stats['created'], $stats['blocked'] + $stats['skipped'], $statementId]);
     });
 
     return [!empty($runTs), $runTs, $stats];
+}
+
+/** One payout statement (header row) by id. */
+function payout_statement($id)
+{
+    return q_row("SELECT * FROM payout_statements WHERE id = ?", [(int)$id]);
+}
+
+/** All statement rows of one payout statement, payout-done members first. */
+function payout_statement_rows($statementId)
+{
+    return q_all("SELECT * FROM payout_statement_rows WHERE statement_id = ? ORDER BY payout_done DESC, username ASC", [(int)$statementId]);
+}
+
+/** All payout statements a member appears on (newest first). */
+function member_payout_statements($userId)
+{
+    return q_all("SELECT s.*, r.payout_done, r.gross, r.tds, r.admin_charge, r.net, r.reason, r.kyc_status, r.bank_ok
+                  FROM payout_statement_rows r
+                  JOIN payout_statements s ON s.id = r.statement_id
+                  WHERE r.user_id = ?
+                  ORDER BY s.id DESC", [(int)$userId]);
 }
 
 /** All payout rows of one report run (same creation timestamp). */

@@ -284,6 +284,45 @@ return [
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
+"CREATE TABLE IF NOT EXISTS payout_statements (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    run_ts DATETIME NOT NULL,
+    period_date DATE NOT NULL,
+    total_gross DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_tds DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_admin DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_net DECIMAL(12,2) NOT NULL DEFAULT 0,
+    members_done INT UNSIGNED NOT NULL DEFAULT 0,
+    members_blocked INT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    INDEX idx_run (run_ts),
+    INDEX idx_period (period_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS payout_statement_rows (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    statement_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    username VARCHAR(20) NOT NULL,
+    full_name VARCHAR(120) NOT NULL,
+    mobile VARCHAR(15) NOT NULL,
+    bank_name VARCHAR(120) NULL,
+    bank_account_no VARCHAR(40) NULL,
+    bank_ifsc VARCHAR(20) NULL,
+    bank_holder VARCHAR(120) NULL,
+    kyc_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    bank_ok TINYINT(1) NOT NULL DEFAULT 0,
+    gross DECIMAL(12,2) NOT NULL DEFAULT 0,
+    tds DECIMAL(12,2) NOT NULL DEFAULT 0,
+    admin_charge DECIMAL(12,2) NOT NULL DEFAULT 0,
+    net DECIMAL(12,2) NOT NULL DEFAULT 0,
+    payout_done TINYINT(1) NOT NULL DEFAULT 0,
+    payout_id INT UNSIGNED NULL,
+    reason VARCHAR(255) NULL,
+    INDEX idx_statement (statement_id),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
 "CREATE TABLE IF NOT EXISTS plan_settings (
     id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
     activation_bv DECIMAL(12,2) NOT NULL DEFAULT 100,
