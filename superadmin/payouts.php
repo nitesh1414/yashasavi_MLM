@@ -12,24 +12,19 @@ if (is_post()) {
         $ok ? flash('success', $msg) : flash('error', $msg);
     }
     if ($action === 'generate') {
-        /* date-wise payout report: pending payouts for every eligible member
-         * (three plan incomes only), TDS + admin charge deducted */
-        $date = post_str('date');
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-            flash('error', 'Please choose a valid report date.');
-            redirect('payouts.php');
-        }
-        [$ok, $runTs, $st] = generate_payout_report($date);
+        /* weekly payout report + statement — income counted up to the last
+         * Saturday 11:59 PM; generated only here at the Superadmin end */
+        [$ok, $runTs, $st] = generate_payout_report();
         if (!$ok || (!$st['created'] && !$st['blocked'] && !$st['skipped'])) {
-            flash('warning', 'Payout report for ' . dmy($date) . ': no eligible members found (eligible income = Leg Completion + Matching Bonus + 50% Direct Sponsor Bonus, minimum ' . money(get_plan()['payout_min']) . ').');
+            flash('warning', 'Weekly payout report: no eligible members found (eligible income = Leg Completion + Matching Bonus + 50% Direct Sponsor Bonus, minimum ' . money_txt(get_plan()['payout_min']) . ').');
             redirect('payouts.php');
         }
         flash('success',
-            'Weekly payout statement for ' . dmy($date) . ' generated: ' . number_format($st['created']) . ' payout(s) '
-            . money($st['total']) . ' gross → ' . money($st['net']) . ' net'
+            'Weekly payout statement generated: ' . number_format($st['created']) . ' payout(s) '
+            . money_txt($st['total']) . ' gross → ' . money_txt($st['net']) . ' net'
             . ($st['blocked'] ? ' · ' . number_format($st['blocked']) . ' member(s) listed as PAYOUT WILL NOT BE DONE (KYC / bank details incomplete)' : '')
             . ($st['skipped'] ? ' · ' . number_format($st['skipped']) . ' skipped (wallet below minimum)' : '')
-            . '. Members now see the statement in their dashboard.');
+            . '. Members now see the statement in their dashboard and can download the receipt.');
         redirect('payouts.php?statement=' . (int)$st['statement_id']);
     }
     redirect('payouts.php' . (get_str('status') ? '?status=' . urlencode(get_str('status')) : ''));
@@ -85,11 +80,10 @@ if ($q !== '') {
 $total = (int)q_val("SELECT COUNT(*) FROM payouts p JOIN users u ON u.id = p.user_id WHERE $where", $params);
 $sumPending = (float)q_val("SELECT COALESCE(SUM(amount),0) FROM payouts p JOIN users u ON u.id=p.user_id WHERE p.status='pending'" . ($status === 'pending' ? " AND $where" : ''), $status === 'pending' ? $params : []);
 $sumPaid = (float)q_val("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE status='paid'");
-[$per, $offset] = paginate($total, 20, $links);
 $rows = q_all("SELECT p.*, u.username, u.full_name FROM payouts p
                JOIN users u ON u.id = p.user_id
                WHERE $where ORDER BY FIELD(p.status,'pending','paid','rejected'), p.id DESC
-               LIMIT $per OFFSET $offset", $params);
+              ", $params);
 
 $activeKey = 'payouts';
 $pageTitle = 'Payouts';
@@ -105,7 +99,8 @@ require __DIR__ . '/../includes/dash_header.php';
 <div class="card" style="border:1.5px dashed var(--accent)">
     <div class="card-title">📅 Generate Weekly Payout Report &amp; Statement</div>
     <p style="font-size:13px;color:var(--ink-soft)">
-        Run this <b>every Monday</b>. It creates the <b>weekly payout statement</b> listing every eligible
+        Run this <b>every Monday</b>. Income is counted <b>up to the last Saturday 11:59 PM</b> — the completed
+        <b>Sunday → Saturday</b> week. It creates the <b>weekly payout statement</b> listing every eligible
         member with amounts, KYC status and bank details. Members with <b>completed KYC + bank details</b>
         get a pending payout (wallet debited) — <b>payout will be done</b>. Members with incomplete KYC or
         bank details are listed as <b>payout will not be done</b> and keep their balance for the next week.
@@ -116,12 +111,6 @@ require __DIR__ . '/../includes/dash_header.php';
     <form method="post" class="filter-form" data-confirm="Generate the weekly payout report? Pending payouts will be created for all eligible members with completed KYC + bank details.">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="generate">
-        <div class="form-group">
-            <label>Week (Monday)</label>
-            <?php $monday = date('Y-m-d', strtotime('monday this week')); /* most recent Monday (today if Monday) */ ?>
-            <input class="form-control" type="date" name="date" value="<?= e($monday) ?>" max="<?= e(date('Y-m-d')) ?>" required>
-            <div class="form-hint">Income is counted up to the chosen Monday 11:59 PM. Generate it only here at the Superadmin end.</div>
-        </div>
         <button class="btn btn-primary" type="submit">📅 Generate Report &amp; Statement</button>
     </form>
 </div>
@@ -129,11 +118,12 @@ require __DIR__ . '/../includes/dash_header.php';
 <?php if ($statement): ?>
 <style>
 @media print{
-    .sidebar,.topbar,.app-tabbar,.filter-form,form,.btn,.flash-wrap,.stat-grid,.card-title .right,.no-print{display:none!important}
-    .main,.content,main{margin:0!important;padding:0!important}
-    body{background:#fff}
-    .print-statement{box-shadow:none!important;border:none!important}
-    .print-statement table{font-size:11px}
+    /* print ONLY the statement table area */
+    body *{visibility:hidden}
+    #payoutStatement, #payoutStatement *{visibility:visible}
+    #payoutStatement{position:absolute;left:0;top:0;width:100%;border:none!important;box-shadow:none!important;padding:0!important;margin:0!important}
+    #payoutStatement .no-print{display:none!important}
+    #payoutStatement table{font-size:11px}
 }
 </style>
 <div class="card print-statement" id="payoutStatement" style="border:1.5px solid var(--accent)">
@@ -145,10 +135,12 @@ require __DIR__ . '/../includes/dash_header.php';
         </span>
     </div>
     <div style="text-align:center;border-bottom:2px solid var(--line);padding-bottom:12px;margin-bottom:14px">
+        <img src="<?= e(upload_url(setting('site_logo')) ?: url('assets/img/logo.png')) ?>" alt="Logo"
+             style="height:64px;object-fit:contain;margin-bottom:8px">
         <h2 style="margin:0;font-size:20px">Yashasavi Veda Herbals Private Limited</h2>
         <div style="font-size:15px;font-weight:700;margin-top:6px">WEEKLY PAYOUT STATEMENT</div>
         <div style="font-size:12.5px;color:var(--ink-soft);margin-top:4px">
-            Week: <b><?= dmy($statement['period_date']) ?></b> (Monday)
+            Week: <b><?= payout_statement_week_label($statement) ?></b>
             &nbsp;·&nbsp; Generated: <b><?= dmy($statement['run_ts'], true) ?></b>
             &nbsp;·&nbsp; Statement #<?= (int)$statement['id'] ?>
         </div>
@@ -201,12 +193,15 @@ require __DIR__ . '/../includes/dash_header.php';
 <div class="card">
     <div class="card-title">📄 Weekly Payout Statements</div>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>Statement</th><th>Week (Monday)</th><th>Generated</th><th>Members</th><th>Gross</th><th>Net Paid</th><th>Not done</th><th></th></tr>
-            <?php foreach ($recentStatements as $st): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th>Statement</th><th>Week</th><th>Generated</th><th>Members</th><th>Gross</th><th>Net Paid</th><th>Not done</th><th></th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($recentStatements as $st): ?>
             <tr>
                 <td><b>#<?= (int)$st['id'] ?></b></td>
-                <td><?= dmy($st['period_date']) ?></td>
+                <td><?= payout_statement_week_label($st) ?></td>
                 <td><?= dmy($st['run_ts'], true) ?></td>
                 <td><?= (int)$st['members_done'] + (int)$st['members_blocked'] ?></td>
                 <td><?= money($st['total_gross']) ?></td>
@@ -215,7 +210,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><a class="btn btn-outline btn-sm" href="payouts.php?statement=<?= (int)$st['id'] ?>">View Statement →</a></td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
 </div>
 <?php endif; ?>
@@ -227,9 +223,12 @@ require __DIR__ . '/../includes/dash_header.php';
         <span class="right"><a class="btn btn-outline btn-sm" href="payouts.php?download=1&run=<?= e(urlencode($runTs)) ?>">⬇ Download Bank Report (CSV)</a></span>
     </div>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>Request</th><th>User</th><th>Bank</th><th>Gross</th><th>TDS</th><th>Admin</th><th>Net Payable</th><th>Status</th></tr>
-            <?php foreach ($runRows as $r): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th>Request</th><th>User</th><th>Bank</th><th>Gross</th><th>TDS</th><th>Admin</th><th>Net Payable</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($runRows as $r): ?>
             <tr>
                 <td><b><?= e($r['request_no']) ?></b></td>
                 <td><b><?= e($r['username']) ?></b><br><small style="color:#000"><?= e($r['full_name']) ?> · <?= e($r['mobile']) ?></small></td>
@@ -241,7 +240,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= status_badge($r['status']) ?></td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
 </div>
 <?php endif; ?>
@@ -269,9 +269,12 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="empty-state"><span class="es-ico">🏦</span>No payout requests found.</div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>Request</th><th>User</th><th>Bank</th><th>Amount</th><th>Deductions</th><th>Net</th><th>Status</th><th>Actions</th></tr>
-            <?php foreach ($rows as $r): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th>Request</th><th>User</th><th>Bank</th><th>Amount</th><th>Deductions</th><th>Net</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($rows as $r): ?>
             <tr>
                 <td><b><?= e($r['request_no']) ?></b><br><small style="color:#000"><?= dmy($r['created_at']) ?></small></td>
                 <td><a href="user_view.php?id=<?= (int)$r['user_id'] ?>"><b><?= e($r['username']) ?></b></a><br>
@@ -306,9 +309,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 </td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
-    <?= $links ?>
     <?php endif; ?>
 </div>
 

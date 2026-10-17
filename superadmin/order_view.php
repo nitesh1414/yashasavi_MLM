@@ -49,9 +49,12 @@ require __DIR__ . '/../includes/dash_header.php';
             <a class="btn btn-light btn-sm right" href="orders.php">⬅ All Orders</a>
         </div>
         <div class="table-wrap" style="box-shadow:none">
-            <table class="table">
-                <tr><th>Product</th><th>DP</th><th>BV</th><th>Qty</th><th>Total</th></tr>
-                <?php foreach ($items as $it): ?>
+            <table class="table table-dt">
+                <thead>
+                    <tr><th>Product</th><th>DP</th><th>BV</th><th>Qty</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($items as $it): ?>
                 <tr>
                     <td><?= e($it['product_name']) ?></td>
                     <td><?= money($it['price']) ?></td>
@@ -62,7 +65,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <?php endforeach; ?>
                 <tr><td colspan="4" style="text-align:right"><b>Total BV</b></td><td><b style="color:#000"><?= e($o['total_bv']) ?></b></td></tr>
                 <tr><td colspan="4" style="text-align:right"><b>Payable</b></td><td><b><?= money($o['total_dp']) ?></b></td></tr>
-            </table>
+                </tbody>
+                </table>
         </div>
 
         <?php if ($o['status'] === 'pending'): ?>
@@ -124,16 +128,20 @@ require __DIR__ . '/../includes/dash_header.php';
         <?php if ($commissions): ?>
         <div class="card">
             <div class="card-title">💠 Commissions from this order</div>
-            <table class="table" style="width:100%">
-                <tr><th>User</th><th>Type</th><th>Amount</th></tr>
-                <?php foreach ($commissions as $c): ?>
+            <table class="table table-dt" style="width:100%">
+                <thead>
+                    <tr><th>User</th><th>Type</th><th>Amount</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($commissions as $c): ?>
                 <tr>
                     <td><a href="user_view.php?id=<?= (int)$c['user_id'] ?>"><?= e($c['username']) ?></a></td>
                     <td><?= badge(ucfirst($c['type']), 'primary') ?><?= $c['level'] ? ' L' . (int)$c['level'] : '' ?></td>
                     <td><b><?= money($c['amount']) ?></b></td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
         <?php endif; ?>
     </div>

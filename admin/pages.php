@@ -18,10 +18,9 @@ if (is_post() && post_str('action') === 'delete') {
 }
 
 $total = (int)q_val("SELECT COUNT(*) FROM pages");
-[$per, $offset] = paginate($total, 20, $links);
 $pages = q_all("SELECT p.*, parent.title AS parent_title FROM pages p
                 LEFT JOIN pages parent ON parent.id = p.parent_id
-                ORDER BY p.menu_order, p.title LIMIT $per OFFSET $offset");
+                ORDER BY p.menu_order, p.title");
 
 $activeKey = 'pages';
 $pageTitle = 'Pages';
@@ -35,9 +34,12 @@ require __DIR__ . '/../includes/dash_header.php';
         <a class="btn btn-primary btn-sm right" href="page_edit.php">+ Add New Page</a>
     </div>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>Title</th><th>Slug</th><th>In Menu</th><th>Order</th><th>Status</th><th>Actions</th></tr>
-            <?php foreach ($pages as $p): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th>Title</th><th>Slug</th><th>In Menu</th><th>Order</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($pages as $p): ?>
             <tr>
                 <td>
                     <b><?= e($p['title']) ?></b>
@@ -61,9 +63,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 </td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
-    <?= $links ?>
 </div>
 
 <?php require __DIR__ . '/../includes/dash_footer.php'; ?>

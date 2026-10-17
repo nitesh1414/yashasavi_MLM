@@ -914,7 +914,7 @@ function request_payout($userId, $amount)
     $plan = get_plan();
     $amount = round((float)$amount, 2);
     if ($amount < (float)$plan['payout_min']) {
-        return [false, 'Minimum payout amount is ' . money($plan['payout_min']) . '.'];
+        return [false, 'Minimum payout amount is ' . money_txt($plan['payout_min']) . '.'];
     }
     $u = q_row("SELECT * FROM users WHERE id = ?", [$userId]);
     /* payout is only done when KYC and bank details are completed */
@@ -928,7 +928,7 @@ function request_payout($userId, $amount)
      * award rewards, level income etc. are NOT added to a member's payout */
     $eligible = payout_eligible_amount($userId);
     if ($amount > $eligible) {
-        return [false, 'Amount exceeds your eligible payout income (' . money($eligible) . '). Only Leg Completion, Matching Bonus and 50% Direct Sponsor Bonus incomes are payable.'];
+        return [false, 'Amount exceeds your eligible payout income (' . money_txt($eligible) . '). Only Leg Completion, Matching Bonus and 50% Direct Sponsor Bonus incomes are payable.'];
     }
     if ($amount > (float)$u['wallet_balance']) {
         return [false, 'Amount exceeds your wallet balance.'];
@@ -978,9 +978,10 @@ function payout_eligible_amount($userId, $upto = null)
 
 /**
  * Generate the WEEKLY payout report + payout statement (super admin only,
- * run every Monday): every member whose eligible income — the three plan
- * incomes only — has reached the payout minimum as of the END of $date is
- * listed on a payout statement. Members with completed KYC and bank
+ * run every Monday): income is counted up to the LAST SATURDAY 11:59 PM,
+ * so the statement covers the completed Sunday-to-Saturday week. Every
+ * member whose eligible income — the three plan incomes only — has
+ * reached the payout minimum is listed on the statement. Members with completed KYC and bank
  * details get a pending payout (wallet debited, TDS + admin charge
  * deducted from the payout amount); members with incomplete KYC or bank
  * details are listed with "payout will not be done" and keep their
@@ -990,10 +991,13 @@ function payout_eligible_amount($userId, $upto = null)
  * Returns [ok(bool), runTs(string|null), stats(array)] with
  * stats = [created, blocked, skipped, total, net, statement_id].
  */
-function generate_payout_report($date)
+function generate_payout_report()
 {
     $plan = get_plan();
-    $cut = $date . ' 23:59:59';
+    /* income is counted up to the last Saturday 11:59 PM (the completed
+     * Sunday → Saturday week); the report is generated every Monday */
+    $sat = date('Y-m-d', strtotime('last saturday'));
+    $cut = $sat . ' 23:59:59';
     $min = (float)$plan['payout_min'];
     $tdsPct = (float)$plan['tds_percent'];
     $admPct = (float)$plan['admin_charge_percent'];
@@ -1110,6 +1114,14 @@ function generate_payout_report($date)
 function payout_statement($id)
 {
     return q_row("SELECT * FROM payout_statements WHERE id = ?", [(int)$id]);
+}
+
+/** Week label of a statement: "from Sunday <d> - to Saturday <d>". */
+function payout_statement_week_label(array $statement)
+{
+    $sat = $statement['period_date'];
+    $sun = date('Y-m-d', strtotime($sat . ' -6 days'));
+    return 'from Sunday ' . dmy($sun) . ' - to Saturday ' . dmy($sat);
 }
 
 /** All statement rows of one payout statement, payout-done members first. */

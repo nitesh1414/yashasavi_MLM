@@ -81,7 +81,7 @@ if (is_post()) {
         if (!$items) { $errors[] = 'Your cart is empty.'; }
 
         if ($paymentMode === 'wallet' && (float)$u['wallet_balance'] < $totalDp) {
-            $errors[] = 'Insufficient wallet balance (' . money($u['wallet_balance']) . '). Choose cash or bank transfer.';
+            $errors[] = 'Insufficient wallet balance (' . money_txt($u['wallet_balance']) . '). Choose cash or bank transfer.';
         }
 
         if ($errors) {
@@ -157,9 +157,12 @@ require __DIR__ . '/../includes/dash_header.php';
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="update">
             <div class="table-wrap" style="box-shadow:none">
-                <table class="table">
-                    <tr><th>Product</th><th>DP</th><th>BV</th><th>Qty</th><th>Total</th><th></th></tr>
-                    <?php foreach ($items as $it): ?>
+                <table class="table table-dt">
+                    <thead>
+                        <tr><th>Product</th><th>DP</th><th>BV</th><th>Qty</th><th>Total</th><th></th></tr>
+                    </thead>
+                    <tbody>
+<?php foreach ($items as $it): ?>
                     <tr>
                         <td>
                             <b><?= e($it['p']['name']) ?></b><br>
@@ -175,7 +178,8 @@ require __DIR__ . '/../includes/dash_header.php';
                         </td>
                     </tr>
                     <?php endforeach; ?>
-                </table>
+                    </tbody>
+                    </table>
             </div>
             <input type="hidden" name="remove_pid" value="">
             <div style="display:flex;gap:10px;margin-top:14px">

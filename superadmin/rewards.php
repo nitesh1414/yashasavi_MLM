@@ -125,7 +125,7 @@ require __DIR__ . '/../includes/dash_header.php';
         <span class="right"><a class="btn btn-primary btn-sm" href="rewards.php?action=add">➕ Add Reward</a></span>
     </div>
     <div class="table-wrap">
-        <table class="table">
+        <table class="table table-dt">
             <thead>
                 <tr><th>#</th><th>Lifetime Points</th><th>Matched Business</th><th>Reward</th><th>Type</th><th>Cash</th><th>Awarded to</th><th>Status</th><th></th></tr>
             </thead>

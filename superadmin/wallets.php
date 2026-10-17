@@ -47,10 +47,9 @@ if ($type === 'credit' || $type === 'debit') {
     $params[] = $type;
 }
 $total = (int)q_val("SELECT COUNT(*) FROM wallet_transactions t JOIN users u ON u.id = t.user_id WHERE $where", $params);
-[$per, $offset] = paginate($total, 25, $links);
 $rows = q_all("SELECT t.*, u.username, u.full_name FROM wallet_transactions t
                JOIN users u ON u.id = t.user_id
-               WHERE $where ORDER BY t.id DESC LIMIT $per OFFSET $offset", $params);
+               WHERE $where ORDER BY t.id DESC", $params);
 $totalBalance = (float)q_val("SELECT COALESCE(SUM(wallet_balance),0) FROM users WHERE wallet_balance > 0");
 $sumCredited = (float)q_val("SELECT COALESCE(SUM(amount),0) FROM commissions WHERE status='credited'");
 $sumPaidOut = (float)q_val("SELECT COALESCE(SUM(net_amount),0) FROM payouts WHERE status='paid'");
@@ -69,9 +68,8 @@ if ($minBal !== '') {
     $wParams[] = (float)$minBal;
 }
 $wTotal = (int)q_val("SELECT COUNT(*) FROM users WHERE $wWhere", $wParams);
-[$wPer, $wOffset] = paginate($wTotal, 20, $wLinks);
 $wallets = q_all("SELECT * FROM users WHERE $wWhere
-                  ORDER BY wallet_balance DESC, id ASC LIMIT $wPer OFFSET $wOffset", $wParams);
+                  ORDER BY wallet_balance DESC, id ASC", $wParams);
 
 $activeKey = 'wallets';
 $pageTitle = 'E-Wallets';
@@ -105,9 +103,12 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="empty-state"><span class="es-ico">👛</span>No transactions found.</div>
         <?php else: ?>
         <div class="table-wrap" style="box-shadow:none">
-            <table class="table">
-                <tr><th>ID</th><th>Date</th><th>User</th><th>Type</th><th>Amount</th><th>After</th><th>Note</th></tr>
-                <?php foreach ($rows as $r): ?>
+            <table class="table table-dt">
+                <thead>
+                    <tr><th>ID</th><th>Date</th><th>User</th><th>Type</th><th>Amount</th><th>After</th><th>Note</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($rows as $r): ?>
                 <tr>
                     <td>#<?= (int)$r['id'] ?></td>
                     <td><?= dmy($r['created_at'], true) ?></td>
@@ -118,9 +119,9 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><small style="color:#000"><?= e($r['note']) ?></small></td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
-        <?= $links ?>
         <?php endif; ?>
     </div>
 
@@ -174,9 +175,12 @@ require __DIR__ . '/../includes/dash_header.php';
                 <div class="empty-state"><span class="es-ico">👛</span>No distributor wallets found.</div>
             <?php else: ?>
             <div class="table-wrap" style="box-shadow:none">
-                <table class="table">
-                    <tr><th>Distributor</th><th>Rank</th><th>L / R BV</th><th>Balance</th><th></th></tr>
-                    <?php foreach ($wallets as $w): ?>
+                <table class="table table-dt">
+                    <thead>
+                        <tr><th>Distributor</th><th>Rank</th><th>L / R BV</th><th>Balance</th><th></th></tr>
+                    </thead>
+                    <tbody>
+<?php foreach ($wallets as $w): ?>
                     <tr>
                         <td><a href="user_view.php?id=<?= (int)$w['id'] ?>"><b><?= e($w['username']) ?></b></a><br>
                             <small style="color:#000"><?= e($w['full_name']) ?></small></td>
@@ -186,9 +190,9 @@ require __DIR__ . '/../includes/dash_header.php';
                         <td><a class="btn btn-light btn-sm" href="commissions.php?q=<?= urlencode($w['username']) ?>">📜</a></td>
                     </tr>
                     <?php endforeach; ?>
-                </table>
+                    </tbody>
+                    </table>
             </div>
-            <?= $wLinks ?>
             <?php endif; ?>
         </div>
     </div>

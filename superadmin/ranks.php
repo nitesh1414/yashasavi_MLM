@@ -59,9 +59,12 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="card">
         <div class="card-title">🏅 Rank Ladder</div>
         <div class="table-wrap" style="box-shadow:none">
-            <table class="table">
-                <tr><th>Rank</th><th>Points Required</th><th>Cash Reward</th><th>Holders</th><th>Actions</th></tr>
-                <?php foreach ($ranks as $r): ?>
+            <table class="table table-dt">
+                <thead>
+                    <tr><th>Rank</th><th>Points Required</th><th>Cash Reward</th><th>Holders</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($ranks as $r): ?>
                 <tr>
                     <td><b><?= e($r['name']) ?></b></td>
                     <td><b><?= number_format((int)$r['min_points']) ?> pts</b></td>
@@ -80,7 +83,8 @@ require __DIR__ . '/../includes/dash_header.php';
                     </td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
         <p class="form-hint">1 point = 3,000 BV left + 3,000 BV right (matched pair). Ranks are re-checked automatically whenever points grow; the one-time cash reward is paid as wallet income on promotion (never part of the payout commission).</p>
     </div>

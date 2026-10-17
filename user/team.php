@@ -28,12 +28,6 @@ $rows = q_all("SELECT u.*, s.username AS sponsor_name FROM users u
                LEFT JOIN users s ON s.id = u.sponsor_id
                WHERE $where ORDER BY u.id DESC", $params);
 
-$pageScriptsFiles = [
-    url('assets/datatables/jquery.min.js'),
-    url('assets/datatables/jquery.dataTables.min.js'),
-    url('assets/js/dtables.js'),
-];
-
 $activeKey = 'team';
 $pageTitle = 'My Team';
 require __DIR__ . '/_nav.php';

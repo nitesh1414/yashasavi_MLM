@@ -43,12 +43,6 @@ $rows = q_all("SELECT u.*, s.username AS sponsor_name, r.name AS rank_name FROM 
                LEFT JOIN ranks r ON r.id = u.rank_id
                WHERE $where ORDER BY u.id DESC", $params);
 
-$pageScriptsFiles = [
-    url('assets/datatables/jquery.min.js'),
-    url('assets/datatables/jquery.dataTables.min.js'),
-    url('assets/js/dtables.js'),
-];
-
 $activeKey = 'users';
 $pageTitle = 'Distributors';
 require __DIR__ . '/_nav.php';

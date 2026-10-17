@@ -24,9 +24,12 @@ require __DIR__ . '/../includes/dash_header.php';
             <span class="right"><a class="btn btn-light btn-sm" href="orders.php">⬅ All Orders</a></span>
         </div>
         <div class="table-wrap" style="box-shadow:none">
-            <table class="table">
-                <tr><th>Product</th><th>Price (DP)</th><th>MRP</th><th>BV</th><th>Qty</th><th>Total</th></tr>
-                <?php foreach ($items as $it): ?>
+            <table class="table table-dt">
+                <thead>
+                    <tr><th>Product</th><th>Price (DP)</th><th>MRP</th><th>BV</th><th>Qty</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($items as $it): ?>
                 <tr>
                     <td><?= e($it['product_name']) ?></td>
                     <td><?= money($it['price']) ?></td>
@@ -44,7 +47,8 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td colspan="5" style="text-align:right"><b>Payable (DP Total)</b></td>
                     <td><b><?= money($order['total_dp']) ?></b></td>
                 </tr>
-            </table>
+                </tbody>
+                </table>
         </div>
     </div>
 

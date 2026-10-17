@@ -28,11 +28,10 @@ if ($q !== '') {
     array_push($params, "%$q%", "%$q%", "%$q%");
 }
 $total = (int)q_val("SELECT COUNT(*) FROM orders o JOIN users u ON u.id = o.user_id WHERE $where", $params);
-[$per, $offset] = paginate($total, 20, $links);
 $rows = q_all("SELECT o.*, u.username, u.full_name, u.mobile FROM orders o
                JOIN users u ON u.id = o.user_id
                WHERE $where ORDER BY FIELD(o.status,'pending','approved','rejected','cancelled'), o.id DESC
-               LIMIT $per OFFSET $offset", $params);
+              ", $params);
 
 $activeKey = 'orders';
 $pageTitle = 'Orders';
@@ -65,9 +64,12 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="empty-state"><span class="es-ico">📦</span>No orders found.</div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>Order</th><th>User</th><th>Payment</th><th>DP</th><th>BV</th><th>Date</th><th>Status</th><th>Actions</th></tr>
-            <?php foreach ($rows as $o): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th>Order</th><th>User</th><th>Payment</th><th>DP</th><th>BV</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($rows as $o): ?>
             <tr>
                 <td><b><?= e($o['order_no']) ?></b></td>
                 <td>
@@ -105,9 +107,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 </td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
-    <?= $links ?>
     <?php endif; ?>
 </div>
 

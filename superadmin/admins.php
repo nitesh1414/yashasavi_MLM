@@ -81,9 +81,12 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="card">
         <div class="card-title">🛠️ Staff Accounts (<?= count($staff) ?>)</div>
         <div class="table-wrap" style="box-shadow:none">
-            <table class="table">
-                <tr><th>Name</th><th>Username</th><th>Role</th><th>Last Login</th><th>Status</th><th>Actions</th></tr>
-                <?php foreach ($staff as $s): ?>
+            <table class="table table-dt">
+                <thead>
+                    <tr><th>Name</th><th>Username</th><th>Role</th><th>Last Login</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($staff as $s): ?>
                 <tr>
                     <td><b><?= e($s['name']) ?></b><br><small style="color:#000"><?= e($s['email'] ?: '') ?></small></td>
                     <td><?= e($s['username']) ?></td>
@@ -111,7 +114,8 @@ require __DIR__ . '/../includes/dash_header.php';
                     </td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
         <p class="form-hint">CMS Admins manage the website (pages, products, sliders). Only Super Admins control the MLM system.</p>
     </div>

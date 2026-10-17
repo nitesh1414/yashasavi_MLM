@@ -47,7 +47,7 @@ require_once __DIR__ . '/social_icons.php';
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Yashasavi">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/css/style.css') ?>?v=<?= APP_VERSION ?>">
 </head>
 <body<?= isset($bodyClass) ? ' class="' . e($bodyClass) . '"' : '' ?>>

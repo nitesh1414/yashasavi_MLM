@@ -20,8 +20,9 @@ function rich_text($html)
     return $html; // content is authored by trusted admins through the editor
 }
 
-/** Format money in INR (Indian lakh / crore digit grouping). */
-function money($n, $symbol = '₹')
+/** Format money in INR (Indian lakh / crore digit grouping) — plain text
+ *  (for messages, e-mails and other non-HTML strings). */
+function money_txt($n, $symbol = '₹')
 {
     $num = (float)$n;
     $neg = $num < 0;
@@ -36,6 +37,13 @@ function money($n, $symbol = '₹')
         $int = $rest . ',' . $last3;
     }
     return ($neg ? '-' : '') . $symbol . $int . '.' . $parts[1];
+}
+
+/** money() for direct HTML output — wrapped in span.money so the amount
+ *  never wraps onto two lines (white-space: nowrap, see dash.css / style.css). */
+function money($n, $symbol = '₹')
+{
+    return '<span class="money">' . money_txt($n, $symbol) . '</span>';
 }
 
 /** Format BV / PV points (Indian grouping). */

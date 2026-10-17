@@ -67,9 +67,12 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="card">
         <div class="card-title">🗂️ Categories (<?= count($categories) ?>)</div>
         <div class="table-wrap" style="box-shadow:none">
-            <table class="table">
-                <tr><th></th><th>Name</th><th>Products</th><th>Status</th><th>Actions</th></tr>
-                <?php foreach ($categories as $c): ?>
+            <table class="table table-dt">
+                <thead>
+                    <tr><th></th><th>Name</th><th>Products</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($categories as $c): ?>
                 <tr>
                     <td><img class="table-img" src="<?= e(upload_url($c['image']) ?: placeholder('C')) ?>" alt=""></td>
                     <td><b><?= e($c['name']) ?></b><br><small style="color:#000"><?= e($c['slug']) ?></small></td>
@@ -88,7 +91,8 @@ require __DIR__ . '/../includes/dash_header.php';
                     </td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
     </div>
 

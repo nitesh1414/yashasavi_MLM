@@ -28,10 +28,9 @@ if ($q !== '') {
     $params[] = "%$q%";
 }
 $total = (int)q_val("SELECT COUNT(*) FROM products p WHERE $where", $params);
-[$per, $offset] = paginate($total, 15, $links);
 $products = q_all("SELECT p.*, c.name AS cat_name FROM products p
                    LEFT JOIN categories c ON c.id = p.category_id
-                   WHERE $where ORDER BY p.sort_order, p.id LIMIT $per OFFSET $offset", $params);
+                   WHERE $where ORDER BY p.sort_order, p.id", $params);
 
 $activeKey = 'products';
 $pageTitle = 'Products';
@@ -55,9 +54,12 @@ require __DIR__ . '/../includes/dash_header.php';
     </form>
 
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th></th><th>Product</th><th>Category</th><th>MRP</th><th>DP</th><th>BV</th><th>Stock</th><th>Status</th><th>Actions</th></tr>
-            <?php foreach ($products as $p): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th></th><th>Product</th><th>Category</th><th>MRP</th><th>DP</th><th>BV</th><th>Stock</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($products as $p): ?>
             <tr>
                 <td><img class="table-img" src="<?= e(upload_url($p['image']) ?: placeholder('P')) ?>" alt=""></td>
                 <td><b><?= e($p['name']) ?></b><br><small style="color:#000"><?= e($p['size']) ?><?= (int)$p['is_featured'] ? ' · ⭐ featured' : '' ?></small></td>
@@ -80,9 +82,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 </td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
-    <?= $links ?>
 </div>
 
 <?php require __DIR__ . '/../includes/dash_footer.php'; ?>

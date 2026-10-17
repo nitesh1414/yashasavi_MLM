@@ -90,9 +90,12 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php if (!$orders): ?><p style="color:var(--ink-soft)">No orders.</p>
             <?php else: ?>
             <div class="table-wrap" style="box-shadow:none">
-                <table class="table">
-                    <tr><th>Order</th><th>Date</th><th>DP</th><th>BV</th><th>Status</th><th></th></tr>
-                    <?php foreach ($orders as $o): ?>
+                <table class="table table-dt">
+                    <thead>
+                        <tr><th>Order</th><th>Date</th><th>DP</th><th>BV</th><th>Status</th><th></th></tr>
+                    </thead>
+                    <tbody>
+<?php foreach ($orders as $o): ?>
                     <tr>
                         <td><?= e($o['order_no']) ?></td>
                         <td><?= dmy($o['created_at']) ?></td>
@@ -102,7 +105,8 @@ require __DIR__ . '/../includes/dash_header.php';
                         <td><a class="btn btn-light btn-sm" href="order_view.php?id=<?= (int)$o['id'] ?>">Open</a></td>
                     </tr>
                     <?php endforeach; ?>
-                </table>
+                    </tbody>
+                    </table>
             </div>
             <?php endif; ?>
         </div>
@@ -181,9 +185,12 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="card-title">👥 Direct Referrals (latest 10)</div>
             <?php if (!$directs): ?><p style="color:var(--ink-soft)">No direct referrals.</p>
             <?php else: ?>
-            <table class="table" style="width:100%">
-                <tr><th>User</th><th>Self BV</th><th>Status</th><th>Joined</th></tr>
-                <?php foreach ($directs as $d): ?>
+            <table class="table table-dt" style="width:100%">
+                <thead>
+                    <tr><th>User</th><th>Self BV</th><th>Status</th><th>Joined</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($directs as $d): ?>
                 <tr>
                     <td><a href="user_view.php?id=<?= (int)$d['id'] ?>"><b><?= e($d['username']) ?></b></a><br>
                         <small style="color:#000"><?= e($d['full_name']) ?></small></td>
@@ -192,7 +199,8 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><?= dmy($d['created_at']) ?></td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
             <?php endif; ?>
         </div>
 
@@ -200,16 +208,20 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="card-title">🏦 Recent Payouts</div>
             <?php if (!$payouts): ?><p style="color:var(--ink-soft)">No payout requests.</p>
             <?php else: ?>
-            <table class="table" style="width:100%">
-                <tr><th>Request</th><th>Amount</th><th>Status</th></tr>
-                <?php foreach ($payouts as $p): ?>
+            <table class="table table-dt" style="width:100%">
+                <thead>
+                    <tr><th>Request</th><th>Amount</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($payouts as $p): ?>
                 <tr>
                     <td><?= e($p['request_no']) ?></td>
                     <td><?= money($p['amount']) ?></td>
                     <td><?= status_badge($p['status']) ?></td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
             <?php endif; ?>
         </div>
     </div>

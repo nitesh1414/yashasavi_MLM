@@ -23,8 +23,7 @@ $where = '1=1';
 if ($status !== '') { $where .= " AND status = ?"; }
 $params = $status !== '' ? [$status] : [];
 $total = (int)q_val("SELECT COUNT(*) FROM enquiries WHERE $where", $params);
-[$per, $offset] = paginate($total, 20, $links);
-$rows = q_all("SELECT * FROM enquiries WHERE $where ORDER BY id DESC LIMIT $per OFFSET $offset", $params);
+$rows = q_all("SELECT * FROM enquiries WHERE $where ORDER BY id DESC", $params);
 
 $activeKey = 'enquiries';
 $pageTitle = 'Enquiries';
@@ -47,9 +46,12 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="empty-state"><span class="es-ico">✉️</span>No enquiries found.</div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>From</th><th>Subject</th><th>Message</th><th>Date</th><th>Status</th><th>Actions</th></tr>
-            <?php foreach ($rows as $r): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th>From</th><th>Subject</th><th>Message</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($rows as $r): ?>
             <tr>
                 <td>
                     <b><?= e($r['name']) ?></b><br>
@@ -84,9 +86,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 </td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
-    <?= $links ?>
     <?php endif; ?>
 </div>
 

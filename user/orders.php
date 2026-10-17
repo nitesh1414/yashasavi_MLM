@@ -11,8 +11,7 @@ if ($status !== '') {
     $params[] = $status;
 }
 $total = (int)q_val("SELECT COUNT(*) FROM orders WHERE $where", $params);
-[$per, $offset] = paginate($total, 15, $links);
-$orders = q_all("SELECT * FROM orders WHERE $where ORDER BY id DESC LIMIT $per OFFSET $offset", $params);
+$orders = q_all("SELECT * FROM orders WHERE $where ORDER BY id DESC", $params);
 
 $activeKey = 'orders';
 $pageTitle = 'My Orders';
@@ -39,9 +38,12 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>Order No.</th><th>Date</th><th>Items</th><th>DP Total</th><th>BV</th><th>Payment</th><th>Status</th><th></th></tr>
-            <?php foreach ($orders as $o):
+        <table class="table table-dt">
+            <thead>
+                <tr><th>Order No.</th><th>Date</th><th>Items</th><th>DP Total</th><th>BV</th><th>Payment</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($orders as $o):
                 $items = q_val("SELECT COUNT(*) FROM order_items WHERE order_id = ?", [$o['id']]);
                 $pmLabel = ['wallet' => 'Wallet', 'bank_transfer' => 'Bank/UPI', 'online' => 'Online', 'cash' => 'Cash'][$o['payment_mode']] ?? $o['payment_mode'];
             ?>
@@ -59,9 +61,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><a class="btn btn-outline btn-sm" href="order_view.php?id=<?= (int)$o['id'] ?>">View</a></td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
-    <?= $links ?>
     <?php endif; ?>
 </div>
 

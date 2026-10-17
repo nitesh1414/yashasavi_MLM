@@ -19,7 +19,8 @@
     --radius: 14px;
     --shadow: 0 10px 30px rgba(27, 58, 31, .08);
     --shadow-sm: 0 4px 14px rgba(27, 58, 31, .07);
-    --font: 'Poppins', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font: 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-head: 'Poppins', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -868,3 +869,8 @@ body.nav-open .app-tabbar { display: none; }
 }
 /* scroll progress line sits below the island */
 #scrollProgress { top: env(safe-area-inset-top, 0px); }
+
+/* ---------- fonts: headings + brand = Poppins, body = Roboto ---------- */
+h1, h2, h3, h4, h5, h6, .brand-name, .sec-kicker, .hero-kicker, .footer-brand { font-family: var(--font-head); }
+/* amounts never wrap onto two lines */
+span.money { white-space: nowrap; display: inline-block; }

@@ -85,9 +85,12 @@ require __DIR__ . '/../includes/dash_header.php';
 
         <div class="card">
             <div class="card-title">🏆 Top Earners (all time)</div>
-            <table class="table" style="width:100%">
-                <tr><th>#</th><th>User</th><th>Rank</th><th>Earned</th><th>Wallet</th></tr>
-                <?php foreach ($topEarners as $i => $t): ?>
+            <table class="table table-dt" style="width:100%">
+                <thead>
+                    <tr><th>#</th><th>User</th><th>Rank</th><th>Earned</th><th>Wallet</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($topEarners as $i => $t): ?>
                 <tr>
                     <td><?= $i + 1 ?></td>
                     <td><a href="user_view.php?id=<?= (int)$t['id'] ?>"><b><?= e($t['username']) ?></b></a><br>
@@ -97,16 +100,20 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><?= money($t['wallet_balance']) ?></td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
     </div>
 
     <div>
         <div class="card">
             <div class="card-title">🤝 Top Sponsors (by team self-BV)</div>
-            <table class="table" style="width:100%">
-                <tr><th>#</th><th>User</th><th>Directs</th><th>Team Self BV</th></tr>
-                <?php foreach ($topSponsors as $i => $t): ?>
+            <table class="table table-dt" style="width:100%">
+                <thead>
+                    <tr><th>#</th><th>User</th><th>Directs</th><th>Team Self BV</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($topSponsors as $i => $t): ?>
                 <tr>
                     <td><?= $i + 1 ?></td>
                     <td><a href="user_view.php?id=<?= (int)$t['id'] ?>"><b><?= e($t['username']) ?></b></a></td>
@@ -114,14 +121,18 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><b><?= bv($t['team_self_bv']) ?></b></td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
 
         <div class="card">
             <div class="card-title">🛒 Best Selling Products</div>
-            <table class="table" style="width:100%">
-                <tr><th>#</th><th>Product</th><th>Qty</th><th>Revenue (DP)</th></tr>
-                <?php foreach ($topProducts as $i => $t): ?>
+            <table class="table table-dt" style="width:100%">
+                <thead>
+                    <tr><th>#</th><th>Product</th><th>Qty</th><th>Revenue (DP)</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($topProducts as $i => $t): ?>
                 <tr>
                     <td><?= $i + 1 ?></td>
                     <td><?= e($t['product_name']) ?></td>
@@ -129,14 +140,18 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><b><?= money($t['revenue']) ?></b></td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
 
         <div class="card">
             <div class="card-title">⚖️ Company Legs</div>
-            <table class="table" style="width:100%">
-                <tr><th>Leg (root child)</th><th>Left BV</th><th>Right BV</th><th>Balance</th></tr>
-                <?php foreach ($legs as $l): ?>
+            <table class="table table-dt" style="width:100%">
+                <thead>
+                    <tr><th>Leg (root child)</th><th>Left BV</th><th>Right BV</th><th>Balance</th></tr>
+                </thead>
+                <tbody>
+<?php foreach ($legs as $l): ?>
                 <tr>
                     <td><b><?= e($l['username']) ?></b></td>
                     <td><?= e(number_format((float)$l['left_bv'], 0)) ?></td>
@@ -144,7 +159,8 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><?= badge(number_format(abs((float)$l['left_bv'] - (float)$l['right_bv']), 0) . ' BV', 'info') ?></td>
                 </tr>
                 <?php endforeach; ?>
-            </table>
+                </tbody>
+                </table>
         </div>
     </div>
 </div>

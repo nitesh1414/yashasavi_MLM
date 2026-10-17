@@ -24,11 +24,10 @@ $total = (int)q_val("SELECT COUNT(*) FROM commissions c JOIN users u ON u.id = c
                      LEFT JOIN orders o ON o.id = c.order_id WHERE $where", $params);
 $sum = (float)q_val("SELECT COALESCE(SUM(c.amount),0) FROM commissions c JOIN users u ON u.id = c.user_id
                      LEFT JOIN orders o ON o.id = c.order_id WHERE $where", $params);
-[$per, $offset] = paginate($total, 25, $links);
 $rows = q_all("SELECT c.*, u.username, u.full_name, o.order_no FROM commissions c
                JOIN users u ON u.id = c.user_id
                LEFT JOIN orders o ON o.id = c.order_id
-               WHERE $where ORDER BY c.id DESC LIMIT $per OFFSET $offset", $params);
+               WHERE $where ORDER BY c.id DESC", $params);
 
 $activeKey = 'commissions';
 $pageTitle = 'Commissions';
@@ -73,9 +72,12 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="empty-state"><span class="es-ico">💠</span>No commissions found.</div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>ID</th><th>Date</th><th>User</th><th>Type</th><th>Order</th><th>BV</th><th>Amount</th><th>Note</th></tr>
-            <?php foreach ($rows as $r): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th>ID</th><th>Date</th><th>User</th><th>Type</th><th>Order</th><th>BV</th><th>Amount</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($rows as $r): ?>
             <tr>
                 <td>#<?= (int)$r['id'] ?></td>
                 <td><?= dmy($r['created_at'], true) ?></td>
@@ -89,9 +91,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><small style="color:#000"><?= e($r['note']) ?></small></td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
-    <?= $links ?>
     <?php endif; ?>
 </div>
 

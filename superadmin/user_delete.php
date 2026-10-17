@@ -46,7 +46,7 @@ $reasons = [];
 if ($isRoot) { $reasons[] = 'This is the company ROOT position — it can never be deleted.'; }
 if ($downline > 0) { $reasons[] = 'This member has <b>' . number_format($downline) . ' downline members</b> below them — deleting would break the network tree. Move / remove the downline first.'; }
 if ($directs > 0) { $reasons[] = 'This member is the <b>direct sponsor of ' . number_format($directs) . ' member(s)</b> — those members would lose their sponsor.'; }
-if ($orders > 0) { $reasons[] = 'This member has <b>' . number_format($orders) . ' order(s)</b> (' . money($orderSum['dp']) . ' DP / ' . number_format((float)$orderSum['bv']) . ' BV) — the BV and commission history of the whole team would become inconsistent.'; }
+if ($orders > 0) { $reasons[] = 'This member has <b>' . number_format($orders) . ' order(s)</b> (' . money_txt($orderSum['dp']) . ' DP / ' . number_format((float)$orderSum['bv']) . ' BV) — the BV and commission history of the whole team would become inconsistent.'; }
 $canDelete = !$reasons;
 
 if (is_post()) {

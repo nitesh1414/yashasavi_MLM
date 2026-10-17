@@ -12,6 +12,10 @@ $plan = get_plan();
 $pairUnits = floor(min((float)$u['left_bv'], (float)$u['right_bv']) / max(1, (float)$plan['pair_unit_bv']));
 $carry = max((float)$u['left_bv'], (float)$u['right_bv']) - min((float)$u['left_bv'], (float)$u['right_bv']);
 $announcements = q_all("SELECT * FROM announcements WHERE status='active' ORDER BY created_at DESC LIMIT 3");
+$latestStatement = q_row("SELECT s.*, r.payout_done, r.gross, r.tds, r.admin_charge, r.net, r.reason
+                          FROM payout_statement_rows r
+                          JOIN payout_statements s ON s.id = r.statement_id
+                          WHERE r.user_id = ? ORDER BY s.id DESC LIMIT 1", [$u['id']]);
 $recentTx = q_all("SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY id DESC LIMIT 6", [$u['id']]);
 $recentOrders = q_all("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5", [$u['id']]);
 
@@ -154,6 +158,26 @@ require __DIR__ . '/../includes/dash_header.php';
             <p class="form-hint" style="margin-top:8px">Full history: every BV entry (self / left / right) and every points award is logged. Rank &amp; award milestones are on the <a href="plan.php">Marketing Plan</a> page.</p>
             <?php endif; ?>
         </div>
+
+        <?php if ($latestStatement): ?>
+        <div class="card">
+            <div class="card-title">📄 Latest Weekly Payout Statement
+                <span class="right"><a class="btn btn-primary btn-sm" href="receipt.php?statement=<?= (int)$latestStatement['id'] ?>">⬇ Download Receipt</a></span>
+            </div>
+            <table class="kv-table" style="width:100%">
+                <tr><td>Week</td><td><b><?= payout_statement_week_label($latestStatement) ?></b></td></tr>
+                <tr><td>Generated</td><td><?= dmy($latestStatement['run_ts'], true) ?></td></tr>
+                <tr><td>Payout amount (gross)</td><td><b><?= money($latestStatement['gross']) ?></b></td></tr>
+                <tr><td>TDS + Admin charges</td><td>− <?= money((float)$latestStatement['tds'] + (float)$latestStatement['admin_charge']) ?></td></tr>
+                <tr><td><b>Net payable</b></td><td><b><?= money($latestStatement['net']) ?></b></td></tr>
+                <tr><td>Payout status</td><td>
+                    <?php if ((int)$latestStatement['payout_done']): ?><?= badge('✔ Payout will be done', 'success') ?>
+                    <?php else: ?><?= badge('✖ Payout will not be done', 'danger') ?><br><small><?= e($latestStatement['reason']) ?></small><?php endif; ?>
+                </td></tr>
+            </table>
+            <a class="btn btn-outline btn-sm mt-2" href="payout.php">All statements →</a>
+        </div>
+        <?php endif; ?>
 
         <div class="card">
             <div class="card-title">💳 Payout Status <a class="right" href="payout.php">View all →</a></div>

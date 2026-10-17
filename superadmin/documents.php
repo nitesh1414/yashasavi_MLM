@@ -145,7 +145,7 @@ require __DIR__ . '/../includes/dash_header.php';
     </div>
     <p class="form-hint" style="margin-bottom:14px">Legal documents appear on the public <b>Legals</b> page; downloads appear on the <b>Promotion</b> page.</p>
     <div class="table-wrap">
-        <table class="table">
+        <table class="table table-dt">
             <thead>
                 <tr><th>#</th><th>Image</th><th>Title</th><th>Type</th><th>File / URL</th><th>Sort</th><th>Status</th><th></th></tr>
             </thead>

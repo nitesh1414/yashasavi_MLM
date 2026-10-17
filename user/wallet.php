@@ -11,8 +11,7 @@ if ($type === 'credit' || $type === 'debit') {
     $params[] = $type;
 }
 $total = (int)q_val("SELECT COUNT(*) FROM wallet_transactions WHERE $where", $params);
-[$per, $offset] = paginate($total, 20, $links);
-$rows = q_all("SELECT * FROM wallet_transactions WHERE $where ORDER BY id DESC LIMIT $per OFFSET $offset", $params);
+$rows = q_all("SELECT * FROM wallet_transactions WHERE $where ORDER BY id DESC", $params);
 
 $activeKey = 'wallet';
 $pageTitle = 'My Wallet';
@@ -40,9 +39,12 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="empty-state"><span class="es-ico">👛</span>No wallet transactions yet.</div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
-        <table class="table">
-            <tr><th>Date</th><th>Type</th><th>Amount</th><th>Balance After</th><th>Reference</th><th>Note</th></tr>
-            <?php foreach ($rows as $r): ?>
+        <table class="table table-dt">
+            <thead>
+                <tr><th>Date</th><th>Type</th><th>Amount</th><th>Balance After</th><th>Reference</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+<?php foreach ($rows as $r): ?>
             <tr>
                 <td><?= dmy($r['created_at'], true) ?></td>
                 <td><?= badge(ucfirst($r['type']), $r['type'] === 'credit' ? 'success' : 'danger') ?></td>
@@ -53,9 +55,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><small style="color:#000"><?= e($r['note']) ?></small></td>
             </tr>
             <?php endforeach; ?>
-        </table>
+            </tbody>
+            </table>
     </div>
-    <?= $links ?>
     <?php endif; ?>
 </div>
 

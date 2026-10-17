@@ -107,7 +107,7 @@ require __DIR__ . '/../includes/dash_header.php';
             }
             foreach (q_all("SELECT c.*, u.username FROM commissions c JOIN users u ON u.id = c.user_id ORDER BY c.id DESC LIMIT 8") as $c) {
                 $saLogs[] = ['d' => $c['created_at'], 'ico' => '💰',
-                    'txt' => money($c['amount']) . ' ' . str_replace('_', ' ', $c['type']) . ' — ' . e($c['username']) . ' (' . e($c['note']) . ')'];
+                    'txt' => money_txt($c['amount']) . ' ' . str_replace('_', ' ', $c['type']) . ' — ' . e($c['username']) . ' (' . e($c['note']) . ')'];
             }
             foreach (q_all("SELECT p.*, u.username FROM points_logs p JOIN users u ON u.id = p.user_id ORDER BY p.id DESC LIMIT 8") as $p) {
                 $saLogs[] = ['d' => $p['created_at'], 'ico' => '⭐',
