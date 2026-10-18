@@ -39,16 +39,12 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><b><?= money($it['total']) ?></b></td>
                 </tr>
                 <?php endforeach; ?>
-                <tr>
-                    <td colspan="5" style="text-align:right"><b>Total BV</b></td>
-                    <td><b style="color:#000"><?= bv($order['total_bv']) ?></b></td>
-                </tr>
-                <tr>
-                    <td colspan="5" style="text-align:right"><b>Payable (DP Total)</b></td>
-                    <td><b><?= money($order['total_dp']) ?></b></td>
-                </tr>
                 </tbody>
                 </table>
+                <div style="text-align:right;font-size:13.5px;line-height:1.9;margin-top:10px">
+                    <div><b>Total BV:</b> <?= bv($order['total_bv']) ?></div>
+                    <div><b>Payable (DP Total):</b> <?= money($order['total_dp']) ?></div>
+                </div>
         </div>
     </div>
 

@@ -151,9 +151,6 @@ require __DIR__ . '/../includes/dash_header.php';
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if (!$rewards): ?>
-                    <tr><td colspan="9" class="muted">No award rewards defined yet.</td></tr>
-                <?php endif; ?>
             </tbody>
         </table>
     </div>

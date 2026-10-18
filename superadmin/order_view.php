@@ -63,10 +63,12 @@ require __DIR__ . '/../includes/dash_header.php';
                     <td><b><?= money($it['total']) ?></b></td>
                 </tr>
                 <?php endforeach; ?>
-                <tr><td colspan="4" style="text-align:right"><b>Total BV</b></td><td><b style="color:#000"><?= e($o['total_bv']) ?></b></td></tr>
-                <tr><td colspan="4" style="text-align:right"><b>Payable</b></td><td><b><?= money($o['total_dp']) ?></b></td></tr>
                 </tbody>
                 </table>
+                <div style="text-align:right;font-size:13.5px;line-height:1.9;margin-top:10px">
+                    <div><b>Total BV:</b> <?= e($o['total_bv']) ?></div>
+                    <div><b>Payable:</b> <?= money($o['total_dp']) ?></div>
+                </div>
         </div>
 
         <?php if ($o['status'] === 'pending'): ?>
