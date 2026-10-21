@@ -55,7 +55,7 @@ if (is_post()) {
     });
 
     /* deliver directly: runs the full approval — self BV, activation,
-     * sponsor + level income, binary matching, ranks, stock decrement */
+     * the three payout incomes, binary matching, points, stock decrement */
     [$ok, $msg] = approve_order($oid, $a['id']);
     if ($ok) {
         flash('success', 'Order ' . $orderNo . ' for ' . $buyer['username'] . ' (' . $buyer['full_name'] .

@@ -56,6 +56,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <a class="btn <?= $status === '' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="users.php">All</a>
             <a class="btn <?= $status === 'active' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="users.php?status=active">Active</a>
             <a class="btn <?= $status === 'blocked' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="users.php?status=blocked">Blocked</a>
+            <a class="btn btn-primary btn-sm" href="user_sponsor.php">🔗 Change Sponsor</a>
         </span>
     </div>
 
@@ -98,6 +99,7 @@ require __DIR__ . '/../includes/dash_header.php';
                     <div class="table-actions">
                         <a class="btn btn-outline btn-sm" href="user_view.php?id=<?= (int)$r['id'] ?>">View</a>
                         <a class="btn btn-light btn-sm" href="user_edit.php?id=<?= (int)$r['id'] ?>">Edit</a>
+                        <a class="btn btn-light btn-sm" href="user_sponsor.php?q=<?= e($r['username']) ?>" title="Change the sponsor of this member">🔗 Sponsor</a>
                         <?php if ($r['status'] === 'active'): ?>
                         <form method="post" class="inline-form" data-confirm="Block this user? They will not be able to login.">
                             <?= csrf_field() ?>

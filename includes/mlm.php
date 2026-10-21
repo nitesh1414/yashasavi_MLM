@@ -333,37 +333,7 @@ function add_commission($userId, $orderId, $type, $amount, $bvAmount, $level = n
 /*  Ranks                                                              */
 /* ------------------------------------------------------------------ */
 
-/**
- * Award & rewards: every award_rewards row whose LIFETIME points
- * threshold is reached is awarded once (tracked via commissions.level =
- * reward id). Points = matched pair points (3,000 BV left + 3,000 BV
- * right per point) — self BV is never counted. Cash awards are wallet
- * income only, NOT part of the member's payout commission.
- */
-function check_award_rewards($userId, $orderId = null)
-{
-    $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
-    if (!$u || $u['status'] !== 'active') {
-        return;
-    }
-    foreach (q_all("SELECT * FROM award_rewards WHERE status = 'active' ORDER BY points ASC") as $a) {
-        if ((int)$u['reward_points'] < (int)$a['points']) {
-            continue;
-        }
-        $already = (int)q_val(
-            "SELECT COUNT(*) FROM commissions WHERE user_id = ? AND type = 'award' AND level = ? AND status = 'credited'",
-            [$userId, (int)$a['id']]
-        );
-        if ($already) {
-            continue;
-        }
-        $amt = $a['reward_type'] === 'cash' ? (float)$a['amount'] : 0.0;
-        add_commission($userId, $orderId, 'award', $amt, (int)$u['reward_points'], (int)$a['id'],
-            'Award reward: ' . $a['reward_title'] . ' (' . (int)$a['points'] . ' lifetime points)');
-    }
-}
-
-function check_rank($userId, $orderId = null, $withReward = true)
+function check_rank($userId, $orderId = null)
 {
     $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
     if (!$u) {
@@ -383,11 +353,8 @@ function check_rank($userId, $orderId = null, $withReward = true)
     if ((int)$u['rank_id'] >= (int)$best['id']) {
         return null; // already at or above this rank
     }
+    /* rank titles are recognition only — no rank cash commission is paid */
     q("UPDATE users SET rank_id = ? WHERE id = ?", [$best['id'], $userId]);
-    if ($withReward && (float)$best['reward_amount'] > 0) {
-        add_commission($userId, $orderId, 'rank', $best['reward_amount'], (int)$u['reward_points'], null,
-            'Rank achievement: ' . $best['name'] . ' (' . (int)$best['min_points'] . ' points)');
-    }
     return $best;
 }
 
@@ -408,19 +375,35 @@ function run_binary_matching($user, $orderId)
     $right = (float)$user['right_bv'];
     $unitsAvailable = (int)floor(min($left, $right) / $unit);
     $newUnits = $unitsAvailable - (int)$user['matched_pairs'];
-    if ($newUnits <= 0) {
-        return 0.0;
-    }
     /* every matched unit is COUNTED, but the matching commission is paid
      * only ONCE — for the member's FIRST matching pair (₹450). Further
      * pairs add POINTS only (see update_reward_points). */
-    q("UPDATE users SET matched_pairs = matched_pairs + ? WHERE id = ?", [$newUnits, $user['id']]);
+    if ($newUnits > 0) {
+        q("UPDATE users SET matched_pairs = matched_pairs + ? WHERE id = ?", [$newUnits, $user['id']]);
+    }
 
+    $alreadyPaid = (int)q_val(
+        "SELECT COUNT(*) FROM commissions WHERE type = 'binary' AND user_id = ?",
+        [$user['id']]
+    );
+    if ($alreadyPaid || $unitsAvailable < 1) {
+        return 0.0; // first pair already paid, or no matched pair yet
+    }
     if ((int)$plan['matching_requires_active'] === 1 && (int)$user['is_active'] !== 1) {
         return 0.0; // inactive members match pairs but are not paid
     }
-    if ((int)$user['matched_pairs'] > 0) {
-        return 0.0; // first pair already paid — points only from here
+    if ($user['status'] !== 'active') {
+        return 0.0;
+    }
+    /* rule c): the ₹450 matching pair commission is paid ONLY when the
+     * member has also earned at least a) or b) — a directly sponsored
+     * downline member in the left or right leg completed their joining */
+    $hasSponsorIncome = (int)q_val(
+        "SELECT COUNT(*) FROM commissions WHERE type = 'sponsor' AND user_id = ?",
+        [$user['id']]
+    );
+    if (!$hasSponsorIncome) {
+        return 0.0;
     }
     if ($plan['binary_type'] === 'fixed') {
         $income = round((float)$plan['binary_value'], 2);
@@ -431,18 +414,31 @@ function run_binary_matching($user, $orderId)
         return 0.0;
     }
     add_commission($user['id'], $orderId, 'binary', $income, $unit, 1,
-        'First matching pair: ' . bv($left) . ' left + ' . bv($right) . ' right');
+        'First matching pair: ' . bv($left) . ' left + ' . bv($right) . ' right (direct sponsor leg income completed)');
 
-    /* 50% Direct Sponsor Bonus: the DIRECT sponsor (L1) of the member who
-       just completed their first matching pair receives 50% (₹225). Paid
-       once per direct member (their first pair is the only paid pair). */
+    /* Direct Sponsor Matching Bonus (rules d + e): when a DIRECTLY
+       SPONSORED downline member in the member's left or right leg
+       completes their own first matching pair (rule c), the member
+       receives 50% (₹225). Paid once per direct member. */
     $smPct = isset($plan['sponsor_matching_percent']) ? (float)$plan['sponsor_matching_percent'] : 0.0;
     if ($smPct > 0 && $user['sponsor_id']) {
         $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$user['sponsor_id']]);
+        /* the member must be a downline member of the sponsor (left or right leg) */
+        $side = $user['leg'];
+        $sponsorIsUpline = false;
+        foreach (ancestor_chain($user) as $anc) {
+            if ((int)$anc['id'] === (int)$user['sponsor_id']) {
+                $sponsorIsUpline = true;
+                break;
+            }
+            $side = $anc['leg'];
+        }
         $smAmt = round($income * $smPct / 100, 2);
-        if ($sponsor && $smAmt > 0 && $sponsor['status'] === 'active' && (int)$sponsor['is_active'] === 1) {
+        if ($sponsor && $sponsorIsUpline && $smAmt > 0
+            && $sponsor['status'] === 'active' && (int)$sponsor['is_active'] === 1) {
             add_commission($sponsor['id'], $orderId, 'sponsor_matching', $smAmt, 0, 1,
-                $smPct . '% bonus — direct ' . $user['username'] . ' completed the first matching pair');
+                $smPct . '% bonus — direct ' . ($side === 'R' ? 'right' : 'left') . ' downline member '
+                . $user['username'] . ' completed the first matching pair');
         }
     }
     return $income;
@@ -456,10 +452,12 @@ function run_binary_matching($user, $orderId)
  * logged (points_logs) and drives the rank cash rewards and the award
  * milestones from the MLM points PDF.
  *
- * $withRewards = false (payout recalculation) updates points and rank
- * TITLES only — rank/award reward money is not part of the payout rebuild.
+ * Points and rank TITLES are recognition only — no rank, car fund, award
+ * or any other commission money exists in this plan besides the three
+ * payout incomes (direct sponsor leg, first matching pair, direct sponsor
+ * matching bonus).
  */
-function update_reward_points($userId, $orderId = null, $withRewards = true)
+function update_reward_points($userId, $orderId = null)
 {
     $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
     if (!$u || (int)$u['is_active'] !== 1 || $u['status'] !== 'active') {
@@ -481,48 +479,70 @@ function update_reward_points($userId, $orderId = null, $withRewards = true)
     q("INSERT INTO points_logs (user_id, order_id, points, total_points, left_bv, right_bv, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)",
       [$userId, $orderId, $add, $target, (float)$u['left_bv'], (float)$u['right_bv'], commission_now()]);
-    check_rank($userId, $orderId, $withRewards);
-    if ($withRewards) {
-        check_award_rewards($userId, $orderId);
-    }
+    check_rank($userId, $orderId);
     return $add;
 }
 
 /**
- * Left / Right Leg Completion Bonus: Rs 300 is paid ONCE per leg when
- * that leg's TOTAL team business — every downline member in the leg, at
- * any depth — first completes the joining threshold (3,000 BV). Maximum
- * Rs 600 per member: one payment for the left leg, one for the right.
- * Called from the placement-tree loop with the leg's BV before and after
- * this order, so the payment fires exactly at the crossing order.
+ * Direct Sponsor Leg Income (rules a + b): the one-time Rs 300 is paid to
+ * the member when a DIRECTLY SPONSORED downline member placed in the
+ * member's LEFT leg completes their own 3,000 BV joining (level 1), and
+ * once when a directly sponsored member in the RIGHT leg completes it
+ * (level 2). Fires at the exact moment the downline member completes
+ * their joining BV — called with the member row of the member who just
+ * completed it. Maximum Rs 600 per member: one payment per leg, forever.
  */
-function pay_leg_completion_bonus(array $user, $legCol, $preBv, $orderId, array $plan)
+function pay_direct_sponsor_leg_bonus(array $buyer, $orderId)
 {
+    $plan = get_plan();
     $threshold = (float)$plan['activation_bv'];
     $amt = round($threshold * (float)$plan['sponsor_percent'] / 100, 2);
-    if ($amt <= 0 || $preBv >= $threshold || (float)$user[$legCol] < $threshold) {
-        return false; // leg already crossed earlier, or still below the threshold
+    if ($amt <= 0 || !(int)$buyer['sponsor_id']) {
+        return 0;
     }
-    $lvl = ($legCol === 'right_bv') ? 2 : 1; // commissions.level: 1 = left leg, 2 = right leg
+    $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$buyer['sponsor_id']]);
+    if (!$sponsor || (int)$sponsor['id'] === (int)$buyer['id']) {
+        return 0;
+    }
+    /* the sponsor must be an ancestor of the member (the member is a
+     * downline member in the sponsor's left or right leg) */
+    $side = $buyer['leg'];
+    $leg = null;
+    foreach (ancestor_chain($buyer) as $anc) {
+        if ((int)$anc['id'] === (int)$sponsor['id']) {
+            $leg = $side;
+            break;
+        }
+        $side = $anc['leg'];
+    }
+    if ($leg === null) {
+        return 0; // sponsor is not in the upline — no leg income
+    }
+    $lvl = ($leg === 'R') ? 2 : 1; // commissions.level: 1 = left leg, 2 = right leg
     $already = (int)q_val(
         "SELECT COUNT(*) FROM commissions WHERE type = 'sponsor' AND user_id = ? AND level = ?",
-        [$user['id'], $lvl]
+        [$sponsor['id'], $lvl]
     );
-    if ($already || $user['status'] !== 'active' || (int)$user['is_active'] !== 1) {
-        return false; // already paid for this leg, or member not yet eligible
+    if ($already || $sponsor['status'] !== 'active' || (int)$sponsor['is_active'] !== 1) {
+        return 0; // already paid for this leg, or sponsor not yet eligible
     }
-    add_commission($user['id'], $orderId, 'sponsor', $amt, $threshold, $lvl,
-        ($lvl === 2 ? 'Right' : 'Left') . ' leg completed ' . bv($threshold) . ' — one-time leg bonus');
-    return true;
+    add_commission($sponsor['id'], $orderId, 'sponsor', $amt, $threshold, $lvl,
+        'Direct ' . ($leg === 'R' ? 'right' : 'left') . ' downline member ' . $buyer['username']
+        . ' completed ' . bv($threshold) . ' joining');
+    /* rule c): earning a) or b) may make a pending first matching pair payable */
+    $sponsor = q_row("SELECT * FROM users WHERE id = ?", [$sponsor['id']]);
+    run_binary_matching($sponsor, $orderId);
+    return 1;
 }
 
 /**
- * Leg Completion Bonus catch-up: if a leg completed 3,000 BV while the
- * member was not yet eligible (own 3,000 BV joining not complete), the
- * pending Rs 300 per completed leg is paid as soon as the member
- * activates. Maximum one left + one right payment, ever.
+ * Direct Sponsor Leg Income catch-up: if a directly sponsored downline
+ * member completed their 3,000 BV joining while the member was not yet
+ * eligible (own joining not complete), the pending Rs 300 per leg is paid
+ * as soon as the member becomes eligible. Maximum one left + one right
+ * payment, ever.
  */
-function pay_pending_leg_commissions($userId, $orderId = null)
+function pay_pending_sponsor_legs($userId, $orderId = null)
 {
     $plan = get_plan();
     $threshold = (float)$plan['activation_bv'];
@@ -535,10 +555,7 @@ function pay_pending_leg_commissions($userId, $orderId = null)
         return 0;
     }
     $paid = 0;
-    foreach ([1 => 'left_bv', 2 => 'right_bv'] as $lvl => $col) {
-        if ((float)$u[$col] < $threshold) {
-            continue;
-        }
+    foreach (['L' => 1, 'R' => 2] as $leg => $lvl) {
         $already = (int)q_val(
             "SELECT COUNT(*) FROM commissions WHERE type = 'sponsor' AND user_id = ? AND level = ?",
             [$userId, $lvl]
@@ -546,9 +563,29 @@ function pay_pending_leg_commissions($userId, $orderId = null)
         if ($already) {
             continue;
         }
+        /* is there a directly sponsored member in this leg (the leg child
+         * or anywhere below it) who already completed their joining? */
+        $child = q_row("SELECT * FROM users WHERE placement_id = ? AND leg = ?", [$userId, $leg]);
+        if (!$child) {
+            continue;
+        }
+        $done = (int)q_val(
+            "SELECT COUNT(*) FROM users
+             WHERE sponsor_id = ? AND is_active = 1
+               AND (id = ? OR path LIKE ?)",
+            [$userId, (int)$child['id'], $child['path'] . '%']
+        );
+        if (!$done) {
+            continue;
+        }
         add_commission($userId, $orderId, 'sponsor', $amt, $threshold, $lvl,
-            ($lvl === 2 ? 'Right' : 'Left') . ' leg completed ' . bv($threshold) . ' — one-time leg bonus');
+            ($lvl === 2 ? 'Right' : 'Left') . ' leg — direct sponsored downline member completed ' . bv($threshold) . ' joining');
         $paid++;
+    }
+    if ($paid) {
+        /* rule c): earning a) or b) may make a pending first matching pair payable */
+        $u = q_row("SELECT * FROM users WHERE id = ?", [$userId]);
+        run_binary_matching($u, $orderId);
     }
     return $paid;
 }
@@ -559,8 +596,9 @@ function pay_pending_leg_commissions($userId, $orderId = null)
 
 /**
  * Approve a pending order: credit BV, activate the buyer, propagate BV
- * up the binary tree, pay sponsor / level / matching income and check
- * ranks. Everything runs in a single transaction.
+ * up the binary tree and pay the three payout incomes (direct sponsor
+ * leg, first matching pair, direct sponsor matching bonus). Everything
+ * runs in a single transaction.
  *
  * Returns [ok(bool), message].
  */
@@ -706,9 +744,9 @@ function approve_order($orderId, $adminId)
             return [false, 'Cash payment has not been authorized yet — use the “Authorize Payment” button first.'];
         }
 
-        /* 1-5) business effects: BV, activation, sponsor + level income,
-         *      binary matching, ranks & special rewards (shared with the
-         *      full plan recalculation) */
+        /* 1-5) business effects: BV, joining completion, direct sponsor
+         *      leg income, binary matching, points (shared with the full
+         *      plan recalculation) */
         if (!apply_order_business_effects($order)) {
             return [false, 'Buyer account missing.'];
         }
@@ -727,8 +765,8 @@ function approve_order($orderId, $adminId)
 
 /**
  * Core business effects of an approved order: self BV + activation,
- * direct sponsor bonus, level income, BV propagation up the placement
- * tree with binary matching, and rank / special-reward checks.
+ * direct sponsor leg income, BV propagation up the placement tree with
+ * binary matching, and points / rank titles (recognition only).
  * Shared by approve_order() and the full plan recalculation
  * (recalculate_all_incomes()); payment status, order status and stock
  * are the caller's business. Returns false when the buyer is missing.
@@ -741,22 +779,23 @@ function approve_order($orderId, $adminId)
  *     self BV is never counted in any commission or points calculation).
  *     Completing Self 3,000 BV makes the member eligible for commission
  *     and points.
- *  2. Leg Completion Bonus ₹300 — paid ONCE per leg (left and right),
- *     when that leg's TOTAL team business — all downline members in the
- *     leg, at any depth — first completes 3,000 BV. Max ₹600 / member.
+ *  2. Direct Sponsor Leg Income (rules a + b): ₹300 paid ONCE per leg
+ *     (left and right) — but only when the downline member who completed
+ *     their own 3,000 BV joining in that leg is DIRECTLY SPONSORED by the
+ *     member. Max ₹600 / member.
  *  3. BV propagates up the placement tree (logged in bv_logs).
- *  4. Matching Bonus ₹450 — paid ONCE, for the member's FIRST matching
- *     pair (3,000 BV left + 3,000 BV right). Further pairs add POINTS.
- *  5. 50% Direct Sponsor Bonus ₹225 — paid ONCE to the DIRECT sponsor
- *     when their direct member completes the first matching pair.
- *  6. Points: +1 per matched 3,000 BV pair (left + right), logged and
- *     driving the rank cash rewards and award milestones.
+ *  4. Matching Pair Income (rule c): ₹450 paid ONCE, for the member's
+ *     FIRST matching pair (3,000 BV left + 3,000 BV right) — only when the
+ *     member has also earned a) or b) (at least one directly sponsored
+ *     downline member completed their joining). Further pairs add POINTS.
+ *  5. Direct Sponsor Matching Bonus (rules d + e): ₹225 paid ONCE to the
+ *     member when a DIRECTLY SPONSORED downline member in their left or
+ *     right leg completes the member's own first matching pair (rule c).
+ *  6. Points: +1 per matched 3,000 BV pair (left + right) — recognition
+ *     only (rank titles; no reward money).
  *
- * There is NO level income, NO car fund and NO other commission.
- *
- * $payoutOnly = true replays an order for the payout recalculation:
- * rank/award reward money is not created (wallet income only — never part
- * of a member's payout commission); points, logs and rank titles are.
+ * There is NO level income, NO car fund, NO rank / award money and NO
+ * other commission of any kind.
  */
 function apply_order_business_effects(array $order, $payoutOnly = false)
 {
@@ -767,40 +806,50 @@ function apply_order_business_effects(array $order, $payoutOnly = false)
     }
     $plan = get_plan();
 
-    /* 1) self BV (display + eligibility) + activation at 3,000 BV */
+    /* 1) self BV (display + eligibility) + joining completion at 3,000 BV */
+    $threshold = (float)$plan['activation_bv'];
+    $preSelf = (float)$buyer['self_bv'];
     q("UPDATE users SET self_bv = self_bv + ? WHERE id = ?", [$totalBv, $buyer['id']]);
-    $buyer['self_bv'] = (float)$buyer['self_bv'] + $totalBv;
+    $buyer['self_bv'] = $preSelf + $totalBv;
     q("INSERT INTO bv_logs (user_id, order_id, kind, bv, balance_after, note, created_at)
        VALUES (?, ?, 'self', ?, ?, ?, ?)",
       [$buyer['id'], $order['id'], $totalBv, $buyer['self_bv'],
        'Purchase ' . ($order['order_no'] ?? '') . ' — self BV', commission_now()]);
-    if ((int)$buyer['is_active'] !== 1 && $buyer['self_bv'] >= (float)$plan['activation_bv']) {
+    /* the moment the member completes their own 3,000 BV joining: every
+     * ancestor who is ALSO the member's direct sponsor earns the one-time
+     * ₹300 Direct Sponsor Leg Income for the leg the member sits in
+     * (rules a + b — sponsor of the downline member, left / right leg) */
+    if ($preSelf < $threshold && $buyer['self_bv'] >= $threshold) {
+        pay_direct_sponsor_leg_bonus($buyer, $order['id']);
+    }
+    if ((int)$buyer['is_active'] !== 1 && $buyer['self_bv'] >= $threshold) {
         q("UPDATE users SET is_active = 1, activated_at = ? WHERE id = ?", [now(), $buyer['id']]);
         $buyer['is_active'] = 1;
-        /* the buyer is now eligible: pay any ₹300 leg bonuses pending from
-         * legs that completed 3,000 BV earlier, and grant points for
-         * already-matched leg BV (retroactive eligibility) */
-        pay_pending_leg_commissions($buyer['id'], $order['id']);
-        update_reward_points($buyer['id'], $order['id'], !$payoutOnly);
+        /* the buyer is now eligible: pay any ₹300 direct sponsor leg incomes
+         * pending from directly sponsored members who completed their joining
+         * earlier (retroactive eligibility), catch up a pending first
+         * matching pair and grant points for already-matched leg BV */
+        pay_pending_sponsor_legs($buyer['id'], $order['id']);
+        run_binary_matching($buyer, $order['id']);
+        update_reward_points($buyer['id'], $order['id']);
     }
 
-    /* 2) propagate BV up the placement tree (logged) + leg bonus +
-     *    matching + points — the ₹300 leg bonus fires when an ancestor's
-     *    left or right leg first completes 3,000 BV total team business */
+    /* 2) propagate BV up the placement tree (logged) + binary matching
+     *    (₹450 first pair, ₹225 sponsor matching) + points for every
+     *    ancestor — team BV counts from ANY downline member, sponsored
+     *    or not */
     $chain = ancestor_chain($buyer); // nearest first
     $leg = $buyer['leg'];            // leg of buyer relative to its parent
     foreach ($chain as $anc) {
         $col = ($leg === 'R') ? 'right_bv' : 'left_bv';
-        $preLegBv = (float)$anc[$col];
         q("UPDATE users SET $col = $col + ? WHERE id = ?", [$totalBv, $anc['id']]);
-        $anc[$col] = $preLegBv + $totalBv;
+        $anc[$col] = (float)$anc[$col] + $totalBv;
         q("INSERT INTO bv_logs (user_id, order_id, kind, bv, balance_after, note, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)",
           [$anc['id'], $order['id'], $leg === 'R' ? 'right' : 'left', $totalBv, $anc[$col],
            'Team BV from ' . $buyer['username'] . ' (' . ($leg === 'R' ? 'right' : 'left') . ' leg)', commission_now()]);
-        pay_leg_completion_bonus($anc, $col, $preLegBv, $order['id'], $plan);
         run_binary_matching($anc, $order['id']);
-        update_reward_points($anc['id'], $order['id'], !$payoutOnly);
+        update_reward_points($anc['id'], $order['id']);
         $leg = $anc['leg']; // leg of this ancestor relative to its own parent
     }
 
@@ -813,9 +862,11 @@ function apply_order_business_effects(array $order, $payoutOnly = false)
  * settings page after the admin changes any plan value.
  *
  * PAYOUT COMMISSIONS ONLY: the rebuild generates exactly the three
- * payout incomes — Direct Sponsor, binary Matching Bonus and the 50%
- * Direct Sponsor Bonus. Level income, rank rewards, car fund and award
- * rewards are NOT part of a member's payout commission: any old entries
+ * payout incomes — Direct Sponsor Leg Income (₹300 left / right, only
+ * when the completing downline member is directly sponsored by the
+ * member), the first Matching Pair ₹450 (only with a) or b) earned) and
+ * the Direct Sponsor Matching Bonus ₹225. Level income, rank rewards,
+ * car fund and award rewards do not exist in this plan: any old entries
  * are cleared and NOT rebuilt. Rank TITLES are still recomputed (no
  * reward money), and left / right / self BV, matched pairs, activation
  * and wallet ledger rows for the three payout incomes are rebuilt.
@@ -928,7 +979,7 @@ function request_payout($userId, $amount)
      * award rewards, level income etc. are NOT added to a member's payout */
     $eligible = payout_eligible_amount($userId);
     if ($amount > $eligible) {
-        return [false, 'Amount exceeds your eligible payout income (' . money_txt($eligible) . '). Only Leg Completion, Matching Bonus and 50% Direct Sponsor Bonus incomes are payable.'];
+        return [false, 'Amount exceeds your eligible payout income (' . money_txt($eligible) . '). Only Direct Sponsor Leg Income (₹300 left / right), First Matching Pair (₹450) and Direct Sponsor Matching Bonus (₹225) are payable.'];
     }
     if ($amount > (float)$u['wallet_balance']) {
         return [false, 'Amount exceeds your wallet balance.'];
@@ -951,11 +1002,11 @@ function request_payout($userId, $amount)
 
 /**
  * Amount currently eligible for payout: ONLY the three plan incomes —
- * Leg Completion Income (once per leg), Matching Bonus Income (first
- * pair) and 50% Direct Sponsor Bonus Income — minus payouts already
- * generated / paid. All other
- * amounts (rank rewards, car fund, award rewards, level income, manual
- * entries) are NOT added to a member's payout.
+ * Direct Sponsor Leg Income (₹300 once per leg), the first Matching
+ * Pair Income (₹450) and the Direct Sponsor Matching Bonus (₹225) —
+ * minus payouts already generated / paid. All other amounts (rank
+ * rewards, car fund, award rewards, level income, manual entries) do
+ * not exist in this plan and are NOT added to a member's payout.
  * $upto (optional 'YYYY-MM-DD HH:MM:SS') limits the income side to that
  * moment — used by date-wise payout reports.
  */

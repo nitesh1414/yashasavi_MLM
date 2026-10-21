@@ -24,10 +24,10 @@ require __DIR__ . '/../includes/dash_header.php';
 ?>
 
 <div class="stat-grid">
-    <div class="stat-card"><div class="st-ico">🤝</div><div><b><?= money($earn['sponsor']) ?></b><span>Leg Completion (₹300 + ₹300)</span></div></div>
+    <div class="stat-card"><div class="st-ico">🤝</div><div><b><?= money($earn['sponsor']) ?></b><span>Direct Sponsor Leg Income (₹300 L + ₹300 R)</span></div></div>
     <div class="stat-card teal"><div class="st-ico">💠</div><div><b><?= money($earn['binary']) ?></b><span>First Matching Pair (₹450)</span></div></div>
-    <div class="stat-card blue"><div class="st-ico">⚖️</div><div><b><?= money($earn['sponsor_matching']) ?></b><span>50% Direct Sponsor Bonus (₹225)</span></div></div>
-    <div class="stat-card gold"><div class="st-ico">🏅</div><div><b><?= money($earn['rank'] + $earn['award']) ?></b><span>Rank + Award Rewards</span></div></div>
+    <div class="stat-card blue"><div class="st-ico">⚖️</div><div><b><?= money($earn['sponsor_matching']) ?></b><span>Direct Sponsor Matching Bonus (₹225)</span></div></div>
+    <div class="stat-card gold"><div class="st-ico">🏅</div><div><b><?= number_format((float)$u['reward_points']) ?></b><span>Points — recognition only, no reward money</span></div></div>
 </div>
 
 <div class="card">
@@ -35,8 +35,8 @@ require __DIR__ . '/../includes/dash_header.php';
         💰 Commission Statement (gross income)
         <span class="right">
             <a class="btn <?= $type === '' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="earnings.php">All</a>
-            <?php foreach (['sponsor', 'binary', 'level', 'rank', 'sponsor_matching', 'car_fund', 'award', 'retail', 'other'] as $t): ?>
-                <a class="btn <?= $type === $t ? 'btn-primary' : 'btn-light' ?> btn-sm" href="earnings.php?type=<?= $t ?>"><?= ucfirst($t) ?></a>
+            <?php foreach (['sponsor' => 'Direct Leg (L/R)', 'binary' => 'Matching Pair', 'sponsor_matching' => 'Sponsor Matching'] as $t => $lbl): ?>
+                <a class="btn <?= $type === $t ? 'btn-primary' : 'btn-light' ?> btn-sm" href="earnings.php?type=<?= $t ?>"><?= e($lbl) ?></a>
             <?php endforeach; ?>
         </span>
     </div>
@@ -54,7 +54,7 @@ require __DIR__ . '/../includes/dash_header.php';
 <?php foreach ($rows as $r): ?>
             <tr>
                 <td><?= dmy($r['created_at'], true) ?></td>
-                <td><?php $tLabels = ['sponsor' => 'Leg Bonus (L/R)', 'binary' => 'Matching', 'level' => 'SP Match', 'rank' => 'Cash Reward', 'sponsor_matching' => 'Sponsor Matching', 'car_fund' => 'Car Fund', 'award' => 'Award Reward', 'retail' => 'Retail', 'other' => 'Other']; ?>
+                <td><?php $tLabels = ['sponsor' => 'Direct Leg Bonus (L/R)', 'binary' => 'Matching', 'level' => 'SP Match', 'rank' => 'Cash Reward', 'sponsor_matching' => 'Sponsor Matching', 'car_fund' => 'Car Fund', 'award' => 'Award Reward', 'retail' => 'Retail', 'other' => 'Other']; ?>
                     <?= badge($tLabels[$r['type']] ?? ucfirst($r['type']), $r['type'] === 'binary' ? 'info' : ($r['type'] === 'rank' || $r['type'] === 'car_fund' || $r['type'] === 'award' ? 'warning' : 'primary')) ?></td>
                 <td><?= e($r['order_no'] ?: '—') ?></td>
                 <td><?php

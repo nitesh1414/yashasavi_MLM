@@ -16,7 +16,7 @@ if (is_post()) {
          * Saturday 11:59 PM; generated only here at the Superadmin end */
         [$ok, $runTs, $st] = generate_payout_report();
         if (!$ok || (!$st['created'] && !$st['blocked'] && !$st['skipped'])) {
-            flash('warning', 'Weekly payout report: no eligible members found (eligible income = Leg Completion + Matching Bonus + 50% Direct Sponsor Bonus, minimum ' . money_txt(get_plan()['payout_min']) . ').');
+            flash('warning', 'Weekly payout report: no eligible members found (eligible income = Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225), minimum ' . money_txt(get_plan()['payout_min']) . ').');
             redirect('payouts.php');
         }
         flash('success',
@@ -104,7 +104,7 @@ require __DIR__ . '/../includes/dash_header.php';
         member with amounts, KYC status and bank details. Members with <b>completed KYC + bank details</b>
         get a pending payout (wallet debited) — <b>payout will be done</b>. Members with incomplete KYC or
         bank details are listed as <b>payout will not be done</b> and keep their balance for the next week.
-        Eligible income = <b>Leg Completion + Matching Bonus + 50% Direct Sponsor Bonus</b> only, minimum
+        Eligible income = <b>Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225)</b> only, minimum
         <?= money(get_plan()['payout_min']) ?>. <?= e(get_plan()['tds_percent']) ?>% TDS and
         <?= e(get_plan()['admin_charge_percent']) ?>% admin charge are deducted from the payout amount.
     </p>

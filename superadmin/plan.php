@@ -72,7 +72,7 @@ if (is_post()) {
             'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed from zero under the current settings — '
             . number_format($st['commissions']) . ' payout income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total) for '
             . number_format($st['members']) . ' member(s), ' . number_format($st['points']) . ' points awarded, in ' . $st['seconds'] . 's. '
-            . 'Payout commission = ₹300 per completed Leg (L+R, once each) + ₹450 first Matching Pair + ₹225 Direct Sponsor Bonus only — rank and award rewards are NOT added. '
+            . 'Payout commission = ₹300 Direct Sponsor Leg Income (L+R, once each, only for directly sponsored downline members) + ₹450 first Matching Pair (only with a) or b) earned) + ₹225 Direct Sponsor Matching Bonus only — rank and award rewards are NOT added. '
             . 'Wallet balances were rebuilt from the ledger; manual entries and payouts were kept.');
         redirect('plan.php');
     }
@@ -122,16 +122,16 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">1 · Leg Completion Income (one time per leg, ₹300 + ₹300)</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">1 · Direct Sponsor Leg Income (rules a + b — one time per leg, ₹300 + ₹300)</h4>
         <div class="form-grid2">
             <div class="form-group">
-                <label>Sponsor income — % of joining BV</label>
+                <label>Direct sponsor leg income — % of joining BV</label>
                 <input class="form-control" type="number" step="0.01" name="sponsor_percent" value="<?= e($plan['sponsor_percent']) ?>">
-                <div class="form-hint" style="margin-top:6px">10% × 3,000 BV = <b>₹300 per leg</b> — paid <b>once</b> when the member's LEFT leg total (all downline, any depth) completes 3,000 BV, and once when the RIGHT leg completes 3,000 BV. Maximum ₹600 per member.</div>
+                <div class="form-hint" style="margin-top:6px">10% × 3,000 BV = <b>₹300 per leg</b> — paid <b>once</b> when a <b>directly sponsored downline member in the member's LEFT leg</b> completes their own 3,000 BV joining, and once for a directly sponsored member in the RIGHT leg. The member must be the <b>sponsor</b> of that downline member. Maximum ₹600 per member.</div>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">2 · Matching Bonus Income (first pair only)</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">2 · Matching Pair Income (rule c — first pair only, ₹450)</h4>
         <div class="form-grid3">
             <div class="form-group">
                 <label>BV per pair unit (1:1 matching unit)</label>
@@ -147,25 +147,25 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="form-group">
                 <label>Value (% or ₹)</label>
                 <input class="form-control" type="number" step="0.01" name="binary_value" value="<?= e($plan['binary_value']) ?>">
-                <div class="form-hint" style="margin-top:6px">3,000 BV left + 3,000 BV right = <b>₹450, paid ONCE for the member's FIRST matching pair</b>. Every further pair adds points only.</div>
+                <div class="form-hint" style="margin-top:6px">3,000 BV left + 3,000 BV right = <b>₹450, paid ONCE for the member's FIRST matching pair — but only when the member has earned a) or b)</b>: at least one directly sponsored downline member in the left or right leg completed their own 3,000 BV joining. Every further pair adds points only.</div>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">3 · 50% Direct Sponsor Bonus (one time per direct)</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">3 · Direct Sponsor Matching Bonus (rules d + e — one time per direct, ₹225)</h4>
         <div class="form-grid2">
             <div class="form-group">
-                <label>Bonus — % of the direct's first matching income</label>
+                <label>Bonus — % of the direct's first matching pair income</label>
                 <input class="form-control" type="number" step="0.01" name="sponsor_matching_percent" value="<?= e($plan['sponsor_matching_percent']) ?>">
-                <div class="form-hint" style="margin-top:6px">50% × ₹450 = <b>₹225</b> — paid <b>once</b> to the direct sponsor when a direct member in the <b>left</b> or <b>right</b> leg completes their first matching pair.</div>
+                <div class="form-hint" style="margin-top:6px">50% × ₹450 = <b>₹225</b> — paid <b>once</b> when a <b>directly sponsored downline member in the member's left or right leg</b> completes their own first matching pair (their rule c). The member must be the sponsor of that downline member.</div>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">4 · Points, Ranks &amp; Awards</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">4 · Points, Ranks &amp; Awards (recognition only — no commission money)</h4>
         <div class="form-grid2">
             <div class="form-group">
                 <label>Points per matched pair unit</label>
                 <input class="form-control" type="number" min="0" name="points_per_unit" value="<?= e($plan['points_per_unit']) ?>">
-                <div class="form-hint" style="margin-top:6px">1 point = 3,000 BV left + 3,000 BV right (both sides). Points need completed joining BV. Manage the <a href="ranks.php">rank cash rewards</a> and <a href="rewards.php">award milestones</a> on their pages.</div>
+                <div class="form-hint" style="margin-top:6px">1 point = 3,000 BV left + 3,000 BV right (both sides). Points need completed joining BV. Points and <a href="ranks.php">rank titles</a> / <a href="rewards.php">award milestones</a> are <b>recognition only</b> — no rank, award, car fund or any other commission money exists in this plan.</div>
             </div>
         </div>
 
@@ -195,13 +195,14 @@ require __DIR__ . '/../includes/dash_header.php';
             Total Income, BV and points</b> from zero, using the full <b>approved order history</b> under
             the NEW settings: Left / Right / Self BV, matched pairs, points, rank titles, BV / points logs
             and the three one-time payout incomes —
-            <b>₹300 per completed Leg (left + right, once each), ₹450 first Matching Pair and
-            ₹225 Direct Sponsor Bonus</b>.
+            <b>₹300 Direct Sponsor Leg Income (left + right, once each, only for directly sponsored
+            downline members), ₹450 first Matching Pair (only with a) or b) earned) and
+            ₹225 Direct Sponsor Matching Bonus</b>.
         </p>
         <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0">
-            <b>Rest all amounts are NOT added to a member's payout commission:</b> rank cash rewards and
-            award rewards are wallet income only (cleared by the rebuild, not re-paid). There is no level
-            income, car fund or any other commission in this plan.
+            <b>No other commission exists in this plan:</b> rank cash rewards, award rewards, level income,
+            car fund and every other commission type are removed — the rebuild clears any old entries and
+            does not re-pay them. Points and rank titles remain recognition only.
         </p>
         <ul style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 14px 18px">
             <li>All automatic income entries, points and BV / points logs are wiped and rebuilt chronologically.</li>

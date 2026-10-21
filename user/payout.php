@@ -46,7 +46,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
     <div class="card">
         <div class="card-title">🏦 Request a Payout</div>
         <p style="font-size:12.5px;color:var(--ink-soft)">
-            Payable income = <b>Leg Completion + Matching Bonus + 50% Direct Sponsor Bonus</b> only;
+            Payable income = <b>Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225)</b> only;
             other amounts are not added to payouts.
         </p>
         <?php if ($eligible < (float)$plan['payout_min']): ?>

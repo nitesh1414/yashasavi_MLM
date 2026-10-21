@@ -28,7 +28,7 @@ if (is_post()) {
 $chain = [];
 $cur = $u;
 while ($cur && (int)$cur['placement_id'] > 0) {
-    $p = q_row("SELECT id, username, full_name, placement_id FROM users WHERE id = ?", [(int)$cur['placement_id']]);
+    $p = q_row("SELECT id, username, full_name, placement_id, leg FROM users WHERE id = ?", [(int)$cur['placement_id']]);
     if (!$p) { break; }
     $chain[] = ['p' => $p, 'leg' => $cur['leg']];
     $cur = $p;
