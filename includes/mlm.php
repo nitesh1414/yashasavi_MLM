@@ -335,12 +335,13 @@ function add_commission($userId, $orderId, $type, $amount, $bvAmount, $level = n
 
 /**
  * Rank check: the member's rank is the highest rank whose LIFETIME points
- * threshold (1 point = 3,000 BV matched left + right) is reached. The
- * moment a HIGHER rank is achieved, the rank's reward amount is credited
- * to the member's WALLET balance as a 'rank' commission — once per rank
- * upgrade (jumping over several ranks pays the highest rank reached).
- * Rank rewards are wallet income only: they are NOT part of the
- * payout-eligible plan incomes (rules a-e).
+ * threshold (1 point = 3,000 BV matched left + right) is reached. EVERY
+ * rank whose threshold is reached pays its reward amount to the member's
+ * WALLET balance as a 'rank' commission — a jump over several ranks pays
+ * EACH of them, no level income is skipped. Each rank is paid exactly
+ * once: the commission's level column stores the rank id. Rank rewards
+ * are wallet income only: they are NOT part of the payout-eligible plan
+ * incomes (rules a-e).
  */
 function check_rank($userId, $orderId = null)
 {
@@ -348,26 +349,47 @@ function check_rank($userId, $orderId = null)
     if (!$u) {
         return null;
     }
+    /* ranks already paid (the commission level column stores the rank id) */
+    $paid = [];
+    foreach (q_all("SELECT level FROM commissions WHERE user_id = ? AND type = 'rank' AND level IS NOT NULL", [$userId]) as $p) {
+        $paid[(int)$p['level']] = true;
+    }
+    /* legacy rank rows (level NULL, paid before per-rank tracking) count
+     * for every rank at or below the member's current rank_id — prevents
+     * double payment when an old database is upgraded */
+    if ((int)$u['rank_id'] > 0) {
+        foreach (q_all("SELECT id FROM ranks") as $r0) {
+            if ((int)$r0['id'] <= (int)$u['rank_id']) {
+                $paid[(int)$r0['id']] = true;
+            }
+        }
+    }
     /* rank = highest rank whose LIFETIME points threshold is reached
-     * (1 point = 3,000 BV matched left + right; self BV never counts) */
+     * (1 point = 3,000 BV matched left + right; self BV never counts);
+     * every newly reached rank on the way is paid, in ascending order */
     $best = null;
+    $newly = [];
     foreach (q_all("SELECT * FROM ranks ORDER BY min_points ASC, id ASC") as $r) {
         if ((int)$r['min_points'] > 0 && (int)$u['reward_points'] >= (int)$r['min_points']) {
             $best = $r;
+            if (empty($paid[(int)$r['id']])) {
+                $newly[] = $r;
+            }
         }
     }
     if (!$best) {
         return null;
     }
-    if ((int)$u['rank_id'] >= (int)$best['id']) {
-        return null; // already at or above this rank
+    if ((int)$u['rank_id'] !== (int)$best['id']) {
+        q("UPDATE users SET rank_id = ? WHERE id = ?", [$best['id'], $userId]);
     }
-    q("UPDATE users SET rank_id = ? WHERE id = ?", [$best['id'], $userId]);
-    /* rank achievement: the reward amount is added to the member's wallet
-     * balance (wallet income — NOT payout-eligible) */
-    if ((float)$best['reward_amount'] > 0) {
-        add_commission($userId, $orderId, 'rank', $best['reward_amount'], (int)$u['reward_points'], null,
-            'Rank achievement: ' . $best['name'] . ' (' . (int)$best['min_points'] . ' points)');
+    /* rank achievement: every newly reached rank's reward amount is added
+     * to the member's wallet balance (wallet income — NOT payout-eligible) */
+    foreach ($newly as $r) {
+        if ((float)$r['reward_amount'] > 0) {
+            add_commission($userId, $orderId, 'rank', $r['reward_amount'], (int)$u['reward_points'], (int)$r['id'],
+                'Rank achievement: ' . $r['name'] . ' (' . (int)$r['min_points'] . ' points)');
+        }
     }
     return $best;
 }
@@ -808,9 +830,10 @@ function approve_order($orderId, $adminId)
  *     member when a DIRECTLY SPONSORED downline member in their left or
  *     right leg completes the member's own first matching pair (rule c).
  *  6. Points: +1 per matched 3,000 BV pair (left + right). Every rank
- *     achievement credits that rank's reward amount to the member's
- *     wallet balance (wallet income — NOT payout-eligible; award
- *     milestones stay recognition only).
+ *     level reached credits that rank's reward amount to the member's
+ *     wallet balance — jumps pay each crossed level, none is skipped
+ *     (wallet income — NOT payout-eligible; award milestones stay
+ *     recognition only).
  *
  * There is NO level income, NO car fund, NO award money and NO other
  * commission of any kind.
