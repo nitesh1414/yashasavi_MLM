@@ -199,8 +199,9 @@ $pairPay = $plan['binary_type'] === 'percent'
                 <b>1 point = 3,000 BV on your left + 3,000 BV on your right</b> (both sides together).
                 Points are added for <b>every matched pair</b> — the first pair pays the ₹450 Matching Pair Income,
                 and every further pair adds points to your tally. Points need your own
-                <b>Self 3,000 BV</b> completed and drive the <b>rank titles</b> and the
-                <b>award milestones</b> below — recognition only, no cash commission.
+                <b>Self 3,000 BV</b> completed and drive the <b>rank achievements</b> (each rank
+                pays its reward into your wallet) and the <b>award milestones</b> below
+                (recognition only).
                 <table class="kv-table" style="width:100%;margin-top:10px">
                     <tr><td>Your points</td><td><b><?= number_format($points) ?> P</b></td></tr>
                     <tr><td>Pairs matched</td><td><b><?= (int)$u['matched_pairs'] ?></b></td></tr>
@@ -220,7 +221,7 @@ $pairPay = $plan['binary_type'] === 'percent'
                     <b><?= e($r['name']) ?></b>
                     <?= ($currentRankId >= (int)$r['id']) ? badge('Achieved', 'success') : ($achieved ? badge('Pending review', 'warning') : '') ?>
                     <br>Points ≥ <b><?= number_format((int)$r['min_points']) ?> P</b>
-                    <?php if ((float)$r['reward_amount'] > 0): ?> · Cash reward: <b><?= money($r['reward_amount']) ?></b><?php endif; ?>
+                    <?php if ((float)$r['reward_amount'] > 0): ?> · Reward to wallet: <b><?= money($r['reward_amount']) ?></b><?php endif; ?>
                 </div>
             <?php endforeach; ?>
             <p style="font-size:12.5px;color:var(--ink-soft)">Ranks are checked automatically whenever your points grow.</p>
@@ -252,6 +253,7 @@ $pairPay = $plan['binary_type'] === 'percent'
                 <tr><td>Point value (1 point)</td><td>3,000 BV left + 3,000 BV right</td></tr>
                 <tr><td>Points per matched pair</td><td><?= (int)$plan['points_per_unit'] ?> P</td></tr>
                 <tr><td>Payout commission</td><td>₹300 direct sponsor leg income (L+R) + ₹450 first matching pair + ₹225 direct sponsor matching bonus only</td></tr>
+                <tr><td>Rank rewards</td><td>credited to your wallet when the rank is achieved — not part of the payout</td></tr>
                 <tr><td>Payout minimum</td><td><?= money($plan['payout_min']) ?></td></tr>
                 <tr><td>TDS on payout</td><td><?= e($plan['tds_percent']) ?>%</td></tr>
                 <tr><td>Admin charge on payout</td><td><?= e($plan['admin_charge_percent']) ?>%</td></tr>

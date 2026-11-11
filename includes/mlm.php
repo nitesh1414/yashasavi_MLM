@@ -333,6 +333,15 @@ function add_commission($userId, $orderId, $type, $amount, $bvAmount, $level = n
 /*  Ranks                                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Rank check: the member's rank is the highest rank whose LIFETIME points
+ * threshold (1 point = 3,000 BV matched left + right) is reached. The
+ * moment a HIGHER rank is achieved, the rank's reward amount is credited
+ * to the member's WALLET balance as a 'rank' commission — once per rank
+ * upgrade (jumping over several ranks pays the highest rank reached).
+ * Rank rewards are wallet income only: they are NOT part of the
+ * payout-eligible plan incomes (rules a-e).
+ */
 function check_rank($userId, $orderId = null)
 {
     $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
@@ -353,8 +362,13 @@ function check_rank($userId, $orderId = null)
     if ((int)$u['rank_id'] >= (int)$best['id']) {
         return null; // already at or above this rank
     }
-    /* rank titles are recognition only — no rank cash commission is paid */
     q("UPDATE users SET rank_id = ? WHERE id = ?", [$best['id'], $userId]);
+    /* rank achievement: the reward amount is added to the member's wallet
+     * balance (wallet income — NOT payout-eligible) */
+    if ((float)$best['reward_amount'] > 0) {
+        add_commission($userId, $orderId, 'rank', $best['reward_amount'], (int)$u['reward_points'], null,
+            'Rank achievement: ' . $best['name'] . ' (' . (int)$best['min_points'] . ' points)');
+    }
     return $best;
 }
 
@@ -449,13 +463,15 @@ function run_binary_matching($user, $orderId)
  * Points are added ONLY to members who completed their own Self 3,000 BV
  * (rule: self BV is never counted in any calculation — it only makes the
  * member eligible for commission and points). Every points change is
- * logged (points_logs) and drives the rank cash rewards and the award
+ * logged (points_logs) and drives the rank achievements and the award
  * milestones from the MLM points PDF.
  *
- * Points and rank TITLES are recognition only — no rank, car fund, award
- * or any other commission money exists in this plan besides the three
- * payout incomes (direct sponsor leg, first matching pair, direct sponsor
- * matching bonus).
+ * Each rank achievement credits that rank's reward amount to the member's
+ * WALLET balance (see check_rank) — wallet income that is NOT
+ * payout-eligible. Award milestones are recognition only and no car fund
+ * exists. The only payout-eligible incomes are the three plan incomes
+ * (direct sponsor leg, first matching pair, direct sponsor matching
+ * bonus).
  */
 function update_reward_points($userId, $orderId = null)
 {
@@ -766,7 +782,7 @@ function approve_order($orderId, $adminId)
 /**
  * Core business effects of an approved order: self BV + activation,
  * direct sponsor leg income, BV propagation up the placement tree with
- * binary matching, and points / rank titles (recognition only).
+ * binary matching, and points + rank rewards (credited to the wallet).
  * Shared by approve_order() and the full plan recalculation
  * (recalculate_all_incomes()); payment status, order status and stock
  * are the caller's business. Returns false when the buyer is missing.
@@ -791,11 +807,13 @@ function approve_order($orderId, $adminId)
  *  5. Direct Sponsor Matching Bonus (rules d + e): ₹225 paid ONCE to the
  *     member when a DIRECTLY SPONSORED downline member in their left or
  *     right leg completes the member's own first matching pair (rule c).
- *  6. Points: +1 per matched 3,000 BV pair (left + right) — recognition
- *     only (rank titles; no reward money).
+ *  6. Points: +1 per matched 3,000 BV pair (left + right). Every rank
+ *     achievement credits that rank's reward amount to the member's
+ *     wallet balance (wallet income — NOT payout-eligible; award
+ *     milestones stay recognition only).
  *
- * There is NO level income, NO car fund, NO rank / award money and NO
- * other commission of any kind.
+ * There is NO level income, NO car fund, NO award money and NO other
+ * commission of any kind.
  */
 function apply_order_business_effects(array $order, $payoutOnly = false)
 {
@@ -861,15 +879,16 @@ function apply_order_business_effects(array $order, $payoutOnly = false)
  * order history using the CURRENT plan settings. Run from the MLM plan
  * settings page after the admin changes any plan value.
  *
- * PAYOUT COMMISSIONS ONLY: the rebuild generates exactly the three
- * payout incomes — Direct Sponsor Leg Income (₹300 left / right, only
- * when the completing downline member is directly sponsored by the
- * member), the first Matching Pair ₹450 (only with a) or b) earned) and
- * the Direct Sponsor Matching Bonus ₹225. Level income, rank rewards,
- * car fund and award rewards do not exist in this plan: any old entries
- * are cleared and NOT rebuilt. Rank TITLES are still recomputed (no
- * reward money), and left / right / self BV, matched pairs, activation
- * and wallet ledger rows for the three payout incomes are rebuilt.
+ * The rebuild generates exactly the three payout incomes — Direct
+ * Sponsor Leg Income (₹300 left / right, only when the completing
+ * downline member is directly sponsored by the member), the first
+ * Matching Pair ₹450 (only with a) or b) earned) and the Direct Sponsor
+ * Matching Bonus ₹225 — PLUS every achieved rank's reward amount, which
+ * is re-credited to the member's wallet (wallet income, NOT
+ * payout-eligible). Level income, car fund and award rewards do not
+ * exist in this plan: any old entries are cleared and NOT rebuilt.
+ * Left / right / self BV, matched pairs, points, rank achievements,
+ * activation and the wallet ledger rows for these incomes are rebuilt.
  * Manual commissions ('other', 'retail') and the payout history are
  * kept. Wallet balances are rebuilt from the complete ledger afterwards.
  * Members are only ever ACTIVATED by the replay, never de-activated —
@@ -1004,9 +1023,10 @@ function request_payout($userId, $amount)
  * Amount currently eligible for payout: ONLY the three plan incomes —
  * Direct Sponsor Leg Income (₹300 once per leg), the first Matching
  * Pair Income (₹450) and the Direct Sponsor Matching Bonus (₹225) —
- * minus payouts already generated / paid. All other amounts (rank
- * rewards, car fund, award rewards, level income, manual entries) do
- * not exist in this plan and are NOT added to a member's payout.
+ * minus payouts already generated / paid. Rank rewards ARE credited to
+ * the wallet balance but are NOT payout-eligible; car fund, award
+ * rewards and level income do not exist. Manual entries are not added
+ * to a member's payout either.
  * $upto (optional 'YYYY-MM-DD HH:MM:SS') limits the income side to that
  * moment — used by date-wise payout reports.
  */

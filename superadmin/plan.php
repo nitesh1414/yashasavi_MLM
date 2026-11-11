@@ -70,9 +70,9 @@ if (is_post()) {
         [$ok, $st] = recalculate_all_incomes();
         flash('success',
             'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed from zero under the current settings — '
-            . number_format($st['commissions']) . ' payout income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total) for '
+            . number_format($st['commissions']) . ' income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total — payout incomes + rank rewards) for '
             . number_format($st['members']) . ' member(s), ' . number_format($st['points']) . ' points awarded, in ' . $st['seconds'] . 's. '
-            . 'Payout commission = ₹300 Direct Sponsor Leg Income (L+R, once each, only for directly sponsored downline members) + ₹450 first Matching Pair (only with a) or b) earned) + ₹225 Direct Sponsor Matching Bonus only — rank and award rewards are NOT added. '
+            . 'Payout commission (withdrawable) = ₹300 Direct Sponsor Leg Income (L+R, once each, only for directly sponsored downline members) + ₹450 first Matching Pair (only with a) or b) earned) + ₹225 Direct Sponsor Matching Bonus only. Rank achievements credit their reward amount to the wallet (rebuilt too, but not payout-eligible); award rewards are not rebuilt. '
             . 'Wallet balances were rebuilt from the ledger; manual entries and payouts were kept.');
         redirect('plan.php');
     }
@@ -160,12 +160,12 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">4 · Points, Ranks &amp; Awards (recognition only — no commission money)</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">4 · Points, Ranks &amp; Awards (rank rewards are credited to the wallet)</h4>
         <div class="form-grid2">
             <div class="form-group">
                 <label>Points per matched pair unit</label>
                 <input class="form-control" type="number" min="0" name="points_per_unit" value="<?= e($plan['points_per_unit']) ?>">
-                <div class="form-hint" style="margin-top:6px">1 point = 3,000 BV left + 3,000 BV right (both sides). Points need completed joining BV. Points and <a href="ranks.php">rank titles</a> / <a href="rewards.php">award milestones</a> are <b>recognition only</b> — no rank, award, car fund or any other commission money exists in this plan.</div>
+                <div class="form-hint" style="margin-top:6px">1 point = 3,000 BV left + 3,000 BV right (both sides). Points need completed joining BV. Every <a href="ranks.php">rank</a> achievement credits that rank's reward amount to the member's <b>wallet balance</b> (wallet income — not payout-eligible). <a href="rewards.php">Award milestones</a> are recognition only; no car fund exists.</div>
             </div>
         </div>
 
@@ -193,16 +193,18 @@ require __DIR__ . '/../includes/dash_header.php';
         <p style="font-size:13px;color:var(--ink-soft)">
             After changing any setting above, run this to recompute <b>every member's payout commission,
             Total Income, BV and points</b> from zero, using the full <b>approved order history</b> under
-            the NEW settings: Left / Right / Self BV, matched pairs, points, rank titles, BV / points logs
+            the NEW settings: Left / Right / Self BV, matched pairs, points, rank achievements, BV / points logs
             and the three one-time payout incomes —
             <b>₹300 Direct Sponsor Leg Income (left + right, once each, only for directly sponsored
             downline members), ₹450 first Matching Pair (only with a) or b) earned) and
-            ₹225 Direct Sponsor Matching Bonus</b>.
+            ₹225 Direct Sponsor Matching Bonus</b> — plus every achieved rank's reward
+            amount re-credited to the member's wallet.
         </p>
         <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0">
-            <b>No other commission exists in this plan:</b> rank cash rewards, award rewards, level income,
+            <b>No other commission exists in this plan:</b> award rewards, level income,
             car fund and every other commission type are removed — the rebuild clears any old entries and
-            does not re-pay them. Points and rank titles remain recognition only.
+            does not re-pay them. Rank rewards are rebuilt and credited to wallets (not payout-eligible);
+            award milestones remain recognition only.
         </p>
         <ul style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 14px 18px">
             <li>All automatic income entries, points and BV / points logs are wiped and rebuilt chronologically.</li>

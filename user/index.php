@@ -111,7 +111,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Direct Sponsor Leg Income (₹300 L + ₹300 R)</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
                 <tr><td>Matching Pair Income (first pair ₹450)</td><td><b><?= money($earn['binary']) ?></b></td></tr>
                 <tr><td>Direct Sponsor Matching Bonus (₹225)</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
-                <tr><td>Points — recognition only, no reward money</td><td><b><?= number_format((float)$u['reward_points']) ?></b></td></tr>
+                <tr><td>Rank Rewards (wallet credit — not in payout)</td><td><b><?= money($earn['rank']) ?></b></td></tr>
+                <tr><td>Points — rank ladder (1 P = 3,000 BV left + right)</td><td><b><?= number_format((float)$u['reward_points']) ?> P</b></td></tr>
                 <?php
                 $bal = (float)$u['wallet_balance'];
                 $tdsAmt = round($bal * (float)$plan['tds_percent'] / 100, 2);

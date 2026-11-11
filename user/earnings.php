@@ -27,7 +27,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="stat-card"><div class="st-ico">🤝</div><div><b><?= money($earn['sponsor']) ?></b><span>Direct Sponsor Leg Income (₹300 L + ₹300 R)</span></div></div>
     <div class="stat-card teal"><div class="st-ico">💠</div><div><b><?= money($earn['binary']) ?></b><span>First Matching Pair (₹450)</span></div></div>
     <div class="stat-card blue"><div class="st-ico">⚖️</div><div><b><?= money($earn['sponsor_matching']) ?></b><span>Direct Sponsor Matching Bonus (₹225)</span></div></div>
-    <div class="stat-card gold"><div class="st-ico">🏅</div><div><b><?= number_format((float)$u['reward_points']) ?></b><span>Points — recognition only, no reward money</span></div></div>
+    <div class="stat-card gold"><div class="st-ico">🏅</div><div><b><?= money($earn['rank']) ?></b><span>Rank Rewards — wallet credit, not in payout (<?= number_format((float)$u['reward_points']) ?> P)</span></div></div>
 </div>
 
 <div class="card">
@@ -35,7 +35,7 @@ require __DIR__ . '/../includes/dash_header.php';
         💰 Commission Statement (gross income)
         <span class="right">
             <a class="btn <?= $type === '' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="earnings.php">All</a>
-            <?php foreach (['sponsor' => 'Direct Leg (L/R)', 'binary' => 'Matching Pair', 'sponsor_matching' => 'Sponsor Matching'] as $t => $lbl): ?>
+            <?php foreach (['sponsor' => 'Direct Leg (L/R)', 'binary' => 'Matching Pair', 'sponsor_matching' => 'Sponsor Matching', 'rank' => 'Rank Reward'] as $t => $lbl): ?>
                 <a class="btn <?= $type === $t ? 'btn-primary' : 'btn-light' ?> btn-sm" href="earnings.php?type=<?= $t ?>"><?= e($lbl) ?></a>
             <?php endforeach; ?>
         </span>
