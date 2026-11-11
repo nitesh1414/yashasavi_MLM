@@ -46,8 +46,8 @@ $adminFee = (float)$plan['admin_charge_percent'];
     <div class="card">
         <div class="card-title">🏦 Request a Payout</div>
         <p style="font-size:12.5px;color:var(--ink-soft)">
-            Payable income = <b>Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225)</b> only;
-            rank rewards are credited to your wallet but are not added to payouts.
+            Payable income = <b>Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225) + Rank Rewards</b>;
+            rank achievements are credited to your wallet and are payable.
         </p>
         <?php if ($eligible < (float)$plan['payout_min']): ?>
             <div class="alert alert-warning">

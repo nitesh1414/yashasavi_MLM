@@ -252,8 +252,8 @@ $pairPay = $plan['binary_type'] === 'percent'
                 <tr><td>Joining / eligibility BV</td><td><?= e($plan['activation_bv']) ?> BV self purchase</td></tr>
                 <tr><td>Point value (1 point)</td><td>3,000 BV left + 3,000 BV right</td></tr>
                 <tr><td>Points per matched pair</td><td><?= (int)$plan['points_per_unit'] ?> P</td></tr>
-                <tr><td>Payout commission</td><td>₹300 direct sponsor leg income (L+R) + ₹450 first matching pair + ₹225 direct sponsor matching bonus only</td></tr>
-                <tr><td>Rank rewards</td><td>credited to your wallet when the rank is achieved — not part of the payout</td></tr>
+                <tr><td>Payout commission</td><td>₹300 direct sponsor leg income (L+R) + ₹450 first matching pair + ₹225 direct sponsor matching bonus + rank rewards</td></tr>
+                <tr><td>Rank rewards</td><td>credited to your wallet when the rank is achieved — included in payouts</td></tr>
                 <tr><td>Payout minimum</td><td><?= money($plan['payout_min']) ?></td></tr>
                 <tr><td>TDS on payout</td><td><?= e($plan['tds_percent']) ?>%</td></tr>
                 <tr><td>Admin charge on payout</td><td><?= e($plan['admin_charge_percent']) ?>%</td></tr>

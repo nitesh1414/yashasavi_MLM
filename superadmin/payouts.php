@@ -16,7 +16,7 @@ if (is_post()) {
          * Saturday 11:59 PM; generated only here at the Superadmin end */
         [$ok, $runTs, $st] = generate_payout_report();
         if (!$ok || (!$st['created'] && !$st['blocked'] && !$st['skipped'])) {
-            flash('warning', 'Weekly payout report: no eligible members found (eligible income = Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225), minimum ' . money_txt(get_plan()['payout_min']) . ').');
+            flash('warning', 'Weekly payout report: no eligible members found (eligible income = Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225) + Rank Rewards, minimum ' . money_txt(get_plan()['payout_min']) . ').');
             redirect('payouts.php');
         }
         flash('success',

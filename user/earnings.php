@@ -27,7 +27,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="stat-card"><div class="st-ico">🤝</div><div><b><?= money($earn['sponsor']) ?></b><span>Direct Sponsor Leg Income (₹300 L + ₹300 R)</span></div></div>
     <div class="stat-card teal"><div class="st-ico">💠</div><div><b><?= money($earn['binary']) ?></b><span>First Matching Pair (₹450)</span></div></div>
     <div class="stat-card blue"><div class="st-ico">⚖️</div><div><b><?= money($earn['sponsor_matching']) ?></b><span>Direct Sponsor Matching Bonus (₹225)</span></div></div>
-    <div class="stat-card gold"><div class="st-ico">🏅</div><div><b><?= money($earn['rank']) ?></b><span>Rank Rewards — wallet credit, not in payout (<?= number_format((float)$u['reward_points']) ?> P)</span></div></div>
+    <div class="stat-card gold"><div class="st-ico">🏅</div><div><b><?= money($earn['rank']) ?></b><span>Rank Rewards (<?= number_format((float)$u['reward_points']) ?> P)</span></div></div>
 </div>
 
 <div class="card">

@@ -340,8 +340,8 @@ function add_commission($userId, $orderId, $type, $amount, $bvAmount, $level = n
  * WALLET balance as a 'rank' commission — a jump over several ranks pays
  * EACH of them, no level income is skipped. Each rank is paid exactly
  * once: the commission's level column stores the rank id. Rank rewards
- * are wallet income only: they are NOT part of the payout-eligible plan
- * incomes (rules a-e).
+ * are wallet income and count towards the payout-eligible income
+ * (withdrawable via payout requests, rules a-e aside).
  */
 function check_rank($userId, $orderId = null)
 {
@@ -384,7 +384,7 @@ function check_rank($userId, $orderId = null)
         q("UPDATE users SET rank_id = ? WHERE id = ?", [$best['id'], $userId]);
     }
     /* rank achievement: every newly reached rank's reward amount is added
-     * to the member's wallet balance (wallet income — NOT payout-eligible) */
+     * to the member's wallet balance (wallet income — included in payouts) */
     foreach ($newly as $r) {
         if ((float)$r['reward_amount'] > 0) {
             add_commission($userId, $orderId, 'rank', $r['reward_amount'], (int)$u['reward_points'], (int)$r['id'],
@@ -489,11 +489,9 @@ function run_binary_matching($user, $orderId)
  * milestones from the MLM points PDF.
  *
  * Each rank achievement credits that rank's reward amount to the member's
- * WALLET balance (see check_rank) — wallet income that is NOT
- * payout-eligible. Award milestones are recognition only and no car fund
- * exists. The only payout-eligible incomes are the three plan incomes
- * (direct sponsor leg, first matching pair, direct sponsor matching
- * bonus).
+ * WALLET balance (see check_rank) — wallet income that is included in
+ * the payout-eligible income. Award milestones are recognition only and
+ * no car fund exists.
  */
 function update_reward_points($userId, $orderId = null)
 {
@@ -832,7 +830,7 @@ function approve_order($orderId, $adminId)
  *  6. Points: +1 per matched 3,000 BV pair (left + right). Every rank
  *     level reached credits that rank's reward amount to the member's
  *     wallet balance — jumps pay each crossed level, none is skipped
- *     (wallet income — NOT payout-eligible; award milestones stay
+ *     (wallet income, included in payouts; award milestones stay
  *     recognition only).
  *
  * There is NO level income, NO car fund, NO award money and NO other
@@ -907,8 +905,8 @@ function apply_order_business_effects(array $order, $payoutOnly = false)
  * downline member is directly sponsored by the member), the first
  * Matching Pair ₹450 (only with a) or b) earned) and the Direct Sponsor
  * Matching Bonus ₹225 — PLUS every achieved rank's reward amount, which
- * is re-credited to the member's wallet (wallet income, NOT
- * payout-eligible). Level income, car fund and award rewards do not
+ * is re-credited to the member's wallet (wallet income, included in
+ * payouts). Level income, car fund and award rewards do not
  * exist in this plan: any old entries are cleared and NOT rebuilt.
  * Left / right / self BV, matched pairs, points, rank achievements,
  * activation and the wallet ledger rows for these incomes are rebuilt.
@@ -1017,11 +1015,12 @@ function request_payout($userId, $amount)
     if (trim((string)$u['bank_name']) === '' || trim((string)$u['bank_account_no']) === '' || trim((string)$u['bank_ifsc']) === '') {
         return [false, 'Your bank details are not completed — the payout cannot be done. Please add your bank details in your profile.'];
     }
-    /* only the three plan incomes are payable — rank rewards, car fund,
-     * award rewards, level income etc. are NOT added to a member's payout */
+    /* the payable incomes are the three plan incomes plus rank rewards —
+     * car fund, award rewards, level income etc. are NOT added to a
+     * member's payout */
     $eligible = payout_eligible_amount($userId);
     if ($amount > $eligible) {
-        return [false, 'Amount exceeds your eligible payout income (' . money_txt($eligible) . '). Only Direct Sponsor Leg Income (₹300 left / right), First Matching Pair (₹450) and Direct Sponsor Matching Bonus (₹225) are payable.'];
+        return [false, 'Amount exceeds your eligible payout income (' . money_txt($eligible) . '). Only Direct Sponsor Leg Income (₹300 left / right), First Matching Pair (₹450), Direct Sponsor Matching Bonus (₹225) and Rank Rewards are payable.'];
     }
     if ($amount > (float)$u['wallet_balance']) {
         return [false, 'Amount exceeds your wallet balance.'];
@@ -1043,13 +1042,12 @@ function request_payout($userId, $amount)
 }
 
 /**
- * Amount currently eligible for payout: ONLY the three plan incomes —
+ * Amount currently eligible for payout: the three plan incomes —
  * Direct Sponsor Leg Income (₹300 once per leg), the first Matching
  * Pair Income (₹450) and the Direct Sponsor Matching Bonus (₹225) —
- * minus payouts already generated / paid. Rank rewards ARE credited to
- * the wallet balance but are NOT payout-eligible; car fund, award
- * rewards and level income do not exist. Manual entries are not added
- * to a member's payout either.
+ * PLUS the Rank Rewards credited for rank achievements, minus payouts
+ * already generated / paid. Car fund, award rewards and level income do
+ * not exist. Manual entries are not added to a member's payout either.
  * $upto (optional 'YYYY-MM-DD HH:MM:SS') limits the income side to that
  * moment — used by date-wise payout reports.
  */
@@ -1057,7 +1055,7 @@ function payout_eligible_amount($userId, $upto = null)
 {
     $sql = "SELECT COALESCE(SUM(amount), 0) FROM commissions
             WHERE user_id = ? AND status = 'credited'
-              AND type IN ('sponsor','binary','sponsor_matching')";
+              AND type IN ('sponsor','binary','sponsor_matching','rank')";
     $params = [(int)$userId];
     if ($upto) {
         $sql .= " AND created_at <= ?";
@@ -1074,7 +1072,8 @@ function payout_eligible_amount($userId, $upto = null)
  * Generate the WEEKLY payout report + payout statement (super admin only,
  * run every Monday): income is counted up to the LAST SATURDAY 11:59 PM,
  * so the statement covers the completed Sunday-to-Saturday week. Every
- * member whose eligible income — the three plan incomes only — has
+ * member whose eligible income — the three plan incomes plus rank
+ * rewards — has
  * reached the payout minimum is listed on the statement. Members with completed KYC and bank
  * details get a pending payout (wallet debited, TDS + admin charge
  * deducted from the payout amount); members with incomplete KYC or bank
@@ -1106,7 +1105,7 @@ function generate_payout_report()
                     COALESCE(c.gross, 0) AS gross, COALESCE(p.taken, 0) AS taken
              FROM users u
              LEFT JOIN (SELECT user_id, SUM(amount) AS gross FROM commissions
-                        WHERE status = 'credited' AND type IN ('sponsor','binary','sponsor_matching')
+                        WHERE status = 'credited' AND type IN ('sponsor','binary','sponsor_matching','rank')
                           AND created_at <= ? GROUP BY user_id) c ON c.user_id = u.id
              LEFT JOIN (SELECT user_id, SUM(amount) AS taken FROM payouts
                         WHERE status IN ('pending','paid') GROUP BY user_id) p ON p.user_id = u.id
