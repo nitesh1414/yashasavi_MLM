@@ -14,7 +14,12 @@ $nav = [
     ['icon' => '📦', 'label' => 'My Orders', 'href' => 'orders.php', 'active' => $activeKey === 'orders', 'count' => $pendingOrdersCount],
     ['label2' => 'Wallet & Payouts'],
     ['icon' => '👛', 'label' => 'My Wallet', 'href' => 'wallet.php', 'active' => $activeKey === 'wallet'],
-    ['icon' => '🏦', 'label' => 'Payout Requests', 'href' => 'payout.php', 'active' => $activeKey === 'payout'],
+    ['icon' => '🏦', 'label' => 'Payout', 'href' => 'payout.php', 'active' => $activeKey === 'payout',
+        'children' => [
+            ['label' => 'Incentive Payout Report', 'href' => 'payout.php', 'active' => $activeKey === 'payout'],
+            ['label' => 'Reward Payout Report', 'href' => 'payout-rewards.php', 'active' => $activeKey === 'payout-rewards'],
+            ['label' => 'My Balance Payout', 'href' => 'payout-balance.php', 'active' => $activeKey === 'payout-balance'],
+        ]],
     ['label2' => 'Account'],
     ['icon' => '📄', 'label' => 'Upload KYC', 'href' => 'kyc.php', 'active' => $activeKey === 'kyc'],
     ['icon' => '👤', 'label' => 'My Profile', 'href' => 'profile.php', 'active' => $activeKey === 'profile'],

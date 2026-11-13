@@ -67,12 +67,21 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
             foreach ($nav as $item):
                 if (isset($item['label2'])) { echo '<div class="side-label">' . e($item['label2']) . '</div>'; continue; }
                 $active = !empty($item['active']);
+                $children = isset($item['children']) && is_array($item['children']) ? $item['children'] : [];
+                foreach ($children as $ch) { if (!empty($ch['active'])) { $active = true; } }
             ?>
                 <a href="<?= e($item['href']) ?>" class="<?= $active ? 'active' : '' ?>">
                     <span class="s-ico"><?= $item['icon'] ?></span>
                     <span><?= e($item['label']) ?></span>
                     <?php if (!empty($item['count'])): ?><span class="side-count"><?= (int)$item['count'] ?></span><?php endif; ?>
                 </a>
+                <?php if ($children && $active): ?>
+                    <?php foreach ($children as $ch): ?>
+                        <a href="<?= e($ch['href']) ?>" class="side-sub<?= !empty($ch['active']) ? ' active' : '' ?>">
+                            <span>↳</span> <span><?= e($ch['label']) ?></span>
+                        </a>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             <?php endforeach; ?>
         </nav>
         <div class="side-foot"><?= e($siteName) ?> • v<?= APP_VERSION ?></div>
