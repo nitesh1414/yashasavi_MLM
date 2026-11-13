@@ -33,6 +33,19 @@ document.addEventListener('DOMContentLoaded', function () {
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeSidebar(); } });
     }
 
+    /* sidebar submenu groups (e.g. Payout): the caret expands/collapses
+       the kids; clicking the row itself navigates */
+    document.querySelectorAll('.side-caret').forEach(function (b) {
+        b.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var g = b.closest('.side-group');
+            if (!g) { return; }
+            var open = g.classList.toggle('open');
+            b.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    });
+
     /* confirm dialogs — delegated so it also covers dynamically added elements */
     document.addEventListener('click', function (e) {
         var el = e.target.closest('[data-confirm]');

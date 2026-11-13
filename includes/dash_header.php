@@ -54,8 +54,8 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <div class="dash">
     <aside class="sidebar" id="sidebar">
         <div class="side-brand">
-            <img src="<?= e($logo) ?>" alt="">
-            <div>
+            <span class="sb-logo"><img src="<?= e($logo) ?>" alt=""></span>
+            <div class="sb-txt">
                 <div class="sb-name"><?= e($siteName) ?></div>
                 <div class="sb-sub"><?= e($areaTitles[$area] ?? '') ?></div>
             </div>
@@ -63,28 +63,44 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
         </div>
         <nav class="side-nav">
             <?php
-            $lastLabel = null;
             foreach ($nav as $item):
                 if (isset($item['label2'])) { echo '<div class="side-label">' . e($item['label2']) . '</div>'; continue; }
                 $active = !empty($item['active']);
                 $children = isset($item['children']) && is_array($item['children']) ? $item['children'] : [];
-                foreach ($children as $ch) { if (!empty($ch['active'])) { $active = true; } }
+                $childActive = false;
+                foreach ($children as $ch) { if (!empty($ch['active'])) { $childActive = true; $active = true; } }
             ?>
-                <a href="<?= e($item['href']) ?>" class="<?= $active ? 'active' : '' ?>">
-                    <span class="s-ico"><?= $item['icon'] ?></span>
-                    <span><?= e($item['label']) ?></span>
-                    <?php if (!empty($item['count'])): ?><span class="side-count"><?= (int)$item['count'] ?></span><?php endif; ?>
-                </a>
-                <?php if ($children && $active): ?>
-                    <?php foreach ($children as $ch): ?>
-                        <a href="<?= e($ch['href']) ?>" class="side-sub<?= !empty($ch['active']) ? ' active' : '' ?>">
-                            <span>↳</span> <span><?= e($ch['label']) ?></span>
+                <?php if ($children): ?>
+                <div class="side-group<?= $active ? ' open' : '' ?>">
+                    <div class="side-row-wrap">
+                        <a href="<?= e($item['href']) ?>" class="side-row<?= $active ? ' active' : '' ?>">
+                            <span class="s-ico"><?= $item['icon'] ?></span>
+                            <span class="s-label"><?= e($item['label']) ?></span>
+                            <?php if (!empty($item['count'])): ?><span class="side-count"><?= (int)$item['count'] ?></span><?php endif; ?>
                         </a>
-                    <?php endforeach; ?>
+                        <button type="button" class="side-caret" aria-label="Expand submenu" aria-expanded="<?= $active ? 'true' : 'false' ?>">▾</button>
+                    </div>
+                    <div class="side-kids">
+                        <?php foreach ($children as $ch): ?>
+                            <a href="<?= e($ch['href']) ?>" class="side-sub<?= !empty($ch['active']) ? ' active' : '' ?>">
+                                <span class="ss-dot"></span><span><?= e($ch['label']) ?></span>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php else: ?>
+                    <a href="<?= e($item['href']) ?>" class="side-row<?= $active ? ' active' : '' ?>">
+                        <span class="s-ico"><?= $item['icon'] ?></span>
+                        <span class="s-label"><?= e($item['label']) ?></span>
+                        <?php if (!empty($item['count'])): ?><span class="side-count"><?= (int)$item['count'] ?></span><?php endif; ?>
+                    </a>
                 <?php endif; ?>
             <?php endforeach; ?>
         </nav>
-        <div class="side-foot"><?= e($siteName) ?> • v<?= APP_VERSION ?></div>
+        <div class="side-foot">
+            <span class="sf-txt"><?= e($siteName) ?> · v<?= APP_VERSION ?></span>
+            <a class="sf-logout" href="<?= e(url(($area === 'user' ? 'user/' : $area . '/') . 'logout.php')) ?>" data-confirm="Logout from your account?">⏻ Logout</a>
+        </div>
     </aside>
     <div class="side-overlay" id="sideOverlay"></div>
 
