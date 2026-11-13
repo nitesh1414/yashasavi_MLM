@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>You are offline — Yashasavi</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+        min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(160deg, #103a14, #1b5e20); color: #fff; padding: 24px;
+    }
+    .card {
+        max-width: 420px; width: 100%; text-align: center;
+        background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14);
+        border-radius: 20px; padding: 44px 30px; backdrop-filter: blur(6px);
+    }
+    .ico { font-size: 52px; margin-bottom: 14px; }
+    h1 { font-size: 22px; font-weight: 400; margin-bottom: 10px; }
+    p { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,.8); margin-bottom: 24px; }
+    a {
+        display: inline-block; background: #c99a2e; color: #103a14; text-decoration: none;
+        font-size: 14.5px; padding: 12px 30px; border-radius: 999px; font-weight: 500;
+        transition: transform .2s ease, background .2s ease;
+    }
+    a:hover { background: #fff; transform: translateY(-2px); }
+    img { width: 84px; height: 84px; border-radius: 20px; margin: 0 auto 18px; display: block; }
+</style>
+</head>
+<body>
+    <div class="card">
+        <img src="assets/img/icon-192.png" alt="Yashasavi">
+        <div class="ico">📴</div>
+        <h1>You are offline</h1>
+        <p>It looks like your internet connection is unavailable. Your app shell is ready — check your connection and try again.</p>
+        <a href="index.php">Try Again</a>
+    </div>
+</body>
+</html>
