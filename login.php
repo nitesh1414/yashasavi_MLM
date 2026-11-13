@@ -48,6 +48,7 @@ require __DIR__ . '/includes/site_header.php';
             <div class="form-group">
                 <label>Password</label>
                 <input class="form-control" type="password" name="password" required placeholder="••••••••">
+                <div style="text-align:right;margin-top:4px"><a href="<?= url('forgot.php') ?>" style="font-size:12.5px">Forgot password?</a></div>
             </div>
             <button class="btn btn-primary btn-block" type="submit">Login →</button>
         </form>
