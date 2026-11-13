@@ -197,8 +197,10 @@ require __DIR__ . '/../includes/dash_header.php';
 @keyframes invmodalIn{from{opacity:0;transform:scale(.94) translateY(12px)}to{opacity:1;transform:none}}
 @media (max-width:640px){
     .invmodal{padding:0}
-    .invmodal-box{width:100vw;max-height:100vh;height:100%;border-radius:0}
-    .invmodal-head{flex-wrap:wrap}
+    .invmodal-box{width:100%;max-height:100%;height:100%;border-radius:0}
+    .invmodal-head{flex-wrap:wrap;padding:10px 12px}
+    .invmodal-body .invoice-doc{margin:10px auto}
+    .invmodal-body{overflow-y:auto;overflow-x:hidden}
 }
 </style>
 
