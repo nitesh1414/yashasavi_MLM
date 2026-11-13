@@ -39,11 +39,49 @@ $pageScripts = <<<JS
                 if (!cur || cur.id !== id) { return; }
                 cur.html = html;
                 bodyEl.innerHTML = html;
+                wrapInvoice();
+                fitInvoice();
             })
             .catch(function () {
                 if (!cur || cur.id !== id) { return; }
                 bodyEl.innerHTML = '<div class="invmodal-err">Could not load the invoice. Please try again.</div>';
             });
+    }
+
+    /* The invoice keeps its fixed paper layout (exactly what the PDF
+       download contains). On narrow screens the whole sheet is scaled
+       down to fit — like viewing a PDF on a phone — never reflowed. */
+    function wrapInvoice() {
+        var doc = bodyEl.querySelector('.invoice-doc');
+        if (!doc || (doc.parentNode && doc.parentNode.classList && doc.parentNode.classList.contains('invmodal-fit'))) { return; }
+        var fit = document.createElement('div');
+        fit.className = 'invmodal-fit';
+        doc.parentNode.replaceChild(fit, doc);
+        fit.appendChild(doc);
+    }
+
+    function fitInvoice() {
+        var fit = bodyEl.querySelector('.invmodal-fit');
+        if (!fit) { return; }
+        var doc = fit.querySelector('.invoice-doc');
+        if (!doc) { return; }
+        var inner = fit.clientWidth - 16; /* 8px side padding */
+        if (!inner || inner >= 820) {
+            doc.style.width = '';
+            doc.style.margin = '';
+            doc.style.transform = '';
+            doc.style.transformOrigin = '';
+            fit.style.height = '';
+            return;
+        }
+        var k = inner / 820;
+        doc.style.width = '820px';
+        doc.style.margin = '0';
+        doc.style.transformOrigin = 'top left';
+        doc.style.transform = 'scale(' + k + ')';
+        if (doc.offsetHeight) { fit.style.height = Math.ceil(doc.offsetHeight * k) + 'px'; }
+        var img = doc.querySelector('img');
+        if (img && !img.complete) { img.addEventListener('load', fitInvoice); }
     }
 
     function close() {
@@ -94,6 +132,10 @@ $pageScripts = <<<JS
         if (ev.target.closest('[data-invprint]')) { ev.preventDefault(); printInvoice(); return; }
         if (ev.target.closest('[data-invdl]')) { ev.preventDefault(); downloadPdf(); return; }
         if (ev.target.closest('[data-invclose]')) { ev.preventDefault(); close(); }
+    });
+
+    window.addEventListener('resize', function () {
+        if (modal && !modal.hidden) { fitInvoice(); }
     });
 
     document.addEventListener('keydown', function (ev) {
@@ -192,6 +234,9 @@ require __DIR__ . '/../includes/dash_header.php';
 .invmodal-x:hover{background:#fde5e5;color:#9c1f1f;border-color:#f3bcbc}
 .invmodal-body{overflow:auto;padding:0;background:#eef1ee;-webkit-overflow-scrolling:touch}
 .invmodal-body .invoice-doc{margin:14px auto;box-shadow:0 2px 14px rgba(0,0,0,.12)}
+/* fit-to-width shell: the sheet scales like a PDF viewer, never reflows */
+.invmodal-fit{padding:10px 8px;overflow:hidden}
+.invmodal-fit .invoice-doc{margin:0 auto}
 .invmodal-load,.invmodal-err{padding:60px 20px;text-align:center;color:var(--ink-soft,#000);font-size:13px}
 .invmodal-err{color:#9c1f1f}
 @keyframes invmodalIn{from{opacity:0;transform:scale(.94) translateY(12px)}to{opacity:1;transform:none}}

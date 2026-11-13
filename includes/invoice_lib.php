@@ -108,7 +108,7 @@ function invoice_html(array $inv)
 .invoice-doc{background:#fff;color:#111;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.45;max-width:820px;margin:0 auto;padding:34px 38px;box-sizing:border-box}
 .invoice-doc *{box-sizing:border-box}
 .inv-top{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;border-bottom:3px solid #17433c;padding-bottom:14px}
-.inv-co img{max-height:54px;display:block;margin-bottom:8px}
+.inv-co img{max-height:54px;max-width:100%;display:block;margin-bottom:8px}
 .inv-co .nm{font-size:17px;font-weight:700;color:#17433c;letter-spacing:.2px}
 .inv-co .ad{font-size:10.5px;color:#444;max-width:380px}
 .inv-co .ct{font-size:10.5px;color:#444}
@@ -139,33 +139,6 @@ function invoice_html(array $inv)
 .inv-status.paid,.inv-status.approved{background:#e3f4e6;color:#176d2d}
 .inv-status.pending{background:#fdf3dc;color:#8a6100}
 .inv-status.rejected,.inv-status.cancelled,.inv-status.refunded{background:#fde5e5;color:#9c1f1f}
-/* ---------- phone: everything stacks, nothing scrolls sideways ---------- */
-@media (max-width:640px){
-.invoice-doc{padding:16px 12px;max-width:100%;font-size:11.5px}
-.inv-top{flex-direction:column;gap:12px}
-.inv-co img{max-height:44px;max-width:100%}
-.inv-co .ad{max-width:100%}
-.inv-title{text-align:left}
-.inv-title h2{font-size:17px;letter-spacing:1.5px}
-.inv-meta{flex-direction:column;gap:10px}
-.inv-items{font-size:11px;margin-top:12px}
-.inv-items thead{display:none}
-.inv-items tr{display:block;border:1px solid #d9dee2;border-radius:6px;margin:8px 0;padding:8px 10px;background:#fff}
-.inv-items td{display:block;border:none;padding:2.5px 0;text-align:right}
-.inv-items td::before{content:attr(data-l);float:left;color:#666;font-weight:700;font-size:9px;letter-spacing:.6px;text-transform:uppercase}
-.inv-items td.pname{text-align:left;font-weight:700;padding:0 0 6px;margin-bottom:5px;border-bottom:1px dashed #e3e8ea}
-.inv-items td.pname::before{content:none}
-.inv-items td.num,.inv-items td.hm{display:none}
-.inv-items tr.tot{background:#f3f7f5;border-color:#ccd9d0}
-.inv-items tr.tot td{padding:3px 0}
-.inv-items tr.tot td.totlab{text-align:left;padding:0 0 5px;margin-bottom:4px;border-bottom:1px dashed #ccd9d0}
-.inv-items tr.tot td.totlab::before{content:none}
-.inv-items tr.tot td:last-child{font-size:12.5px}
-.inv-sum{flex-direction:column-reverse;gap:12px;margin-top:12px}
-.inv-tots{flex:1 1 auto}
-.inv-words{font-size:10.5px}
-.inv-note{font-size:9.5px}
-}
 </style>
 <div class="invoice-doc" id="invoiceDoc">
     <div class="inv-top">
@@ -214,22 +187,22 @@ function invoice_html(array $inv)
         <tbody>
         <?php $i = 0; foreach ($inv['items'] as $it): $i++; ?>
             <tr>
-                <td class="num"><?= $i ?></td>
-                <td class="pname"><b><?= e($it['product_name']) ?></b></td>
-                <td class="r" data-l="MRP"><?= money($it['mrp']) ?></td>
-                <td class="r" data-l="DP"><?= money($it['price']) ?></td>
-                <td class="r" data-l="BV"><?= number_format((float)$it['bv'], 0) ?></td>
-                <td class="r" data-l="Qty"><?= (int)$it['qty'] ?></td>
-                <td class="r" data-l="DP Total"><?= money((float)$it['price'] * (int)$it['qty']) ?></td>
+                <td><?= $i ?></td>
+                <td><b><?= e($it['product_name']) ?></b></td>
+                <td class="r"><?= money($it['mrp']) ?></td>
+                <td class="r"><?= money($it['price']) ?></td>
+                <td class="r"><?= number_format((float)$it['bv'], 0) ?></td>
+                <td class="r"><?= (int)$it['qty'] ?></td>
+                <td class="r"><?= money((float)$it['price'] * (int)$it['qty']) ?></td>
             </tr>
         <?php endforeach; ?>
             <tr class="tot">
-                <td colspan="2" class="totlab">Total (<?= $i ?> product<?= $i > 1 ? 's' : '' ?>)</td>
-                <td class="r" data-l="Total MRP"><?= money($t['mrp']) ?></td>
-                <td class="r hm">—</td>
-                <td class="r" data-l="Total BV"><?= number_format($t['bv'], 0) ?></td>
-                <td class="r" data-l="Qty"><?= (int)$t['qty'] ?></td>
-                <td class="r" data-l="DP Total"><?= money($t['dp']) ?></td>
+                <td colspan="2">Total (<?= $i ?> product<?= $i > 1 ? 's' : '' ?>)</td>
+                <td class="r"><?= money($t['mrp']) ?></td>
+                <td class="r">—</td>
+                <td class="r"><?= number_format($t['bv'], 0) ?></td>
+                <td class="r"><?= (int)$t['qty'] ?></td>
+                <td class="r"><?= money($t['dp']) ?></td>
             </tr>
         </tbody>
     </table>
