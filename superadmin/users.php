@@ -8,16 +8,13 @@ if (is_post()) {
     $action = post_str('action');
     $id = (int)post_str('id');
     $user = q_row("SELECT * FROM users WHERE id = ?", [$id]);
-    if ($user) {
-        if ($action === 'block') {
-            q("UPDATE users SET status='blocked' WHERE id = ?", [$id]);
-            flash('success', 'User ' . $user['username'] . ' blocked.');
-        } elseif ($action === 'unblock') {
-            q("UPDATE users SET status='active' WHERE id = ?", [$id]);
-            flash('success', 'User ' . $user['username'] . ' unblocked.');
+    if ($user && $user['status'] !== 'deleted') {
+        if ($action === 'block' || $action === 'unblock') {
+            [$ok, $msg] = set_member_account_status($id, $action === 'block' ? 'blocked' : 'active');
+            flash($ok ? 'success' : 'error', $msg);
         } elseif ($action === 'activate') {
-            q("UPDATE users SET is_active = 1, activated_at = COALESCE(activated_at, ?) WHERE id = ?", [now(), $id]);
-            flash('success', 'User ' . $user['username'] . ' manually activated (can now earn commissions).');
+            [$ok, $msg] = manually_activate_member($id);
+            flash($ok ? 'success' : 'error', $msg);
         }
     }
     redirect('users.php' . (get_str('q') ? '?q=' . urlencode(get_str('q')) : ''));
@@ -25,7 +22,7 @@ if (is_post()) {
 
 $q = get_str('q');
 $status = get_str('status');
-$where = "1=1";
+$where = "u.status <> 'deleted'";
 $params = [];
 if ($q !== '') {
     $where .= " AND (u.username LIKE ? OR u.full_name LIKE ? OR u.mobile LIKE ? OR u.email LIKE ?)";
@@ -57,6 +54,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <a class="btn <?= $status === 'active' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="users.php?status=active">Active</a>
             <a class="btn <?= $status === 'blocked' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="users.php?status=blocked">Blocked</a>
             <a class="btn btn-primary btn-sm" href="user_sponsor.php">🔗 Change Sponsor</a>
+            <a class="btn btn-light btn-sm" href="deletion_audit.php">Deleted member audit</a>
         </span>
     </div>
 

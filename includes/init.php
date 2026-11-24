@@ -94,7 +94,7 @@ set_exception_handler(function (Throwable $e) {
         echo '<h1>⚙️ The website database needs to be updated</h1>'
             . '<p>New features were added to the software and the database has not been upgraded yet.</p>'
             . '<p style="margin-top:16px"><a class="btn" href="' . $upgradeUrl . '">→ Run the upgrade now</a></p>'
-            . '<p style="margin-top:16px">Open <code>install/upgrade.php</code> in your browser and click '
+            . '<p style="margin-top:16px">A superadmin can sign in, open <code>install/upgrade.php</code> and click '
             . '<b>Run Upgrade</b>. Existing accounts, teams and orders are preserved.</p>';
     } else {
         echo '<h1>⚠️ Something went wrong</h1>'
@@ -132,3 +132,4 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/mlm.php';
+require_once __DIR__ . '/income_policy.php';

@@ -7,9 +7,6 @@ if (is_post()) {
     verify_csrf();
     $panImg = handle_upload('pan_card', 'kyc');
     $aadImg = handle_upload('aadhaar_card', 'kyc');
-    $hasPan = is_string($panImg) || !empty($u['pan_image']);
-    $hasAad = is_string($aadImg) || !empty($u['aadhaar_image']);
-
     if ($panImg === false || $aadImg === false) {
         if (is_string($panImg)) { delete_upload($panImg); }
         if (is_string($aadImg)) { delete_upload($aadImg); }
@@ -17,17 +14,26 @@ if (is_post()) {
     } elseif (!is_string($panImg) && !is_string($aadImg)) {
         flash('error', 'Please choose at least one document image to upload.');
     } else {
-        if (is_string($panImg)) {
-            delete_upload($u['pan_image']);
-            q("UPDATE users SET pan_image = ? WHERE id = ?", [$panImg, $u['id']]);
+        try {
+            $previous = db_tx(function () use ($u, $panImg, $aadImg) {
+                lock_network_mutation();
+                $fresh = q_row("SELECT status, pan_image, aadhaar_image FROM users WHERE id = ? FOR UPDATE", [$u['id']]);
+                if (!$fresh || $fresh['status'] !== 'active') { return null; }
+                if (is_string($panImg)) { q("UPDATE users SET pan_image = ? WHERE id = ?", [$panImg, $u['id']]); }
+                if (is_string($aadImg)) { q("UPDATE users SET aadhaar_image = ? WHERE id = ?", [$aadImg, $u['id']]); }
+                q("UPDATE users SET kyc_status = 'pending', kyc_remark = NULL WHERE id = ?", [$u['id']]);
+                return $fresh;
+            });
+            if (!$previous) { throw new RuntimeException('Your account is no longer available.'); }
+            // Delete replaced files only after the database transaction commits.
+            if (is_string($panImg)) { delete_upload($previous['pan_image']); }
+            if (is_string($aadImg)) { delete_upload($previous['aadhaar_image']); }
+            flash('success', 'KYC documents uploaded — the company will verify them shortly.');
+        } catch (Throwable $ex) {
+            if (is_string($panImg)) { delete_upload($panImg); }
+            if (is_string($aadImg)) { delete_upload($aadImg); }
+            flash('error', 'The KYC upload could not be saved. Please sign in and try again.');
         }
-        if (is_string($aadImg)) {
-            delete_upload($u['aadhaar_image']);
-            q("UPDATE users SET aadhaar_image = ? WHERE id = ?", [$aadImg, $u['id']]);
-        }
-        /* re-submitting puts the KYC back into the verification queue */
-        q("UPDATE users SET kyc_status = 'pending', kyc_remark = NULL WHERE id = ?", [$u['id']]);
-        flash('success', 'KYC documents uploaded — the company will verify them shortly.');
     }
     redirect('kyc.php');
 }

@@ -5,11 +5,16 @@
 require_once __DIR__ . '/includes/init.php';
 
 $plan = get_plan();
+$unit = max(1, (float)$plan['pair_unit_bv']);
+$pairPay = round($plan['binary_type'] === 'fixed' ? (float)$plan['binary_value'] : $unit * (float)$plan['binary_value'] / 100, 2);
+$directPay = round((float)$plan['activation_bv'] * (float)$plan['sponsor_percent'] / 100, 2);
+$firstBonus = round($pairPay * (float)$plan['sponsor_matching_percent'] / 100, 2);
+$pointsPerPair = max(0, (int)$plan['points_per_unit']);
 $ranks = q_all("SELECT * FROM ranks ORDER BY min_points ASC, id ASC");
 $awards = q_all("SELECT * FROM award_rewards WHERE status='active' ORDER BY points ASC");
 
 $pageTitle = 'Business Opportunity — Marketing Plan';
-$pageDesc = 'The complete Yashasavi income plan: retail income, direct sponsor income, binary matching income, sponsor matching income, cash rewards, car fund and award rewards — from ₹3,000 up to ₹25 crore.';
+$pageDesc = 'Explore the configured Yashasavi income plan, matching rules, ranks and award milestones.';
 
 require __DIR__ . '/includes/site_header.php';
 ?>
@@ -19,7 +24,7 @@ require __DIR__ . '/includes/site_header.php';
         <span class="hero-kicker"><?= e(setting('site_tagline')) ?></span>
         <h1>Build Multiple Sources of Income</h1>
         <p>Achieve Freedom • Live Your Dream — a simple, powerful and proven plan with <b>no level limit</b>,
-            left-right carry forward business and rewards from ₹3,000 up to ₹25 crore.</p>
+            left-right carry forward business and configured rank rewards.</p>
     </div>
 </section>
 
@@ -27,21 +32,21 @@ require __DIR__ . '/includes/site_header.php';
 <section class="section">
     <div class="container">
         <div class="sec-head">
-            <span class="sec-kicker">11 Types of Income</span>
+            <span class="sec-kicker">The Income Plan</span>
             <h2>Every Way You Can Earn</h2>
-            <p>All incomes are calculated automatically and credited to your E-wallet.</p>
+            <p>Plan income is subject to eligibility. Other company programs and awards are not automatic wallet credits.</p>
         </div>
         <div class="income-grid">
             <div class="income-card"><div class="i-ico">🛍️</div><h3>01 · Retail Income</h3><p>Buy at the special distributor price (DP) and sell at MRP — keep <b>30% to 45%</b> retail margin on every product.</p></div>
-            <div class="income-card"><div class="i-ico">🤝</div><h3>02 · Leg Completion Income</h3><p>When your <b>left leg's total business</b> — all downline members, any depth — completes <b>3,000 BV</b> you earn <b>₹300 once</b>; when your <b>right leg</b> completes 3,000 BV, another <b>₹300 once</b>. Maximum ₹600.</p></div>
-            <div class="income-card"><div class="i-ico">⚖️</div><h3>03 · 50% Direct Sponsor Bonus</h3><p>When your direct member completes their first matching pair, you receive <b>₹225 (50%)</b> — once per direct, left or right leg.</p></div>
-            <div class="income-card"><div class="i-ico">🔁</div><h3>04 · Binary Matching Bonus</h3><p><b>3,000 BV left + 3,000 BV right</b> = 1 pair → <b><?= money($plan['binary_value']) ?></b> for your <b>first matching pair</b>. Every further pair adds points.</p></div>
-            <div class="income-card"><div class="i-ico">⭐</div><h3>05 · Points</h3><p><b>1 point = 3,000 BV left + 3,000 BV right</b>. Points collect from every matched pair — the more your team grows, the more points you earn.</p></div>
-            <div class="income-card"><div class="i-ico">🏅</div><h3>06 · Rank Cash Rewards</h3><p>Rank points from 20 P (Silver Star ₹3,000) up to 30,00,000 P (Chairman ₹25 crore) — automatic cash rewards.</p></div>
-            <div class="income-card"><div class="i-ico">🏆</div><h3>07 · Award &amp; Rewards</h3><p>Lifetime points milestones — dinner set, mixer grinder, mobile, laptop, scooter, cash funds, car funds, house fund, plot fund and bungalow fund.</p></div>
-            <div class="income-card"><div class="i-ico">👑</div><h3>08 · Royalty Income</h3><p>Top leaders share in the company's growth through the royalty pool.</p></div>
-            <div class="income-card"><div class="i-ico">🏠</div><h3>09 · House Fund</h3><p>Consistent achievers become eligible for the house fund support program.</p></div>
-            <div class="income-card"><div class="i-ico">✈️</div><h3>10 · Tour &amp; Vacation</h3><p>Qualify for domestic and international company tours with your family.</p></div>
+            <div class="income-card"><div class="i-ico">🤝</div><h3>02 · Direct Sponsor Income</h3><p>At the current plan rate, earn <b><?= money($directPay) ?> once per newly green direct member</b>. The actual sponsor receives it even when someone else is the placement parent, subject to eligibility.</p></div>
+            <div class="income-card"><div class="i-ico">⚖️</div><h3>03 · First-Pair Sponsor Bonus</h3><p>The current rate is <b><?= e($plan['sponsor_matching_percent']) ?>% (<?= money($firstBonus) ?>)</b> of a direct member's first pair, once per direct and subject to sponsor and placement eligibility.</p></div>
+            <div class="income-card"><div class="i-ico">🔁</div><h3>04 · Binary Matching Bonus</h3><p><b><?= bv($unit) ?> left + <?= bv($unit) ?> right</b> of approved team BV = 1 pair → <b><?= money($pairPay) ?></b> per pair. Team BV counts even when contributors are not yet green.</p></div>
+            <div class="income-card"><div class="i-ico">⭐</div><h3>05 · Points</h3><p>At the current rate, each <?= bv($unit) ?> left + right pair earns <b><?= $pointsPerPair ?> point(s)</b>, subject to recipient eligibility.</p></div>
+            <div class="income-card"><div class="i-ico">🏅</div><h3>06 · Rank Cash Rewards</h3><p>Configured rank rewards are credited when an eligible member reaches a new rank.</p></div>
+            <div class="income-card"><div class="i-ico">🏆</div><h3>07 · Award &amp; Rewards</h3><p>Lifetime points milestones are listed below for company recognition; they are not automatic wallet credits.</p></div>
+            <div class="income-card"><div class="i-ico">👑</div><h3>08 · Royalty Income</h3><p>Not configured as an automatic income; confirm program availability with the company.</p></div>
+            <div class="income-card"><div class="i-ico">🏠</div><h3>09 · House Fund</h3><p>Confirm program availability and conditions with the company.</p></div>
+            <div class="income-card"><div class="i-ico">✈️</div><h3>10 · Tour &amp; Vacation</h3><p>Tour programs are not configured as automatic income; confirm availability with the company.</p></div>
             <div class="income-card"><div class="i-ico">🎓</div><h3>11 · Education System</h3><p>Free business training, product education and leadership development for every distributor.</p></div>
         </div>
     </div>
@@ -57,26 +62,25 @@ require __DIR__ . '/includes/site_header.php';
         <div class="plan-cols">
             <div class="plan-box">
                 <h3>🧮 1 : 1 Pair Matching</h3>
-                <p>When <b>both your left and right leg</b> generate <?= e(bv($plan['pair_unit_bv'])) ?> BV each,
-                   one pair is matched and you earn <b><?= money($plan['binary_value']) ?></b>.</p>
+                <p>When <b>both your left and right leg</b> generate <?= bv($unit) ?> each,
+                   one pair is matched and you earn <b><?= money($pairPay) ?></b>.</p>
                 <table class="plan-table">
                     <tr><th>Left Leg</th><th></th><th>Right Leg</th><th>You Earn</th></tr>
-                    <tr><td><?= e(bv($plan['pair_unit_bv'])) ?></td><td>+</td><td><?= e(bv($plan['pair_unit_bv'])) ?></td><td><b><?= money($plan['binary_value']) ?></b></td></tr>
-                    <tr><td><?= e(bv($plan['pair_unit_bv'] * 2)) ?></td><td>+</td><td><?= e(bv($plan['pair_unit_bv'] * 2)) ?></td><td><b><?= money($plan['binary_value'] * 2) ?></b></td></tr>
-                    <tr><td><?= e(bv($plan['pair_unit_bv'] * 5)) ?></td><td>+</td><td><?= e(bv($plan['pair_unit_bv'] * 5)) ?></td><td><b><?= money($plan['binary_value'] * 5) ?></b></td></tr>
+                    <tr><td><?= e(bv($plan['pair_unit_bv'])) ?></td><td>+</td><td><?= e(bv($plan['pair_unit_bv'])) ?></td><td><b><?= money($pairPay) ?></b></td></tr>
+                    <tr><td><?= e(bv($plan['pair_unit_bv'] * 2)) ?></td><td>+</td><td><?= e(bv($plan['pair_unit_bv'] * 2)) ?></td><td><b><?= money($pairPay * 2) ?></b></td></tr>
+                    <tr><td><?= e(bv($plan['pair_unit_bv'] * 5)) ?></td><td>+</td><td><?= e(bv($plan['pair_unit_bv'] * 5)) ?></td><td><b><?= money($pairPay * 5) ?></b></td></tr>
                 </table>
                 <p class="muted">Unmatched BV is carried forward — your business is never lost.</p>
             </div>
             <div class="plan-box">
                 <h3>🛡️ Capping &amp; Rules</h3>
                 <ul class="plan-list">
-                    <li><b>Daily capping:</b> <?= money($plan['daily_cap']) ?></li>
-                    <li><b>Monthly capping:</b> <?= money($plan['monthly_cap']) ?></li>
-                    <li><b>Carry forward:</b> unmatched BV / pairs carry forward (<?= (int)$plan['carry_forward'] === 1 ? 'Yes' : 'No' ?>)</li>
-                    <li><b>No level limit</b> — unlimited depth income</li>
+                    <li><b>Carry forward:</b> unmatched team BV carries forward.</li>
+                    <li><b>Eligibility:</b> <?= (int)$plan['matching_requires_active'] ? 'your ID must be green to receive matching.' : 'matching does not require a green ID.' ?></li>
+                    <li>Legacy daily and monthly cap settings are not applied by the prospective income policy.</li>
                     <li><b>No need to manage rank</b> — points are calculated automatically</li>
-                    <li>TDS <?= e(rtrim(rtrim((string)(float)$plan['tds_percent'], '0'), '.')) ?>% + admin charge <?= e(rtrim(rtrim((string)(float)$plan['admin_charge_percent'], '0'), '.')) ?>% applicable on payouts</li>
-                    <li>KYC confirmation is mandatory for rewards &amp; payouts</li>
+                    <li>TDS <?= e((float)$plan['tds_percent']) ?>% + admin charge <?= e((float)$plan['admin_charge_percent']) ?>% applicable on payouts</li>
+                    <li>Verified KYC and bank details are required for payouts</li>
                 </ul>
             </div>
         </div>
@@ -89,12 +93,12 @@ require __DIR__ . '/includes/site_header.php';
         <div class="sec-head">
             <span class="sec-kicker">Cash Reward Plan</span>
             <h2>Recognising Your Performance, Rewarding Your Success</h2>
-            <p>1 Point (P) = 3,000 BV on the left + 3,000 BV on the right. Rewards are awarded within 15 days of achieving.</p>
+            <p>The current rate is <?= $pointsPerPair ?> point(s) per <?= bv($unit) ?> matched on each side. Historical points retain the rate in effect when earned.</p>
         </div>
         <div class="table-wrap plan-table-wrap">
             <table class="plan-rank-table">
                 <thead>
-                    <tr><th>#</th><th>Rank</th><th>Points Required</th><th>Matched Business (L + R)</th><th>Cash Reward</th></tr>
+                    <tr><th>#</th><th>Rank</th><th>Points Required</th><th>Illustrative BV at current rate (L + R)</th><th>Cash Reward</th></tr>
                 </thead>
                 <tbody>
                     <?php $i = 1; foreach ($ranks as $r): ?>
@@ -102,7 +106,7 @@ require __DIR__ . '/includes/site_header.php';
                         <td><?= $i++ ?></td>
                         <td><b>🏅 <?= e($r['name']) ?></b></td>
                         <td><?= number_format((int)$r['min_points']) ?> P</td>
-                        <td><?= e(bv((float)$r['min_points'] * 6000)) ?></td>
+                        <td><?= $pointsPerPair ? bv(ceil((int)$r['min_points'] / $pointsPerPair) * $unit * 2) : '—' ?></td>
                         <td class="gold"><b><?= money($r['reward_amount']) ?></b></td>
                     </tr>
                     <?php endforeach; ?>
@@ -119,7 +123,7 @@ require __DIR__ . '/includes/site_header.php';
         <div class="sec-head">
             <span class="sec-kicker">Award &amp; Rewards</span>
             <h2>Next-to-Next Matching Rewards</h2>
-            <p>No time limit — every reward is given once you reach the required points.</p>
+            <p>Points mark eligibility for company recognition; awards are not automatic wallet credits.</p>
         </div>
         <div class="award-grid">
             <?php foreach ($awards as $a): ?>

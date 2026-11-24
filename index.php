@@ -12,6 +12,10 @@ if (!$featured) {
                        WHERE p.status='active' ORDER BY p.sort_order LIMIT 8");
 }
 $categories = q_all("SELECT * FROM categories WHERE status='active' ORDER BY sort_order LIMIT 6");
+$incomePlan = get_plan();
+$incomeUnit = max(1, (float)$incomePlan['pair_unit_bv']);
+$incomePairPay = round($incomePlan['binary_type'] === 'fixed' ? (float)$incomePlan['binary_value'] : $incomeUnit * (float)$incomePlan['binary_value'] / 100, 2);
+$incomeDirectPay = round((float)$incomePlan['activation_bv'] * (float)$incomePlan['sponsor_percent'] / 100, 2);
 $testimonials = q_all("SELECT * FROM testimonials WHERE status='active' ORDER BY sort_order LIMIT 3");
 
 require __DIR__ . '/includes/site_header.php';
@@ -148,18 +152,18 @@ require __DIR__ . '/includes/site_header.php';
     <div class="container">
         <div class="sec-head">
             <span class="sec-kicker">Better Earnings. Better Lifestyle.</span>
-            <h2>11 Types of Income</h2>
+            <h2>Income &amp; Rewards</h2>
             <p>Build multiple sources of income — no level limit, carry forward business.</p>
         </div>
         <div class="income-grid">
             <div class="income-card"><div class="i-ico">🛍️</div><h3>Retail Income</h3><p>30% to 45% margin between DP and MRP.</p></div>
-            <div class="income-card"><div class="i-ico">🤝</div><h3>Leg Completion Income</h3><p>₹300 when your left leg completes 3,000 BV, ₹300 when your right leg completes 3,000 BV — once per leg.</p></div>
-            <div class="income-card"><div class="i-ico">🔁</div><h3>Binary Matching Income</h3><p>₹450 per 3000:3000 BV pair, with carry forward.</p></div>
-            <div class="income-card"><div class="i-ico">⚖️</div><h3>Sponsor Matching Income</h3><p>50% of the matching income earned by your directs.</p></div>
-            <div class="income-card"><div class="i-ico">🏅</div><h3>Cash Rewards</h3><p>15 ranks — from Silver Star to Chairman (₹25 crore).</p></div>
-            <div class="income-card"><div class="i-ico">🚗</div><h3>Car Fund</h3><p>₹1,50,000 car fund at 500 points.</p></div>
-            <div class="income-card"><div class="i-ico">🏆</div><h3>Award Rewards</h3><p>Dinner set, mixer grinder, cash funds and more.</p></div>
-            <div class="income-card"><div class="i-ico">👑</div><h3>Royalty &amp; Funds</h3><p>Royalty, house fund, tours and education system.</p></div>
+            <div class="income-card"><div class="i-ico">🤝</div><h3>Direct Sponsor Income</h3><p><?= money($incomeDirectPay) ?> for each newly green direct member, regardless of their placement parent, subject to eligibility.</p></div>
+            <div class="income-card"><div class="i-ico">🔁</div><h3>Binary Matching Income</h3><p><?= money($incomePairPay) ?> per <?= bv($incomeUnit) ?> left and right pair of approved team BV.</p></div>
+            <div class="income-card"><div class="i-ico">⚖️</div><h3>Sponsor Matching Income</h3><p><?= e($incomePlan['sponsor_matching_percent']) ?>% of an eligible direct member's first matching pair, once per direct.</p></div>
+            <div class="income-card"><div class="i-ico">🏅</div><h3>Cash Rewards</h3><p>Configured rank rewards are credited when you reach an eligible rank.</p></div>
+            <div class="income-card"><div class="i-ico">🚗</div><h3>Car Fund</h3><p>Company recognition milestone; not an automatic wallet credit.</p></div>
+            <div class="income-card"><div class="i-ico">🏆</div><h3>Award Rewards</h3><p>Explore the company's configured recognition milestones.</p></div>
+            <div class="income-card"><div class="i-ico">👑</div><h3>Royalty &amp; Funds</h3><p>Ask the company about availability and conditions for other programs.</p></div>
         </div>
         <p class="text-center mt-3">
             <a class="btn btn-primary" href="<?= url('opportunity.php') ?>">View the Complete Plan →</a>

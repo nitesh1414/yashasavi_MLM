@@ -66,7 +66,7 @@ return [
     wallet_balance DECIMAL(14,2) NOT NULL DEFAULT 0,
     total_earned DECIMAL(14,2) NOT NULL DEFAULT 0,
     total_withdrawn DECIMAL(14,2) NOT NULL DEFAULT 0,
-    status ENUM('active','blocked') NOT NULL DEFAULT 'active',
+    status ENUM('active','blocked','deleted') NOT NULL DEFAULT 'active',
     kyc_status ENUM('pending','verified','rejected') NOT NULL DEFAULT 'pending',
     must_change_password TINYINT(1) NOT NULL DEFAULT 0,
     kyc_remark VARCHAR(255) NULL,
@@ -79,6 +79,46 @@ return [
     INDEX idx_path (path(191)),
     INDEX idx_active (is_active),
     INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+/* The income-rule cutover keeps a separate team-BV watermark. This
+ * prevents old matches being paid again and records pending green-ID bonuses. */
+"CREATE TABLE IF NOT EXISTS matching_state (
+    user_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    left_eligible_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    right_eligible_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    processed_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_pairs INT UNSIGNED NOT NULL DEFAULT 0,
+    pending_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_first_bonus DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_first_sponsor_id INT UNSIGNED NULL,
+    pending_first_sponsor_leg TINYINT UNSIGNED NULL,
+    points_processed_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_points INT UNSIGNED NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS sponsor_activation_bonuses (
+    member_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    sponsor_id INT UNSIGNED NOT NULL,
+    order_id INT UNSIGNED NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    bv DECIMAL(12,2) NOT NULL,
+    leg TINYINT UNSIGNED NULL,
+    status ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
+    commission_id INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL,
+    paid_at DATETIME NULL,
+    INDEX idx_sponsor_status (sponsor_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS member_deletion_audit (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    admin_id INT UNSIGNED NOT NULL,
+    changes_json LONGTEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_deleted_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
 "CREATE TABLE IF NOT EXISTS categories (

@@ -4,9 +4,9 @@ require_once __DIR__ . '/../includes/init.php';
 $a = require_superadmin();
 
 $stats = [
-    'users'         => (int)q_val("SELECT COUNT(*) FROM users"),
-    'active_users'  => (int)q_val("SELECT COUNT(*) FROM users WHERE is_active = 1"),
-    'new_today'     => (int)q_val("SELECT COUNT(*) FROM users WHERE created_at >= ?", [date('Y-m-d 00:00:00')]),
+    'users'         => (int)q_val("SELECT COUNT(*) FROM users WHERE status <> 'deleted'"),
+    'active_users'  => (int)q_val("SELECT COUNT(*) FROM users WHERE is_active = 1 AND status <> 'deleted'"),
+    'new_today'     => (int)q_val("SELECT COUNT(*) FROM users WHERE status <> 'deleted' AND created_at >= ?", [date('Y-m-d 00:00:00')]),
     'orders'        => (int)q_val("SELECT COUNT(*) FROM orders"),
     'pending_orders'=> (int)q_val("SELECT COUNT(*) FROM orders WHERE status='pending'"),
     'sales_dp'      => (float)q_val("SELECT COALESCE(SUM(total_dp),0) FROM orders WHERE status='approved'"),
@@ -22,12 +22,12 @@ $stats = [
 $chart = [];
 for ($i = 13; $i >= 0; $i--) {
     $d = date('Y-m-d', strtotime("-$i days"));
-    $chart[$d] = (int)q_val("SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?", [$d]);
+    $chart[$d] = (int)q_val("SELECT COUNT(*) FROM users WHERE status <> 'deleted' AND DATE(created_at) = ?", [$d]);
 }
 $maxChart = max(1, max($chart));
 
 $recentUsers = q_all("SELECT u.*, s.username AS sponsor_name FROM users u
-                      LEFT JOIN users s ON s.id = u.sponsor_id ORDER BY u.id DESC LIMIT 6");
+                      LEFT JOIN users s ON s.id = u.sponsor_id WHERE u.status <> 'deleted' ORDER BY u.id DESC LIMIT 6");
 $recentOrders = q_all("SELECT o.*, u.username FROM orders o JOIN users u ON u.id = o.user_id ORDER BY o.id DESC LIMIT 6");
 
 $activeKey = 'dashboard';

@@ -1,174 +1,239 @@
 <?php
-/**
- * Delete a distributor — SUPER ADMIN ONLY.
- * GET  ?id=N  → full information about the member + confirmation form.
- * POST        → performs the deletion after re-checking every safety rule.
- *
- * Safety rules (the network and the accounts must stay consistent):
- *   - the company root cannot be deleted
- *   - a member with a downline cannot be deleted (the tree would break)
- *   - a member with directly sponsored members cannot be deleted
- *   - a member with orders cannot be deleted (BV / commission history)
- * In those cases the page explains why and suggests blocking instead.
- */
+/** Remove one member from the live network, after a full, stale-safe preview. */
 require_once __DIR__ . '/../includes/init.php';
+require_once __DIR__ . '/../includes/member_deletion.php';
 $a = require_superadmin();
-
 $id = (int)(get_str('id') ?: post_str('id'));
-$u = q_row("SELECT u.*, s.username AS sponsor_name, p.username AS upline_name, r.name AS rank_name
-            FROM users u
-            LEFT JOIN users s ON s.id = u.sponsor_id
-            LEFT JOIN users p ON p.id = u.placement_id
-            LEFT JOIN ranks r ON r.id = u.rank_id
-            WHERE u.id = ?", [$id]);
-if (!$u) {
-    flash('error', 'Distributor not found.');
-    redirect('users.php');
-}
-
-/* ---- safety analysis ---- */
-$isRoot = $u['placement_id'] === null;
-$downline = (int)q_val("SELECT COUNT(*) FROM users WHERE path LIKE ?", [$u['path'] . '%']) - 1;
-$directs = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ?", [$id]);
-$orders = (int)q_val("SELECT COUNT(*) FROM orders WHERE user_id = ?", [$id]);
-$orderSum = q_row("SELECT COUNT(*) n, COALESCE(SUM(total_dp),0) dp, COALESCE(SUM(total_bv),0) bv
-                   FROM orders WHERE user_id = ?", [$id]);
-$earn = user_earnings_breakdown($id);
-$payouts = (int)q_val("SELECT COUNT(*) FROM payouts WHERE user_id = ?", [$id]);
-
-/* left / right team sizes */
-$teamL = 0; $teamR = 0;
-$ch = user_children($id);
-if ($ch['L']) { $teamL = (int)q_val("SELECT COUNT(*) FROM users WHERE path LIKE ?", [$ch['L']['path'] . '%']); }
-if ($ch['R']) { $teamR = (int)q_val("SELECT COUNT(*) FROM users WHERE path LIKE ?", [$ch['R']['path'] . '%']); }
-
-$reasons = [];
-if ($isRoot) { $reasons[] = 'This is the company ROOT position — it can never be deleted.'; }
-if ($downline > 0) { $reasons[] = 'This member has <b>' . number_format($downline) . ' downline members</b> below them — deleting would break the network tree. Move / remove the downline first.'; }
-if ($directs > 0) { $reasons[] = 'This member is the <b>direct sponsor of ' . number_format($directs) . ' member(s)</b> — those members would lose their sponsor.'; }
-if ($orders > 0) { $reasons[] = 'This member has <b>' . number_format($orders) . ' order(s)</b> (' . money_txt($orderSum['dp']) . ' DP / ' . number_format((float)$orderSum['bv']) . ' BV) — the BV and commission history of the whole team would become inconsistent.'; }
-$canDelete = !$reasons;
+$u = q_row("SELECT * FROM users WHERE id = ? AND status <> 'deleted'", [$id]);
+if (!$u) { flash('error', 'Member not found or already deleted.'); redirect('users.php'); }
+$ready = income_policy_ready();
 
 if (is_post()) {
     verify_csrf();
-    if (post_str('action') !== 'delete') { redirect('users.php'); }
-    if (!$canDelete) {
-        flash('error', $u['username'] . ' cannot be deleted (see the reasons on their delete page). You can block them instead.');
-        redirect('user_delete.php?id=' . $id);
+    $promote = post_str('promote');
+    $sponsorId = (int)post_str('sponsor_id');
+    $sponsorText = post_str('sponsor');
+    if (post_str('confirm_username') !== $u['username']) {
+        flash('error', 'Enter the exact member ID to confirm.');
+        redirect('user_delete.php?id=' . $id . '&preview=1&promote=' . urlencode($promote) . '&sponsor=' . urlencode($sponsorText));
     }
-    /* re-check under the just-deleted state cannot change here; delete the
-     * member's own money records (commissions, wallet, payout requests) and
-     * the account itself — nothing else references a downline-free,
-     * sponsor-free, order-free member */
-    db_tx(function () use ($id) {
-        q("DELETE FROM commissions WHERE user_id = ?", [$id]);
-        q("DELETE FROM wallet_transactions WHERE user_id = ?", [$id]);
-        q("DELETE FROM payouts WHERE user_id = ?", [$id]);
-        q("DELETE FROM users WHERE id = ?", [$id]);
-    });
-    flash('success', 'Distributor ' . $u['username'] . ' (' . $u['full_name'] . ') has been deleted permanently.');
-    redirect('users.php');
+    // A confirmation is valid only for the exact plan the server issued to
+    // this superadmin session, not merely for client-supplied hidden fields.
+    $issued = $_SESSION['member_deletion_preview'] ?? null;
+    unset($_SESSION['member_deletion_preview']);
+    if (!$issued || (int)$issued['id'] !== $id || $issued['promote'] !== $promote
+        || (int)$issued['sponsor_id'] !== $sponsorId || time() - (int)$issued['issued_at'] > 900
+        || !hash_equals($issued['nonce'], post_str('preview_token'))) {
+        flash('error', 'The preview expired or its choices were changed. Review a fresh preview before confirming.');
+        redirect('user_delete.php?id=' . $id . '&preview=1&promote=' . urlencode($promote) . '&sponsor=' . urlencode($sponsorText));
+    }
+    [$ok, $msg] = delete_member_with_plan($id, $promote, $sponsorId, $issued['hash'], (int)$a['id']);
+    flash($ok ? 'success' : 'error', $msg);
+    if ($ok) { redirect('users.php'); }
+    redirect('user_delete.php?id=' . $id . '&preview=1&promote=' . urlencode($promote) . '&sponsor=' . urlencode($sponsorText));
 }
 
+$kids = user_children($id);
+$directCount = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ? AND status <> 'deleted'", [$id]);
+$promote = get_str('promote');
+$sponsorText = get_str('sponsor');
+$sponsor = $sponsorText !== '' ? find_user($sponsorText) : null;
+$preview = null;
+unset($_SESSION['member_deletion_preview']);
+if ($ready && get_str('preview') === '1') {
+    $preview = build_member_deletion_plan($id, $promote, $sponsor ? (int)$sponsor['id'] : 0);
+    if (empty($preview['error'])) {
+        $promote = $preview['promoteLeg'];
+        $_SESSION['member_deletion_preview'] = [
+            'id' => $id, 'promote' => $promote, 'sponsor_id' => (int)$preview['newSponsorId'],
+            'hash' => $preview['hash'], 'nonce' => bin2hex(random_bytes(32)), 'issued_at' => time(),
+        ];
+    }
+}
+$label = function ($mid) use ($preview) {
+    if (!$mid) { return 'Company root / none'; }
+    $m = $preview['members'][(int)$mid] ?? null;
+    return $m ? $m['username'] . ' — ' . $m['full_name'] : '#' . (int)$mid;
+};
+$position = function ($parent, $leg) use ($label) {
+    return $parent ? $label($parent) . ' · ' . ($leg === 'R' ? 'Right' : 'Left') : 'Company root';
+};
 $activeKey = 'users';
-$pageTitle = 'Delete Distributor';
+$pageTitle = 'Delete Member — Preview';
 require __DIR__ . '/_nav.php';
 require __DIR__ . '/../includes/dash_header.php';
 ?>
-
-<div class="two-col">
-    <div>
-        <div class="card" style="border:1.5px solid #e53935">
-            <div class="card-title">🗑 Delete Distributor — <?= e($u['username']) ?></div>
-
-            <?php if ($canDelete): ?>
-            <div class="alert alert-warning" style="margin-bottom:14px">
-                <b>You are about to permanently delete this member.</b><br>
-                This cannot be undone. Please check <b>all</b> the information below carefully before confirming.
-            </div>
-            <?php else: ?>
-            <div class="alert alert-danger" style="margin-bottom:14px">
-                <b>This member CANNOT be deleted:</b>
-                <ul style="margin:8px 0 0 18px">
-                    <?php foreach ($reasons as $r): ?><li><?= $r ?></li><?php endforeach; ?>
-                </ul>
-                You can <a href="users.php"><b>block</b></a> them instead — a blocked member cannot log in but the network stays intact.
-            </div>
-            <?php endif; ?>
-
-            <table class="kv-table" style="width:100%">
-                <tr><td colspan="2" style="background:#f2f6f1"><b>👤 Identity</b></td></tr>
-                <tr><td>User ID</td><td><b><?= e($u['username']) ?></b></td></tr>
-                <tr><td>Full name</td><td><b><?= e($u['full_name']) ?></b></td></tr>
-                <tr><td>Email</td><td><?= e($u['email'] ?: '—') ?></td></tr>
-                <tr><td>Mobile</td><td><?= e($u['mobile']) ?></td></tr>
-                <tr><td>Date of birth</td><td><?= $u['dob'] ? dmy($u['dob']) : '—' ?></td></tr>
-                <tr><td>Marital status</td><td><?= e($u['marital_status'] ?: '—') ?></td></tr>
-                <tr><td>Nationality</td><td><?= e($u['nationality'] ?: '—') ?></td></tr>
-
-                <tr><td colspan="2" style="background:#f2f6f1"><b>📍 Address</b></td></tr>
-                <tr><td>Address</td><td><?= e($u['address'] ?: '—') ?></td></tr>
-                <tr><td>City / State / PIN</td><td><?= e($u['city'] ?: '—') ?> · <?= e($u['state'] ?: '—') ?> · <?= e($u['pincode'] ?: '—') ?></td></tr>
-
-                <tr><td colspan="2" style="background:#f2f6f1"><b>👥 Network position</b></td></tr>
-                <tr><td>Sponsor (introducer)</td><td><?= e($u['sponsor_name'] ?: '— (company root)') ?></td></tr>
-                <tr><td>Upline (placed under)</td><td><?= e($u['upline_name'] ?: '— (company root)') ?></td></tr>
-                <tr><td>Leg</td><td><?= $isRoot ? '— (root)' : ($u['leg'] === 'R' ? 'RIGHT' : 'LEFT') ?></td></tr>
-                <tr><td>Level (from company root)</td><td><?= (int)$u['depth'] + 1 ?></td></tr>
-                <tr><td>Left team members</td><td><?= number_format($teamL) ?></td></tr>
-                <tr><td>Right team members</td><td><?= number_format($teamR) ?></td></tr>
-                <tr><td>Downline members</td><td><b><?= number_format($downline) ?></b></td></tr>
-                <tr><td>Directly sponsored members</td><td><b><?= number_format($directs) ?></b></td></tr>
-
-                <tr><td colspan="2" style="background:#f2f6f1"><b>📊 Business &amp; money</b></td></tr>
-                <tr><td>Left BV</td><td><?= bv($u['left_bv']) ?></td></tr>
-                <tr><td>Right BV</td><td><?= bv($u['right_bv']) ?></td></tr>
-                <tr><td>Self purchase BV</td><td><?= bv($u['self_bv']) ?></td></tr>
-                <tr><td>Matched pairs</td><td><?= number_format((int)$u['matched_pairs']) ?></td></tr>
-                <tr><td>Wallet balance</td><td><b><?= money($u['wallet_balance']) ?></b></td></tr>
-                <tr><td>Total earned</td><td><?= money($u['total_earned']) ?></td></tr>
-                <tr><td>Total withdrawn</td><td><?= money($u['total_withdrawn']) ?></td></tr>
-                <tr><td>Direct sponsor income</td><td><?= money($earn['sponsor']) ?></td></tr>
-                <tr><td>Matching income</td><td><?= money($earn['binary']) ?></td></tr>
-                <tr><td>50% Direct SP Match Income</td><td><?= money($earn['sponsor_matching']) ?></td></tr>
-                <tr><td>Rank rewards</td><td><?= money($earn['rank']) ?></td></tr>
-                <tr><td>Orders</td><td><?= number_format((int)$orderSum['n']) ?> (<?= money($orderSum['dp']) ?> DP / <?= number_format((float)$orderSum['bv']) ?> BV)</td></tr>
-                <tr><td>Payout requests</td><td><?= number_format($payouts) ?></td></tr>
-
-                <tr><td colspan="2" style="background:#f2f6f1"><b>🏦 Bank &amp; KYC</b></td></tr>
-                <tr><td>Bank account</td><td><?= e($u['bank_account_no'] ? $u['bank_name'] . ' · ' . $u['bank_account_no'] . ' · ' . $u['bank_ifsc'] : '—') ?></td></tr>
-                <tr><td>Account holder</td><td><?= e($u['bank_holder'] ?: '—') ?></td></tr>
-                <tr><td>PAN / Aadhaar</td><td><?= e($u['pan_no'] ?: '—') ?> · <?= e($u['aadhaar_no'] ? 'XXXX-XXXX-' . substr($u['aadhaar_no'], -4) : '—') ?></td></tr>
-                <tr><td>Nominee</td><td><?= e($u['nominee_name'] ?: '—') ?> (<?= e($u['nominee_relation'] ?: '—') ?>)</td></tr>
-
-                <tr><td colspan="2" style="background:#f2f6f1"><b>⚙️ Status</b></td></tr>
-                <tr><td>Member status</td><td><?= (int)$u['is_active'] ? badge('Active', 'success') : badge('Inactive', 'warning') ?> <?= status_badge($u['status']) ?></td></tr>
-                <tr><td>KYC</td><td><?= status_badge($u['kyc_status']) ?></td></tr>
-                <tr><td>Rank</td><td><?= e($u['rank_name'] ?: '—') ?></td></tr>
-                <tr><td>Joined</td><td><?= dmy($u['created_at'], true) ?></td></tr>
-                <tr><td>Activated at</td><td><?= $u['activated_at'] ? dmy($u['activated_at'], true) : '—' ?></td></tr>
-                <tr><td>Last login</td><td><?= $u['last_login'] ? dmy($u['last_login'], true) : '—' ?></td></tr>
-            </table>
-
-            <?php if ($canDelete): ?>
-            <form method="post" class="inline-form" data-confirm="FINAL WARNING: permanently delete <?= e($u['username']) ?> (<?= e($u['full_name']) ?>)? This cannot be undone.">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
-                <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-                    <button class="btn btn-danger" type="submit">🗑 Yes, delete <?= e($u['username']) ?> permanently</button>
-                    <a class="btn btn-outline" href="user_view.php?id=<?= (int)$u['id'] ?>">Cancel — view member</a>
-                    <a class="btn btn-light" href="users.php">Cancel — back to list</a>
-                </div>
-            </form>
-            <?php else: ?>
-            <div style="margin-top:16px">
-                <a class="btn btn-outline" href="user_view.php?id=<?= (int)$u['id'] ?>">View member</a>
-                <a class="btn btn-light" href="users.php">Back to distributors</a>
-            </div>
-            <?php endif; ?>
-        </div>
+<style>
+.delete-preview table.table { min-width: 680px; }
+.delete-preview table.table th:first-child { min-width: 160px; }
+.delete-preview table.table td { overflow-wrap: break-word; }
+.delete-preview table.table.delete-impact-table { min-width: 760px; table-layout: fixed; }
+.delete-impact-table th { white-space: normal; }
+.delete-impact-table th:first-child { width: 25%; }
+</style>
+<div class="card" style="max-width:1100px;border:1px solid #e7b9ad">
+    <div class="card-title"><b>Remove <?= e($u['username']) ?> from the network</b>
+        <span class="right"><a class="btn btn-light btn-sm" href="users.php">← Distributors</a></span>
     </div>
+    <div class="alert alert-warning"><b>Review before confirming.</b> Only this member is removed from the live tree; both teams are kept.
+        Login is disabled, while their orders, commissions, wallet, payouts and audit identity are retained.</div>
+    <?php if (!$ready): ?>
+        <div class="alert alert-danger">The database must be upgraded first. <a href="../install/upgrade.php">Run the upgrade</a> before removing members.</div>
+    <?php else: ?>
+    <form method="get" class="delete-options">
+        <input type="hidden" name="id" value="<?= $id ?>">
+        <input type="hidden" name="preview" value="1">
+        <div class="form-grid2">
+            <div class="form-group">
+                <label>Branch to take this member's position</label>
+                <?php if ($kids['L'] && $kids['R']): ?>
+                <select class="form-control" name="promote" required>
+                    <option value="">Choose left or right</option>
+                    <option value="L" <?= $promote === 'L' ? 'selected' : '' ?>>Left — <?= e($kids['L']['username']) ?></option>
+                    <option value="R" <?= $promote === 'R' ? 'selected' : '' ?>>Right — <?= e($kids['R']['username']) ?></option>
+                </select>
+                <div class="form-hint">The other whole branch is attached at the first free slot on its own side under the promoted branch.</div>
+                <?php elseif ($kids['L'] || $kids['R']): $one = $kids['L'] ?: $kids['R']; ?>
+                <input type="hidden" name="promote" value="<?= $kids['L'] ? 'L' : 'R' ?>">
+                <div class="form-hint"><b><?= e($one['username']) ?></b> is the only child and will take this position.</div>
+                <?php else: ?>
+                <div class="form-hint">No child branches; this position will become empty.</div>
+                <?php endif; ?>
+            </div>
+            <div class="form-group">
+                <label>Replacement sponsor <?= $directCount ? '(required)' : '(not needed)' ?></label>
+                <?php if ($directCount): ?>
+                <input class="form-control" name="sponsor" value="<?= e($sponsorText) ?>" required placeholder="Member ID, e.g. YSH100001">
+                <div class="form-hint"><?= number_format($directCount) ?> direct referral(s) will transfer. The chosen sponsor cannot be the deleted member.
+                    If a direct referral is chosen, that member takes the old sponsor (or becomes a sponsor root).</div>
+                <?php else: ?>
+                <div class="form-hint">There are no directly sponsored members to transfer.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Preview exact changes</button>
+    </form>
+    <?php endif; ?>
 </div>
 
+<?php if ($preview && !empty($preview['error'])): ?>
+    <div class="alert alert-danger" style="max-width:1100px"><?= e($preview['error']) ?></div>
+<?php elseif ($preview): ?>
+<div class="delete-preview" style="max-width:1100px">
+    <p class="form-hint">On small screens, scroll tables horizontally to see every column.</p>
+    <div class="card">
+        <div class="card-title"><b>1 · Tree changes</b></div>
+        <?php if ($preview['promotedId']): ?>
+            <p><b><?= e($label($preview['promotedId'])) ?></b> will take <?= e($u['username']) ?>’s position
+               (<?= e($position((int)$u['placement_id'], $u['leg'])) ?>).</p>
+            <?php if ($preview['otherId']): ?>
+            <p>The entire <?= $preview['otherLeg'] === 'R' ? 'right' : 'left' ?> branch rooted at <b><?= e($label($preview['otherId'])) ?></b>
+               will move beneath <b><?= e($label($preview['destination'])) ?></b> on its <?= $preview['otherLeg'] === 'R' ? 'right' : 'left' ?> side.
+               It carries <?= bv($preview['movedTeamBv']) ?>.</p>
+            <?php endif; ?>
+        <?php else: ?>
+            <p>The position will become empty. No descendants are removed.</p>
+            <?php if (!$u['placement_id']): ?><p><b>This is the last member of the tree.</b> The superadmin can create a new company root afterward.</p><?php endif; ?>
+        <?php endif; ?>
+        <?php if ($preview['moves']): ?>
+        <div class="table-wrap" style="margin-top:12px;box-shadow:none"><table class="table">
+            <thead><tr><th>Member</th><th>Current position</th><th>After removal</th><th>Depth</th><th>Old / new ancestry</th></tr></thead>
+            <tbody><?php foreach ($preview['moves'] as $m): ?><tr>
+                <td><?= e($label($m['user_id'])) ?></td>
+                <td><?= e($position($m['old_parent'], $m['old_leg'])) ?></td>
+                <td><?= e($position($m['new_parent'], $m['new_leg'])) ?></td>
+                <td><?= $m['old_depth'] ?> → <?= $m['new_depth'] ?></td>
+                <td><small><?= e($m['old_path']) ?><br>→ <?= e($m['new_path']) ?></small></td>
+            </tr><?php endforeach; ?></tbody>
+        </table></div>
+        <p class="form-hint"><?= count($preview['moves']) ?> member(s) have an updated ancestry path; no descendant is deleted.</p>
+        <?php endif; ?>
+        <?php if ($preview['teamChanges']): ?>
+        <div class="table-wrap" style="margin-top:12px;box-shadow:none"><table class="table">
+            <thead><tr><th>Member</th><th>Left team: before → after</th><th>Right team: before → after</th></tr></thead><tbody>
+            <?php foreach ($preview['teamChanges'] as $t): ?><tr><td><?= e($label($t['user_id'])) ?></td>
+                <td><?= number_format($t['old_l']) ?> → <?= number_format($t['new_l']) ?></td>
+                <td><?= number_format($t['old_r']) ?> → <?= number_format($t['new_r']) ?></td></tr><?php endforeach; ?>
+            </tbody></table></div>
+        <?php endif; ?>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><b>2 · Sponsorship changes</b></div>
+        <?php if (!$preview['sponsorChanges']): ?><p>No direct referrals will change sponsor.</p>
+        <?php else: ?><div class="table-wrap" style="box-shadow:none"><table class="table">
+            <thead><tr><th>Referral</th><th>Current sponsor</th><th>New sponsor</th></tr></thead><tbody>
+            <?php foreach ($preview['sponsorChanges'] as $c): ?><tr>
+                <td><?= e($label($c['user_id'])) ?></td><td><?= e($u['username']) ?></td><td><?= e($label($c['new_sponsor_id'])) ?></td>
+            </tr><?php endforeach; ?></tbody></table></div>
+        <p class="form-hint">The new sponsor applies prospectively. Past commissions and existing activation events are not transferred.</p>
+        <?php endif; ?>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><b>3 · BV and income impact</b></div>
+        <?php if (!$preview['bvChanges']): ?><p>No remaining member's displayed leg BV changes.</p>
+        <?php else: ?><div class="table-wrap" style="box-shadow:none"><table class="table">
+            <thead><tr><th>Member</th><th>Left BV: before → after</th><th>Right BV: before → after</th></tr></thead><tbody>
+            <?php foreach ($preview['bvChanges'] as $b): ?><tr><td><?= e($label($b['user_id'])) ?></td>
+                <td><?= bv($b['old_l']) ?> → <?= bv($b['new_l']) ?></td><td><?= bv($b['old_r']) ?> → <?= bv($b['new_r']) ?></td></tr><?php endforeach; ?>
+            </tbody></table></div><?php endif; ?>
+        <p class="form-hint">The deleted member's <?= bv($u['self_bv']) ?> of own BV leaves the live tree. Team BV is derived from the self BV of retained members.
+            <?php if ($preview['legacyCounters']): ?><b><?= count($preview['legacyCounters']) ?> existing leg-counter inconsistency/ies will also be corrected;</b> the exact before/after values are listed above.<?php endif; ?></p>
+        <p class="form-hint">Matching BV is updated for <?= count($preview['stateChanges']) ?> member(s).
+            Already credited income, ranks and points are not reversed or re-paid; moving a branch does not create a new commission.</p>
+        <?php if ($preview['stateChanges']): ?><div class="table-wrap" style="box-shadow:none"><table class="table delete-impact-table">
+            <thead><tr><th>Member</th><th>Matching left BV: before → after</th><th>Matching right BV: before → after</th><th>Matching watermark: before → after</th><th>Points watermark: before → after</th></tr></thead><tbody>
+            <?php foreach ($preview['stateChanges'] as $mid => $new): $old = $preview['states'][$mid]; ?><tr>
+                <td><?= e($label($mid)) ?></td><td><?= bv($old['left_eligible_bv']) ?> → <?= bv($new['left_eligible_bv']) ?></td>
+                <td><?= bv($old['right_eligible_bv']) ?> → <?= bv($new['right_eligible_bv']) ?></td>
+                <td><?= bv($old['processed_bv']) ?> → <?= bv($new['processed_bv']) ?></td>
+                <td><?= bv($old['points_processed_bv']) ?> → <?= bv($new['points_processed_bv']) ?></td>
+            </tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
+        <p><b><?= count($preview['bonuses']) ?></b> unpaid direct-activation bonus(es) owed to this deleted sponsor will be cancelled;
+           they are not transferred to the replacement sponsor.</p>
+        <?php if ($preview['bonuses']): ?><ul><?php foreach ($preview['bonuses'] as $b): ?><li><?= e($label($b['member_id'])) ?> · <?= money($b['amount']) ?></li><?php endforeach; ?></ul><?php endif; ?>
+        <?php if ($preview['pendingFirstBonuses']): ?>
+        <p><?= count($preview['pendingFirstBonuses']) ?> held first-pair sponsor bonus(es) tied to this sponsor will no longer be payable after removal; they will not transfer to the replacement sponsor.</p>
+        <ul><?php foreach ($preview['pendingFirstBonuses'] as $bonus): ?><li><?= e($label($bonus['user_id'])) ?> · <?= money($bonus['amount']) ?></li><?php endforeach; ?></ul>
+        <?php endif; ?>
+        <?php if ($preview['sourceBonus']): $sb = $preview['sourceBonus']; ?>
+        <p class="form-hint">The <?= money($sb['amount']) ?> activation bonus associated with this member remains <?= e($sb['status']) ?> for its original sponsor <?= e($label($sb['sponsor_id'])) ?>; it is not transferred.</p>
+        <?php endif; ?>
+        <?php $pendingPairs = (int)($preview['states'][$id]['pending_pairs'] ?? 0); $pendingAmount = $preview['states'][$id]['pending_amount'] ?? 0; ?>
+        <p class="form-hint"><?= $pendingPairs ?> unpaid matching pair(s) (<?= money($pendingAmount) ?>) and <?= (int)($preview['states'][$id]['pending_points'] ?? 0) ?> pending point(s) on the removed account cannot be paid while it is deleted.</p>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><b>4 · Records retained for audit</b></div>
+        <p>Wallet balance: <b><?= money($u['wallet_balance']) ?></b> · Total earned: <b><?= money($u['total_earned']) ?></b>
+           · Withdrawn: <b><?= money($u['total_withdrawn']) ?></b>. The member cannot log in or request new payouts after deletion.</p>
+        <p><b><?= count($preview['orders']) ?></b> order(s), <b><?= count($preview['payouts']) ?></b> payout request(s), and <b><?= (int)$preview['walletHistory']['entries'] ?></b> wallet entries and all commissions are kept. Rank and points stay with the archived identity.</p>
+        <?php if ($preview['orders']): ?><div class="table-wrap" style="box-shadow:none"><table class="table"><thead><tr><th>Order</th><th>Status</th><th>Payment mode / status</th><th>DP</th><th>BV</th></tr></thead><tbody>
+            <?php foreach ($preview['orders'] as $o): ?><tr><td><?= e($o['order_no']) ?></td><td><?= e($o['status']) ?></td><td><?= e($o['payment_mode']) ?> / <?= e($o['payment_status']) ?></td><td><?= money($o['total_dp']) ?></td><td><?= bv($o['total_bv']) ?></td></tr><?php endforeach; ?>
+        </tbody></table></div><p class="form-hint">Pending orders cannot be approved for a deleted account; they can be reviewed or rejected. Rejecting a paid wallet order refunds the retained, inaccessible archived wallet, so staff must resolve that balance separately.</p><?php endif; ?>
+        <?php if ($preview['payouts']): ?><div class="table-wrap" style="box-shadow:none"><table class="table"><thead><tr><th>Payout</th><th>Status</th><th>Gross</th><th>Net</th></tr></thead><tbody>
+            <?php foreach ($preview['payouts'] as $p): ?><tr><td><?= e($p['request_no']) ?></td><td><?= e($p['status']) ?></td><td><?= money($p['amount']) ?></td><td><?= money($p['net_amount']) ?></td></tr><?php endforeach; ?>
+        </tbody></table></div><p class="form-hint">Existing pending payouts may still be paid or rejected by staff. A rejection refunds the archived wallet; the member cannot log in or request a new payout. New automatic payouts exclude deleted accounts.</p><?php endif; ?>
+        <?php if ($preview['earnings']): ?><p class="form-hint">Commission history:</p><ul><?php foreach ($preview['earnings'] as $c): ?><li><?= e($c['type']) ?> · <?= e($c['status']) ?> · <?= (int)$c['entries'] ?> entries · <?= money($c['amount']) ?></li><?php endforeach; ?></ul><?php endif; ?>
+    </div>
+
+    <div class="card" style="border:1px solid #d98e7f">
+        <div class="card-title"><b>Confirm removal</b></div>
+        <p class="form-hint">This action changes the live network immediately and cannot be undone automatically. If the tree or records change, or 15 minutes pass, this preview must be refreshed.</p>
+        <form method="post" data-confirm="Remove this member from the live network and apply the previewed tree and sponsor changes?">
+            <?= csrf_field() ?>
+            <input type="hidden" name="id" value="<?= $id ?>">
+            <input type="hidden" name="promote" value="<?= e($preview['promoteLeg']) ?>">
+            <input type="hidden" name="sponsor" value="<?= e($sponsorText) ?>">
+            <input type="hidden" name="sponsor_id" value="<?= (int)$preview['newSponsorId'] ?>">
+            <input type="hidden" name="preview_token" value="<?= e($_SESSION['member_deletion_preview']['nonce']) ?>">
+            <div class="form-group"><label>Type <?= e($u['username']) ?> to confirm</label>
+                <input class="form-control" name="confirm_username" required autocomplete="off" style="max-width:280px"></div>
+            <button class="btn btn-danger" type="submit">Delete member and update tree</button>
+            <a class="btn btn-light" href="users.php">Cancel</a>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
 <?php require __DIR__ . '/../includes/dash_footer.php'; ?>

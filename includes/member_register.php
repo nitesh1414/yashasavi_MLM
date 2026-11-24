@@ -107,8 +107,10 @@ function member_register_handle($opts)
         /* Super admin may add a member WITHOUT a sponsor: the member is then
          * placed under the company root (first free position of the leg). */
         if (!$errors && $opts['area'] === 'superadmin' && $f['sponsor'] === '') {
-            $root = q_val("SELECT username FROM users WHERE sponsor_id IS NULL OR sponsor_id = 0 ORDER BY id ASC LIMIT 1");
-            if (!$root) {
+            $root = q_val("SELECT username FROM users WHERE (placement_id IS NULL OR placement_id = 0) AND status <> 'deleted' ORDER BY id ASC LIMIT 1");
+            if (!$root && (int)q_val("SELECT COUNT(*) FROM users WHERE status <> 'deleted'") === 0) {
+                $f['_first_root'] = true; // verified again inside registration's transaction
+            } elseif (!$root) {
                 $errors[] = 'No company root member found — please specify a sponsor.';
             } else {
                 $f['sponsor'] = $root;
@@ -116,7 +118,7 @@ function member_register_handle($opts)
         }
 
         /* placement guard (panel-specific) */
-        if (!$errors) {
+        if (!$errors && empty($f['_first_root'])) {
             $sp = find_user($f['sponsor']);
             if (!$sp) {
                 $errors[] = 'Sponsor ID not found.';
@@ -146,6 +148,7 @@ function member_register_handle($opts)
         }
 
         if (!$errors) {
+            if ($opts['area'] === 'user') { $f['_member_actor_id'] = (int)$opts['actor']['id']; }
             [$ok, $uid, $msg] = register_distributor($f);
             if ($ok) {
                 $nu = q_row("SELECT username, full_name FROM users WHERE id = ?", [$uid]);
@@ -201,7 +204,7 @@ function member_register_render_form($f, $errors, $prefill, $opts)
                 <?php else: ?>
                     <input class="form-control" type="text" name="sponsor" id="sponsor" <?= $opts['area'] === 'superadmin' ? '' : 'required' ?>
                            value="<?= e($f['sponsor']) ?>" placeholder="<?= $opts['area'] === 'superadmin' ? 'Optional — empty places under company root' : 'e.g. YSH100001' ?>" data-sponsor-api="<?= e(url('api.php')) ?>">
-                    <div class="form-hint" id="sponsor_name"><?= $sponsorRow ? '✓ ' . e($sponsorRow['full_name']) : ($opts['area'] === 'superadmin' ? 'Leave empty to place the new member under the company root.' : '') ?></div>
+                    <div class="form-hint" id="sponsor_name"><?= $sponsorRow ? '✓ ' . e($sponsorRow['full_name']) : ($opts['area'] === 'superadmin' ? 'Leave empty to use the company root, or create the first root if the tree is empty.' : '') ?></div>
                 <?php endif; ?>
             </div>
             <div class="form-group">

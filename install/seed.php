@@ -18,7 +18,7 @@ function seed_database($fresh = false)
     /*  Drop existing tables (fresh install)                            */
     /* ---------------------------------------------------------------- */
     if ($fresh) {
-        $tables = ['wallet_transactions', 'commissions', 'payouts', 'order_items', 'orders',
+        $tables = ['member_deletion_audit', 'sponsor_activation_bonuses', 'matching_state', 'payout_statement_rows', 'payout_statements', 'points_logs', 'bv_logs', 'wallet_transactions', 'commissions', 'payouts', 'order_items', 'orders',
                    'announcements', 'enquiries', 'documents', 'testimonials', 'sliders',
                    'pages', 'products', 'categories', 'users', 'award_rewards', 'plan_levels',
                    'ranks', 'plan_settings', 'admins', 'settings'];
@@ -96,6 +96,10 @@ function seed_database($fresh = false)
     foreach ($D['settings'] as $k => $v) {
         save_setting($k, $v);
     }
+
+    /* Fresh installs start the prospective income policy with no history. */
+    save_setting('income_rules_v1_8_49', 'ready');
+    q("INSERT IGNORE INTO matching_state (user_id) SELECT id FROM users");
 
     /* ---------------------------------------------------------------- */
     /*  Categories                                                      */

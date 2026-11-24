@@ -9,7 +9,7 @@ require_once __DIR__ . '/../includes/init.php';
 $a = require_superadmin();
 
 $id = get_int('id');
-$u = q_row("SELECT * FROM users WHERE id = ?", [$id]);
+$u = q_row("SELECT * FROM users WHERE id = ? AND status <> 'deleted'", [$id]);
 if (!$u) {
     flash('error', 'Member not found.');
     redirect('users.php');

@@ -16,13 +16,13 @@
 function attempt_user_login($login, $password)
 {
     $user = q_row(
-        "SELECT * FROM users WHERE (username = ? OR email = ?) LIMIT 1",
+        "SELECT * FROM users WHERE (username = ? OR email = ?) AND status <> 'deleted' LIMIT 1",
         [$login, $login]
     );
     if (!$user || !password_verify($password, $user['password'])) {
         return false;
     }
-    if ($user['status'] === 'blocked') {
+    if ($user['status'] !== 'active') {
         return 'blocked';
     }
     session_regenerate_id(true);
@@ -36,8 +36,9 @@ function current_user()
     static $user = null;
     if ($user === null && !empty($_SESSION['user_id'])) {
         $user = q_row("SELECT * FROM users WHERE id = ?", [(int)$_SESSION['user_id']]);
-        if (!$user) {
+        if (!$user || $user['status'] !== 'active') {
             unset($_SESSION['user_id']);
+            $user = null;
         }
     }
     return $user ?: null;
@@ -87,7 +88,7 @@ function current_admin($role = 'admin')
     static $cache = [];
     $key = $role;
     if (!array_key_exists($key, $cache) && !empty($_SESSION[$role . '_id'])) {
-        $cache[$key] = q_row("SELECT * FROM admins WHERE id = ? AND role = ?", [(int)$_SESSION[$role . '_id'], $role]);
+        $cache[$key] = q_row("SELECT * FROM admins WHERE id = ? AND role = ? AND status = 'active' ", [(int)$_SESSION[$role . '_id'], $role]);
         if (!$cache[$key]) {
             unset($_SESSION[$role . '_id']);
         }

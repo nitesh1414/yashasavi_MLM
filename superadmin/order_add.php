@@ -37,33 +37,44 @@ if (is_post()) {
     $totalDp  = (float)$p['dp'] * $qty;
     $totalBv  = (float)$p['bv'] * $qty;
 
-    /* create the order (cash, already received) and deliver it straight away */
+    /* Create and approve in one transaction. A deletion cannot land between
+     * cash receipt and approval, leaving a newly paid order stranded. */
     $orderNo = '';
-    $oid = db_tx(function () use (&$orderNo, $buyer, $p, $qty, $totalMrp, $totalDp, $totalBv) {
-        $orderNo = order_no();
-        q("INSERT INTO orders (order_no, user_id, total_mrp, total_dp, total_bv, payment_mode, payment_status,
-           txn_ref, status, ship_name, ship_mobile, ship_address, ship_city, ship_state, ship_pincode, created_at)
-           VALUES (?, ?, ?, ?, ?, 'cash', 'paid', 'cash received by company', 'pending', ?, ?, ?, ?, ?, ?, NOW())",
-          [$orderNo, $buyer['id'], $totalMrp, $totalDp, $totalBv,
-           $buyer['full_name'], $buyer['mobile'], $buyer['address'], $buyer['city'], $buyer['state'], $buyer['pincode']]);
-        $oid = (int)db()->lastInsertId();
-        q("INSERT INTO order_items (order_id, product_id, product_name, price, mrp, bv, qty, total, total_bv)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [$oid, $p['id'], $p['name'], $p['dp'], $p['mrp'], $p['bv'],
-           $qty, (float)$p['dp'] * $qty, (float)$p['bv'] * $qty]);
-        return $oid;
-    });
-
-    /* deliver directly: runs the full approval — self BV, activation,
-     * the three payout incomes, binary matching, points, stock decrement */
-    [$ok, $msg] = approve_order($oid, $a['id']);
-    if ($ok) {
-        flash('success', 'Order ' . $orderNo . ' for ' . $buyer['username'] . ' (' . $buyer['full_name'] .
-            ') delivered — cash ₹' . number_format($totalDp) . ' received, ' . number_format($totalBv) .
-            ' BV and commissions credited.');
-        redirect('order_view.php?id=' . $oid);
+    try {
+        [$ok, $oid, $msg] = db_tx(function () use (&$orderNo, $buyer, $p, $qty, $totalMrp, $totalDp, $totalBv, $a) {
+            lock_network_mutation();
+            $current = q_row("SELECT status FROM users WHERE id = ? FOR UPDATE", [$buyer['id']]);
+            if (!$current || $current['status'] !== 'active') { return [false, 0, 'The member is no longer active.']; }
+            $product = q_row("SELECT * FROM products WHERE id = ? FOR UPDATE", [$p['id']]);
+            if (!$product || $product['status'] !== 'active' || (int)$product['stock'] < $qty
+                || (float)$product['dp'] !== (float)$p['dp'] || (float)$product['mrp'] !== (float)$p['mrp']
+                || (float)$product['bv'] !== (float)$p['bv']) {
+                return [false, 0, 'Product availability or pricing changed. Please review the order.'];
+            }
+            $orderNo = order_no();
+            q("INSERT INTO orders (order_no, user_id, total_mrp, total_dp, total_bv, payment_mode, payment_status,
+               txn_ref, status, ship_name, ship_mobile, ship_address, ship_city, ship_state, ship_pincode, created_at)
+               VALUES (?, ?, ?, ?, ?, 'cash', 'paid', 'cash received by company', 'pending', ?, ?, ?, ?, ?, ?, NOW())",
+              [$orderNo, $buyer['id'], $totalMrp, $totalDp, $totalBv,
+               $buyer['full_name'], $buyer['mobile'], $buyer['address'], $buyer['city'], $buyer['state'], $buyer['pincode']]);
+            $oid = (int)db()->lastInsertId();
+            q("INSERT INTO order_items (order_id, product_id, product_name, price, mrp, bv, qty, total, total_bv)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              [$oid, $p['id'], $p['name'], $p['dp'], $p['mrp'], $p['bv'],
+               $qty, (float)$p['dp'] * $qty, (float)$p['bv'] * $qty]);
+            [$approved, $message] = approve_order($oid, $a['id']);
+            if (!$approved) { throw new RuntimeException($message); }
+            return [true, $oid, $message];
+        });
+    } catch (Throwable $ex) {
+        error_log('Manual order transaction failed: ' . $ex->getMessage());
+        flash('error', 'The order could not be delivered. No order or financial changes were saved.');
+        redirect('order_add.php');
     }
-    flash('error', 'Order ' . $orderNo . ' was created but could not be delivered: ' . $msg);
+    if (!$ok) { flash('error', $msg . ' No order was created.'); redirect('order_add.php'); }
+    flash('success', 'Order ' . $orderNo . ' for ' . $buyer['username'] . ' (' . $buyer['full_name'] .
+        ') delivered — cash ₹' . number_format($totalDp) . ' received, ' . number_format($totalBv) .
+        ' BV and commissions credited.');
     redirect('order_view.php?id=' . $oid);
 }
 

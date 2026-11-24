@@ -86,7 +86,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 </tbody>
                 </table>
         </div>
-        <p class="form-hint">1 point = 3,000 BV left + 3,000 BV right (matched pair). Ranks are re-checked automatically whenever points grow; the one-time cash reward is paid as wallet income on promotion (never part of the payout commission).</p>
+        <p class="form-hint">Points per matched pair follow the configured plan. Ranks are re-checked whenever points grow; each reached rank's one-time cash reward is credited to the wallet and is eligible for payout.</p>
     </div>
 
     <div class="card">
@@ -100,7 +100,7 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
             <div class="form-grid3">
                 <div class="form-group">
-                    <label>Points Required (1 point = 3,000 BV left + 3,000 BV right)</label>
+                    <label>Points Required</label>
                     <input class="form-control" type="number" min="0" name="min_points" value="<?= (int)($editRank['min_points'] ?? 0) ?>">
                 </div>
                 <div class="form-group">

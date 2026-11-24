@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/init.php';
 $a = require_superadmin();
 
 $id = get_int('id');
-$u = q_row("SELECT * FROM users WHERE id = ?", [$id]);
+$u = q_row("SELECT * FROM users WHERE id = ? AND status <> 'deleted'", [$id]);
 if (!$u) {
     flash('error', 'User not found.');
     redirect('users.php');
@@ -31,7 +31,7 @@ if (is_post()) {
     q("UPDATE users SET full_name=?, email=?, mobile=?, dob=?, marital_status=?, nationality=?,
        address=?, city=?, state=?, pincode=?, nominee_name=?, nominee_relation=?,
        bank_holder=?, bank_account_no=?, bank_ifsc=?, bank_name=?, bank_branch=?,
-       aadhaar_no=?, pan_no=? WHERE id=?",
+       aadhaar_no=?, pan_no=? WHERE id=? AND status <> 'deleted' ",
       [$full_name, $email ?: null, $mobile, post_str('dob') ?: null, post_str('marital_status'),
        post_str('nationality'), post_str('address'), post_str('city'), post_str('state'), post_str('pincode'),
        post_str('nominee_name'), post_str('nominee_relation'), post_str('bank_holder'),
@@ -39,7 +39,7 @@ if (is_post()) {
        post_str('bank_name'), post_str('bank_branch'),
        post_str('aadhaar_no') ?: null, strtoupper(post_str('pan_no')) ?: null, $id]);
     if ($newPass !== '') {
-        q("UPDATE users SET password=? WHERE id=?", [password_hash($newPass, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $id]);
+        q("UPDATE users SET password=? WHERE id=? AND status <> 'deleted' ", [password_hash($newPass, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $id]);
     }
     flash('success', 'Distributor updated.');
     redirect('user_view.php?id=' . $id);

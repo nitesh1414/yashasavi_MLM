@@ -26,15 +26,13 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
      * and the viewer drills down with "view subtree". */
     $cap = 4000;
 
-    /* joining BV requirement (3,000 BV on the current plan) — members who
-     * have NOT completed it are shown in RED in the tree. Guard: if the
-     * plan setting is ever saved as 0/empty, fall back to the plan's
-     * 3,000 BV joining rule so the tree never turns everyone green. */
+    /* Joining BV is displayed separately from earning status: manual
+     * activation and later plan changes can make those two values differ. */
     $actBv = (float)get_plan()['activation_bv'];
     if ($actBv <= 0) { $actBv = 3000.0; }
     $rows = q_all("SELECT id, username, full_name, leg, placement_id, left_bv, right_bv,
                    is_active, status, rank_id, self_bv, reward_points, created_at, sponsor_id, path, depth
-                   FROM users WHERE path LIKE ? AND id != ?
+                   FROM users WHERE path LIKE ? AND id != ? AND status <> 'deleted'
                    ORDER BY depth, id LIMIT " . ($cap + 1),
                    [$rootUser['path'] . '%', (int)$rootUser['id']]);
     $truncated = count($rows) > $cap;
@@ -108,11 +106,10 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
             return '';
         }
 
-        // Member node — visible: ID pill only; everything else in the click tooltip.
-        // Icon colour = joining BV completion: GREEN when the member has
-        // completed the plan's joining BV (3,000 BV on the current plan),
-        // RED when it is not completed yet.
-        $on = (float)$user['self_bv'] >= $actBv;
+        // Green means the earning ID is activated, including explicit
+        // manual activation; joining BV completion is shown independently.
+        $on = (int)$user['is_active'] === 1;
+        $bvComplete = (float)$user['self_bv'] >= $actBv;
         $blocked = $user['status'] === 'blocked';
         $kids = isset($byParent[$user['id']]) ? $byParent[$user['id']] : [];
         // first free leg under this member (for the add action); spillover if full
@@ -120,7 +117,7 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
         $addHref = $addBase . '?ref=' . urlencode($user['username']) . '&leg=' . $tagLeg;
         $viewHref = $linkBase . '?root=' . (int)$user['id'];
         $statusTxt = $blocked ? 'Blocked' : ((int)$user['is_active'] === 1 ? 'Active' : 'Inactive');
-        $bvTxt = $on ? '✅ Completed' : '❌ Not completed';
+        $bvTxt = $bvComplete ? '✅ Completed' : '❌ Not completed' . ($on ? ' (earning enabled)' : '');
         $upline = $parentUser ? $parentUser['username'] : 'Company Root';
         $rank = isset($rankNames[$user['rank_id']]) ? $rankNames[$user['rank_id']] : '—';
 
@@ -305,8 +302,8 @@ function render_binary_tree($rootUser, $levels = 0, $linkBase = 'tree.php', $add
                 . 'on any member to continue deeper into that branch.</div>'
             : '')
         . '<div class="tree-legends">
-                <span class="lg"><span class="dot" style="background:#43a047"></span> Joining BV completed (green icon)</span>
-                <span class="lg"><span class="dot" style="background:#e53935"></span> Joining BV not completed (red icon)</span>
+                <span class="lg"><span class="dot" style="background:#43a047"></span> Earning ID activated (green icon)</span>
+                <span class="lg"><span class="dot" style="background:#e53935"></span> Earning ID not activated (red icon)</span>
                 <span class="lg"><span class="dot" style="background:#fff;box-shadow:0 0 0 2px #d6a83c inset"></span> Root</span>
                 <span class="lg">📜 First frame shows up to <b>level 7</b> — scroll for the rest; members stay full size</span>
                 <span class="lg">➡️ Single-child legs render as straight vertical lines — the ➕ chip beside the line is that free position</span>

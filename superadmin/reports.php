@@ -31,7 +31,7 @@ $topProducts = q_all("SELECT oi.product_name, SUM(oi.qty) AS qty_sold, SUM(oi.to
                       WHERE o.status = 'approved'
                       GROUP BY oi.product_name ORDER BY revenue DESC LIMIT 10");
 // Leg analysis (direct children of company root)
-$legs = q_all("SELECT u.id, u.username, u.left_bv, u.right_bv FROM users u WHERE u.placement_id IS NULL ORDER BY u.id");
+$legs = q_all("SELECT u.id, u.username, u.left_bv, u.right_bv FROM users u WHERE u.placement_id IS NULL AND u.status <> 'deleted' ORDER BY u.id");
 // Last 6 months trend
 $trend = [];
 for ($i = 5; $i >= 0; $i--) {

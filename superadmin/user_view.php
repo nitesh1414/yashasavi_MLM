@@ -15,18 +15,20 @@ if (!$u) {
     redirect('users.php');
 }
 
+$archived = $u['status'] === 'deleted';
 if (is_post()) {
     verify_csrf();
+    if ($archived) { flash('error', 'Archived member records are read-only.'); redirect('user_view.php?id=' . $id); }
     $action = post_str('action');
     if ($action === 'kyc_verify') {
-        q("UPDATE users SET kyc_status='verified', kyc_remark=NULL WHERE id=?", [$id]);
+        q("UPDATE users SET kyc_status='verified', kyc_remark=NULL WHERE id=? AND status <> 'deleted'", [$id]);
         flash('success', 'KYC marked verified.');
     } elseif ($action === 'kyc_reject') {
-        q("UPDATE users SET kyc_status='rejected', kyc_remark=? WHERE id=?", [post_str('remark') ?: 'Rejected by admin', $id]);
+        q("UPDATE users SET kyc_status='rejected', kyc_remark=? WHERE id=? AND status <> 'deleted'", [post_str('remark') ?: 'Rejected by admin', $id]);
         flash('success', 'KYC marked rejected.');
     } elseif ($action === 'activate') {
-        q("UPDATE users SET is_active=1, activated_at=COALESCE(activated_at, ?) WHERE id=?", [now(), $id]);
-        flash('success', 'User activated.');
+        [$ok, $msg] = manually_activate_member($id);
+        flash($ok ? 'success' : 'error', $msg);
     }
     redirect('user_view.php?id=' . $id);
 }
@@ -44,6 +46,8 @@ require __DIR__ . '/_nav.php';
 require __DIR__ . '/../includes/dash_header.php';
 ?>
 
+<?php if ($archived): ?><div class="alert alert-warning"><b>Archived member — read only.</b> This account is no longer in the live network and cannot log in.
+    Orders, commissions, wallet and payout records remain available for audit. <a href="deletion_audit.php">View deletion audit</a>.</div><?php endif; ?>
 <div class="stat-grid">
     <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance</span></div></div>
     <div class="stat-card gold"><div class="st-ico">💰</div><div><b><?= money($earn['total']) ?></b><span>Total Income</span></div></div>
@@ -57,11 +61,13 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="card-title">
                 👤 <?= e($u['username']) ?> — <?= e($u['full_name']) ?>
                 <span class="right">
+                    <?php if (!$archived): ?>
                     <a class="btn btn-outline btn-sm" href="user_edit.php?id=<?= (int)$u['id'] ?>">✏️ Edit</a>
                     <a class="btn btn-gold btn-sm" href="order_add.php?uid=<?= (int)$u['id'] ?>">🧾 Add Order</a>
                     <a class="btn btn-light btn-sm" href="tree.php?root=<?= (int)$u['id'] ?>">🌳 Tree</a>
                     <a class="btn btn-outline btn-sm" href="user_position.php?id=<?= (int)$u['id'] ?>">🔁 Change Position</a>
                     <a class="btn btn-outline btn-sm" href="user_sponsor.php?q=<?= e($u['username']) ?>">🔗 Change Sponsor</a>
+                    <?php else: ?><a class="btn btn-light btn-sm" href="deletion_audit.php">Deletion audit</a><?php endif; ?>
                 </span>
             </div>
             <table class="kv-table" style="width:100%">
@@ -71,9 +77,9 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Email / Mobile</td><td><?= e($u['email'] ?: '—') ?> / <?= e($u['mobile']) ?></td></tr>
                 <tr><td>Address</td><td><?= e(trim($u['address'] . ', ' . $u['city'] . ', ' . $u['state'] . ' - ' . $u['pincode'], ', -')) ?></td></tr>
                 <tr><td>Nominee</td><td><?= e(trim($u['nominee_name'] . ' (' . $u['nominee_relation'] . ')', ' ()')) ?: '—' ?></td></tr>
-                <tr><td>Sponsor</td><td><?= e($u['sponsor_name'] ? $u['sponsor_name'] . ' — ' . $u['sponsor_full'] : '— (root)') ?></td></tr>
+                <tr><td>Sponsor</td><td><?= $archived ? 'Archived — see deletion audit' : e($u['sponsor_name'] ? $u['sponsor_name'] . ' — ' . $u['sponsor_full'] : '— (root)') ?></td></tr>
                 <tr><td>Placement / Leg</td>
-                    <td><?= e($u['placement_id'] ? q_val("SELECT username FROM users WHERE id = ?", [$u['placement_id']]) : 'root') ?> · <?= $u['leg'] === 'L' ? 'LEFT' : 'RIGHT' ?></td></tr>
+                    <td><?= $archived ? 'Removed from live tree' : e($u['placement_id'] ? q_val("SELECT username FROM users WHERE id = ?", [$u['placement_id']]) : 'root') . ' · ' . ($u['leg'] === 'L' ? 'LEFT' : 'RIGHT') ?></td></tr>
                 <tr><td>Bank</td>
                     <td><?= e($u['bank_name'] ?: '—') ?> · <?= e(mask_acct($u['bank_account_no'])) ?> · IFSC <?= e($u['bank_ifsc'] ?: '—') ?></td></tr>
                 <tr><td>PAN / Aadhaar</td><td><?= e($u['pan_no'] ?: '—') ?> / <?= e($u['aadhaar_no'] ? 'XXXX-XXXX-' . substr($u['aadhaar_no'], -4) : '—') ?></td></tr>
@@ -81,10 +87,10 @@ require __DIR__ . '/../includes/dash_header.php';
             </table>
         </div>
 
-        <div class="card">
+        <?php if (!$archived): ?><div class="card">
             <div class="card-title">🌳 Genealogy (below this user)</div>
             <?= render_binary_tree($u, 2, 'tree.php') ?>
-        </div>
+        </div><?php endif; ?>
 
         <div class="card">
             <div class="card-title">📦 Recent Orders</div>
@@ -117,12 +123,12 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="card">
             <div class="card-title">📊 Business Summary</div>
             <table class="kv-table" style="width:100%">
-                <tr><td>Left team BV (<?= $teamCounts['L'] ?> members)</td><td><b><?= bv($u['left_bv']) ?></b></td></tr>
-                <tr><td>Right team BV (<?= $teamCounts['R'] ?> members)</td><td><b><?= bv($u['right_bv']) ?></b></td></tr>
+                <tr><td>Left team BV <?= $archived ? '(at removal)' : '(' . $teamCounts['L'] . ' members)' ?></td><td><b><?= bv($u['left_bv']) ?></b></td></tr>
+                <tr><td>Right team BV <?= $archived ? '(at removal)' : '(' . $teamCounts['R'] . ' members)' ?></td><td><b><?= bv($u['right_bv']) ?></b></td></tr>
                 <tr><td>Self purchase BV</td><td><b><?= bv($u['self_bv']) ?></b></td></tr>
                 <tr><td>Direct referral income</td><td><?= money($earn['sponsor']) ?></td></tr>
                 <tr><td>Binary matching income</td><td><?= money($earn['binary']) ?></td></tr>
-                <tr><td>50% Direct SP Match Income</td><td><?= money($earn['level']) ?></td></tr>
+                <tr><td>Direct Sponsor Matching Income</td><td><?= money($earn['sponsor_matching']) ?></td></tr>
                 <tr><td>Rank rewards</td><td><?= money($earn['rank']) ?></td></tr>
                 <tr><td>Total withdrawn</td><td><?= money($u['total_withdrawn']) ?></td></tr>
             </table>
@@ -158,14 +164,14 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php else: ?>
             <p style="font-size:12px;color:var(--ink-soft)">No KYC documents uploaded (registered before this requirement).</p>
             <?php endif; ?>
-            <?php if ($u['kyc_status'] !== 'verified'): ?>
+            <?php if (!$archived && $u['kyc_status'] !== 'verified'): ?>
             <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="kyc_verify">
                 <button class="btn btn-primary btn-sm" type="submit">✔ Mark Verified</button>
             </form>
             <?php endif; ?>
-            <?php if ($u['kyc_status'] !== 'rejected'): ?>
+            <?php if (!$archived && $u['kyc_status'] !== 'rejected'): ?>
             <form method="post" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="kyc_reject">
@@ -173,7 +179,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <button class="btn btn-danger btn-sm" type="submit">✖ Reject</button>
             </form>
             <?php endif; ?>
-            <?php if (!(int)$u['is_active']): ?>
+            <?php if (!$archived && !(int)$u['is_active']): ?>
             <form method="post" style="margin-top:8px">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="activate">
@@ -182,7 +188,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php endif; ?>
         </div>
 
-        <div class="card">
+        <?php if (!$archived): ?><div class="card">
             <div class="card-title">👥 Direct Referrals (latest 10)</div>
             <?php if (!$directs): ?><p style="color:var(--ink-soft)">No direct referrals.</p>
             <?php else: ?>
@@ -205,6 +211,15 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php endif; ?>
         </div>
 
+        <?php endif; ?>
+        <div class="card">
+            <div class="card-title">💰 Recent Commissions <span class="right"><a href="commissions.php?q=<?= urlencode($u['username']) ?>">All ledger entries →</a></span></div>
+            <?php if (!$commissions): ?><p style="color:var(--ink-soft)">No commissions.</p><?php else: ?>
+            <div class="table-wrap" style="box-shadow:none"><table class="table"><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead><tbody>
+            <?php foreach ($commissions as $c): ?><tr><td><?= dmy($c['created_at']) ?></td><td><?= e($c['type']) ?></td><td><?= money($c['amount']) ?></td><td><?= e($c['note']) ?></td></tr><?php endforeach; ?>
+            </tbody></table></div><?php endif; ?>
+            <p class="form-hint"><a href="wallets.php?wq=<?= urlencode($u['username']) ?>">View wallet and transaction history</a></p>
+        </div>
         <div class="card">
             <div class="card-title">🏦 Recent Payouts</div>
             <?php if (!$payouts): ?><p style="color:var(--ink-soft)">No payout requests.</p>

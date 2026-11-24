@@ -90,7 +90,10 @@ if (is_post()) {
         }
 
         // create order
-        db_tx(function () use (&$orderNo, $items, $totalDp, $totalMrp, $totalBv, $paymentMode, $txnRef, $u, $shipName, $shipMobile, $shipAddress, $shipCity, $shipState, $shipPin) {
+        $createdOrderId = db_tx(function () use (&$orderNo, $items, $totalDp, $totalMrp, $totalBv, $paymentMode, $txnRef, $u, $shipName, $shipMobile, $shipAddress, $shipCity, $shipState, $shipPin) {
+            lock_network_mutation();
+            $locked = q_row("SELECT status, wallet_balance FROM users WHERE id = ? FOR UPDATE", [$u['id']]);
+            if (!$locked || $locked['status'] !== 'active' || ($paymentMode === 'wallet' && (float)$locked['wallet_balance'] < $totalDp)) { return 0; }
             $orderNo = order_no();
             q("INSERT INTO orders (order_no, user_id, total_mrp, total_dp, total_bv, payment_mode, payment_status,
                txn_ref, status, ship_name, ship_mobile, ship_address, ship_city, ship_state, ship_pincode, created_at)
@@ -111,6 +114,10 @@ if (is_post()) {
             return $oid;
         });
 
+        if (!$createdOrderId) {
+            flash('error', 'Your account or wallet balance changed. Please log in and review your order again.');
+            redirect('cart.php');
+        }
         $_SESSION['cart'] = [];
         if ($paymentMode === 'cash') {
             flash('success', 'Order ' . $orderNo . ' placed successfully! Pay the cash amount to the company / your distributor — the order is processed once the company authorizes your payment.');

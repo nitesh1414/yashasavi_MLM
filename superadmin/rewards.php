@@ -73,7 +73,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="card-title">🏆 <?= $editing ? 'Edit Award Reward' : 'Add Award Reward' ?>
         <span class="right"><a class="btn btn-light btn-sm" href="rewards.php">← Back to list</a></span>
     </div>
-    <p class="form-hint">Awards are granted automatically when a member's LIFETIME points reach the milestone (1 point = 3,000 BV left + 3,000 BV right). Each reward is given once per member.</p>
+    <p class="form-hint">These are company recognition milestones based on lifetime points. They are not automatically credited to the wallet; points per matched pair follow the configured plan.</p>
     <form method="post">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="save">

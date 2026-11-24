@@ -40,7 +40,7 @@ $admPct = rtrim(rtrim(number_format((float)$plan['admin_charge_percent'], 2, '.'
     <p class="form-hint" style="margin:4px 0 10px">
         Your reward income (cash rewards for rank achievements, car fund and royalty) for every completed
         15-day period. The running period (<b><?= e(dmy($curFrom)) ?> – <?= e(dmy($curTo)) ?></b>) closes on
-        <?= e(dmy($curTo)) ?> and appears here afterwards. Click <b>Statement</b> for the payout statement of a period.
+        <?= e(dmy($curTo)) ?> and appears here afterwards. Click <b>Statement</b> for the payout statement of a period. These report estimates use the <b>current</b> deduction rates; actual payout requests retain their originally recorded amounts.
     </p>
 
     <?php if (!$rows): ?>

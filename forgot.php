@@ -53,18 +53,18 @@ if (is_post()) {
             $error = 'Your reset session expired. Please start again with your Member ID.';
             $step = 1;
         } else {
-            $u = q_row("SELECT * FROM users WHERE id = ?", [(int)$ticket['id']]);
+            $u = q_row("SELECT * FROM users WHERE id = ? AND status <> 'deleted'", [(int)$ticket['id']]);
             $mobile = trim(post_str('mobile'));
             $dob = trim(post_str('dob'));
             if (!$u || strcasecmp($mobile, trim((string)$u['mobile'])) !== 0) {
                 $memberId = (int)$ticket['id'];
-                $mob = trim((string)$u['mobile']);
+                $mob = trim((string)($u['mobile'] ?? ''));
                 $maskedMobile = strlen($mob) > 4
                     ? substr($mob, 0, 2) . str_repeat('*', max(0, strlen($mob) - 4)) . substr($mob, -2)
                     : '****';
                 $error = 'The mobile number does not match this member\'s record.';
                 $step = 2;
-            } elseif ($u['dob'] && $dob !== '' && $dob !== date('Y-m-d', strtotime((string)$u['dob']))) {
+            } elseif ($u['dob'] && $dob !== date('Y-m-d', strtotime((string)$u['dob']))) {
                 $memberId = (int)$ticket['id'];
                 $maskedMobile = '******';
                 $error = 'The date of birth does not match this member\'s record.';
@@ -91,12 +91,18 @@ if (is_post()) {
                 $memberId = (int)$ticket['id'];
                 $step = 3;
             } else {
-                q("UPDATE users SET password = ? WHERE id = ?",
+                $updated = q("UPDATE users SET password = ? WHERE id = ? AND status <> 'deleted'",
                   [password_hash($newPass, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), (int)$ticket['id']]);
-                unset($_SESSION['pwreset']);
-                login_throttle_reset('forgot');
-                flash('success', 'Your password has been reset. Please login with your new password.');
-                redirect('login.php');
+                if (!$updated->rowCount()) {
+                    unset($_SESSION['pwreset']);
+                    $error = 'This member account is no longer available.';
+                    $step = 1;
+                } else {
+                    unset($_SESSION['pwreset']);
+                    login_throttle_reset('forgot');
+                    flash('success', 'Your password has been reset. Please login with your new password.');
+                    redirect('login.php');
+                }
             }
         }
     }
