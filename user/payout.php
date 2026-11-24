@@ -41,7 +41,7 @@ $admPct = rtrim(rtrim(number_format((float)$plan['admin_charge_percent'], 2, '.'
     <p class="form-hint" style="margin:4px 0 10px">
         Your incentive income for every completed week (Sunday to Saturday). The running week
         (<b><?= e(dmy($curFrom)) ?> – <?= e(dmy($curTo)) ?></b>) closes on Saturday and appears here afterwards.
-        Click <b>Statement</b> for the full payout statement of a week. These report estimates use the <b>current</b> deduction rates; actual payout requests retain their originally recorded amounts.
+        Click <b>Statement</b> for the full payout statement of a week.
     </p>
 
     <?php if (!$rows): ?>

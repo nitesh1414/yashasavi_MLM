@@ -7,23 +7,14 @@ $type = get_str('type', 'direct'); // direct | downline
 $q = get_str('q');
 
 if ($type === 'downline') {
-    $leg = get_str('leg');
-    $child = in_array($leg, ['L', 'R'], true) ? user_children($u['id'])[$leg] : null;
-    if (in_array($leg, ['L', 'R'], true)) {
-        $where = $child ? "u.path LIKE ?" : "u.id = 0 AND u.path LIKE ?";
-        $params = [$child ? $child['path'] . '%' : ''];
-        $title = $leg === 'R' ? 'My Right Team' : 'My Left Team';
-    } else {
-        $where = "u.id != " . (int)$u['id'] . " AND u.path LIKE ?";
-        $params = [$u['path'] . '%'];
-        $title = 'My Downline (entire network)';
-    }
+    $where = "u.id != " . (int)$u['id'] . " AND u.path LIKE ?";
+    $params = [$u['path'] . '%'];
+    $title = 'My Downline (entire network)';
 } else {
     $where = "u.sponsor_id = ?";
     $params = [(int)$u['id']];
     $title = 'My Direct Referrals';
 }
-$where .= " AND u.status <> 'deleted'";
 if ($q !== '') {
     $where .= " AND (u.username LIKE ? OR u.full_name LIKE ? OR u.mobile LIKE ?)";
     $params[] = "%$q%";
@@ -47,20 +38,19 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="card-title">
         👥 <?= e($title) ?>
         <span class="right">
-            <a class="btn <?= $type === 'direct' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="team.php?type=direct">Direct (<?= (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ? AND status <> 'deleted'", [$u['id']]) ?>)</a>
+            <a class="btn <?= $type === 'direct' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="team.php?type=direct">Direct (<?= (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ?", [$u['id']]) ?>)</a>
             <a class="btn <?= $type === 'downline' ? 'btn-primary' : 'btn-light' ?> btn-sm" href="team.php?type=downline">Downline</a>
         </span>
     </div>
 
     <form method="get" class="filter-form">
         <input type="hidden" name="type" value="<?= e($type) ?>">
-        <?php if ($type === 'downline' && in_array(get_str('leg'), ['L', 'R'], true)): ?><input type="hidden" name="leg" value="<?= e(get_str('leg')) ?>"><?php endif; ?>
         <div class="form-group">
             <label>Search</label>
             <input class="form-control" type="text" name="q" value="<?= e($q) ?>" placeholder="User ID, name or mobile">
         </div>
         <button class="btn btn-primary" type="submit">Search</button>
-        <?php if ($q): ?><a class="btn btn-light" href="team.php?type=<?= e($type) ?><?= $type === 'downline' && in_array(get_str('leg'), ['L', 'R'], true) ? '&amp;leg=' . e(get_str('leg')) : '' ?>">Clear</a><?php endif; ?>
+        <?php if ($q): ?><a class="btn btn-light" href="team.php?type=<?= e($type) ?>">Clear</a><?php endif; ?>
     </form>
 
     <?php if (!$rows): ?>

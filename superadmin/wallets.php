@@ -17,8 +17,6 @@ if (is_post() && post_str('action') === 'adjust') {
     } else {
         try {
             db_tx(function () use ($target, $amount, $direction, $note, $userId) {
-                lock_network_mutation();
-                if (!q_row("SELECT id FROM users WHERE id = ? FOR UPDATE", [$userId])) { throw new RuntimeException('User no longer exists.'); }
                 if ($direction === 'debit') {
                     $newBal = debit_wallet($userId, $amount, 'admin', null, $note);
                     if ($newBal === null) {
@@ -135,11 +133,11 @@ require __DIR__ . '/../includes/dash_header.php';
                 <input type="hidden" name="action" value="adjust">
                 <div class="form-group">
                     <label>User</label>
-                    <?php $userOptions = q_all("SELECT id, username, full_name, status FROM users ORDER BY id LIMIT 500"); ?>
+                    <?php $userOptions = q_all("SELECT id, username, full_name FROM users ORDER BY id LIMIT 500"); ?>
                     <select class="form-control" name="user_id" required>
                         <option value="">— select user —</option>
                         <?php foreach ($userOptions as $uo): ?>
-                            <option value="<?= (int)$uo['id'] ?>"><?= e($uo['username'] . ' — ' . $uo['full_name'] . ($uo['status'] === 'deleted' ? ' (archived)' : '')) ?></option>
+                            <option value="<?= (int)$uo['id'] ?>"><?= e($uo['username'] . ' — ' . $uo['full_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -160,7 +158,6 @@ require __DIR__ . '/../includes/dash_header.php';
                     <label>Note (visible to user)</label>
                     <input class="form-control" name="note" placeholder="e.g. Promotional bonus">
                 </div>
-                <p class="form-hint">Archived wallets are retained for audit and may be adjusted only to record a deliberate financial resolution; the member cannot log in.</p>
                 <button class="btn btn-primary" type="submit" data-confirm="Apply this wallet adjustment?">Apply Adjustment</button>
             </form>
         </div>
@@ -186,7 +183,7 @@ require __DIR__ . '/../includes/dash_header.php';
 <?php foreach ($wallets as $w): ?>
                     <tr>
                         <td><a href="user_view.php?id=<?= (int)$w['id'] ?>"><b><?= e($w['username']) ?></b></a><br>
-                            <small style="color:#000"><?= e($w['full_name']) ?><?= $w['status'] === 'deleted' ? ' · Archived' : '' ?></small></td>
+                            <small style="color:#000"><?= e($w['full_name']) ?></small></td>
                         <td><?= $w['rank_id'] ? e(q_val("SELECT name FROM ranks WHERE id = ?", [$w['rank_id']]) ?: '—') : '—' ?></td>
                         <td><b><?= bv($w['left_bv']) ?></b> / <b><?= bv($w['right_bv']) ?></b></td>
                         <td><b class="text-ok"><?= money($w['wallet_balance']) ?></b></td>

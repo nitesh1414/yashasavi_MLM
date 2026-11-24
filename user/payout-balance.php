@@ -65,7 +65,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
 <div class="stat-grid">
     <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(gross income credited)</span></div></div>
     <div class="stat-card gold"><div class="st-ico">✅</div><div><b><?= money($eligible) ?></b><span>Eligible for Payout<br>(before TDS + charges)</span></div></div>
-    <div class="stat-card teal"><div class="st-ico">⚖️</div><div><b><?= money($bal) ?></b><span>Illustrative Ledger Balance<br>(current TDS + charges)</span></div></div>
+    <div class="stat-card teal"><div class="st-ico">⚖️</div><div><b><?= money($bal) ?></b><span>Payout Ledger Balance<br>(net of TDS + charges)</span></div></div>
     <div class="stat-card red"><div class="st-ico">🏦</div><div><b><?= money($u['total_withdrawn']) ?></b><span>Total Withdrawn</span></div></div>
 </div>
 
@@ -84,8 +84,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
     <p class="form-hint" style="margin:4px 0 10px">
         Your payout account: every completed week and reward period closes with its <b>net</b> payout income
         (after <?= e($tds) ?>% TDS + <?= e($adminFee) ?>% admin charges); payment releases and held payout
-        requests reduce the balance. This is an illustrative ledger using current rates, not a stored payout record;
-        actual requests and payments retain the amounts recorded when created.
+        requests reduce the balance.
     </p>
     <?php if (!$ledger): ?>
         <div class="empty-state"><span class="es-ico">🧾</span>No payout balance yet. Weekly closings appear here
@@ -116,7 +115,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
     <div class="card">
         <div class="card-title">🏦 Request a Payout</div>
         <p style="font-size:12.5px;color:var(--ink-soft)">
-            Payable income = <b>Direct Sponsor Income + Matching Income + Direct Sponsor Matching Bonus + Rank Rewards</b>;
+            Payable income = <b>Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225) + Rank Rewards</b>;
             rank achievements are credited to your wallet and are payable.
         </p>
         <?php if ($eligible < (float)$plan['payout_min']): ?>

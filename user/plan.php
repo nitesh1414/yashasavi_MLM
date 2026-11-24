@@ -9,7 +9,6 @@ $ranks = q_all("SELECT * FROM ranks ORDER BY min_points ASC, id ASC");
 $awards = q_all("SELECT * FROM award_rewards WHERE status = 'active' ORDER BY points ASC");
 $points = (int)$u['reward_points'];
 $directs = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ? AND is_active = 1", [$u['id']]);
-$qual = income_policy_ready() ? q_row("SELECT left_eligible_bv, right_eligible_bv FROM matching_state WHERE user_id = ?", [$u['id']]) : null;
 
 $activeKey = 'plan';
 $pageTitle = 'Marketing Plan';
@@ -26,7 +25,7 @@ $pairPay = $plan['binary_type'] === 'percent'
 <div class="two-col">
     <div>
         <div class="card">
-            <div class="card-title">1. 🤝 Direct Sponsor Income</div>
+            <div class="card-title">1. 🤝 Direct Sponsor Leg Income (Left + Right)</div>
             <div class="plan-tree">
                 <div class="pt-node you">
                     <i class="pt-ico fas fa-user" aria-hidden="true"></i>
@@ -51,18 +50,24 @@ $pairPay = $plan['binary_type'] === 'percent'
                 </div>
             </div>
             <div class="pt-chips">
-                <span class="pt-chip">Joining threshold: <b><?= bv($plan['activation_bv']) ?></b></span>
-                <span class="pt-chip green">Each green direct: <b><?= money((float)$plan['activation_bv'] * (float)$plan['sponsor_percent'] / 100) ?></b></span>
+                <span class="pt-chip">Joining amount: <b>₹6,000</b></span>
+                <span class="pt-chip">Business Volume: <b>3,000 BV</b></span>
+                <span class="pt-chip green">Direct downline member (left) completes 3,000 BV: <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b></span>
+                <span class="pt-chip green">Direct downline member (right) completes 3,000 BV: <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b></span>
             </div>
             <div class="plan-box">
-                Each time one of your <b>directly sponsored members becomes green</b>, you receive
-                <b><?= money((float)$plan['activation_bv'] * (float)$plan['sponsor_percent'] / 100) ?></b> once for that member.
-                The payment goes to their actual sponsor even when they are placed under someone else.
-                There is no one-per-leg limit; your own account must be eligible to receive the payment.
+                When a <b>directly sponsored downline member in your LEFT leg</b> completes their own
+                <b>3,000 BV joining</b>, you receive a one-time <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b>.
+                When a directly sponsored downline member in your <b>RIGHT leg</b> completes their own
+                <b>3,000 BV joining</b>, you receive another one-time
+                <b><?= money(3000 * $plan['sponsor_percent'] / 100) ?></b> (<?= e($plan['sponsor_percent']) ?>% of 3,000 BV).
+                <br><b>You must be the sponsor of that downline member</b> — the ₹300 is paid only for
+                <b>your direct downline members</b> sitting in your left or right leg. Maximum
+                <b>₹600</b> from this income — one payment per leg, forever.
                 <table class="kv-table" style="width:100%;margin-top:10px">
                     <tr><td>Your left leg BV</td><td><b><?= bv($u['left_bv']) ?></b></td></tr>
                     <tr><td>Your right leg BV</td><td><b><?= bv($u['right_bv']) ?></b></td></tr>
-                    <tr><td>Direct sponsor income earned</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
+                    <tr><td>Direct sponsor leg income earned</td><td><b><?= money($earn['sponsor']) ?></b> (max <?= money(2 * 3000 * $plan['sponsor_percent'] / 100) ?>)</td></tr>
                 </table>
             </div>
         </div>
@@ -80,14 +85,14 @@ $pairPay = $plan['binary_type'] === 'percent'
                         <div class="pt-node">
                             <i class="pt-ico fas fa-user" aria-hidden="true"></i>
                             <span class="pt-name">LEFT (L)</span>
-                            <span class="pt-sub">Left <?= bv($unit) ?></span>
+                            <span class="pt-sub">Left BV 3,000</span>
                         </div>
                     </div>
                     <div class="pt-kid">
                         <div class="pt-node">
                             <i class="pt-ico fas fa-user" aria-hidden="true"></i>
                             <span class="pt-name">RIGHT (R)</span>
-                            <span class="pt-sub">Right <?= bv($unit) ?></span>
+                            <span class="pt-sub">Right BV 3,000</span>
                         </div>
                     </div>
                 </div>
@@ -95,23 +100,31 @@ $pairPay = $plan['binary_type'] === 'percent'
             <table class="table" style="width:100%">
                 <tr><th>Left BV</th><th>Right BV</th><th>Matched BV</th><th>Payout</th></tr>
                 <tr>
-                    <td><?= bv($unit) ?></td>
-                    <td><?= bv($unit) ?></td>
-                    <td><b><?= bv($unit) ?></b> = 1 pair</td>
+                    <td>3,000</td>
+                    <td>3,000</td>
+                    <td><b>3,000</b> = 1 pair</td>
                     <td><b><?= money($pairPay) ?></b></td>
                 </tr>
             </table>
             <div class="plan-box">
-                Every <b><?= bv($unit) ?> of approved team BV on the left</b> matched with
-                <b><?= bv($unit) ?> on the right</b> earns <b><?= money($pairPay) ?></b>.
-                Each pair pays regardless of who sponsored the contributing members or whether those members are green.
-                Unmatched team BV carries forward.
-                <?php if ((int)$plan['matching_requires_active']): ?> Your own ID must be green to receive matching income.<?php endif; ?>
+                Matching pair income is calculated on <b>eligible matching business volume</b>:
+                3,000 BV on your <b>Left</b> leg + 3,000 BV on your <b>Right</b> leg = 1 matched pair.
+                The payout rate is <b><?= money($pairPay) ?></b> — paid <b>ONCE, for your FIRST matching pair
+                only</b>, and <b>only when you have earned at least one Direct Sponsor Leg Income (rule 1,
+                left or right)</b> — at least one directly sponsored downline member of yours completed
+                their own 3,000 BV joining. Every further pair adds <b>1 point</b> to your tally
+                (see Points &amp; Rewards) — no further matching commission.
+                <br><b>Eligibility rules:</b>
+                you must have completed your own <b>Self 3,000 BV</b> joining
+                <?= (int)$plan['matching_requires_active'] ? '' : ' (not required by current settings)' ?>;
+                only <b>confirmed / approved order BV</b> counts;
+                pair matching is 1:<?= e($plan['pair_unit_bv']) ?> on both legs;
+                unmatched BV keeps accumulating.
                 <table class="kv-table" style="width:100%;margin-top:10px">
                     <tr><td>Your left leg BV</td><td><b><?= bv($u['left_bv']) ?></b></td></tr>
                     <tr><td>Your right leg BV</td><td><b><?= bv($u['right_bv']) ?></b></td></tr>
-                    <tr><td>Matching left / right BV</td><td><b><?= bv($qual['left_eligible_bv'] ?? 0) ?> / <?= bv($qual['right_eligible_bv'] ?? 0) ?></b></td></tr>
-                    <tr><td>Pairs matched so far</td><td><b><?= (int)$u['matched_pairs'] ?></b> (each new qualifying pair pays)</td></tr>
+                    <tr><td>Matched BV (weaker side)</td><td><b><?= bv(min((float)$u['left_bv'], (float)$u['right_bv'])) ?></b></td></tr>
+                    <tr><td>Pairs matched so far</td><td><b><?= (int)$u['matched_pairs'] ?></b> (only the first pair pays)</td></tr>
                     <tr><td>Matching bonus income earned</td><td><b><?= money($earn['binary']) ?></b></td></tr>
                 </table>
             </div>
@@ -137,28 +150,28 @@ $pairPay = $plan['binary_type'] === 'percent'
                         <div class="pt-node">
                             <i class="pt-ico fas fa-user" aria-hidden="true"></i>
                             <span class="pt-name">LEFT (L)</span>
-                            <span class="pt-sub"><?= bv($unit) ?></span>
+                            <span class="pt-sub">3,000 BV</span>
                         </div>
                     </div>
                     <div class="pt-kid">
                         <div class="pt-node">
                             <i class="pt-ico fas fa-user" aria-hidden="true"></i>
                             <span class="pt-name">RIGHT (R)</span>
-                            <span class="pt-sub"><?= bv($unit) ?></span>
+                            <span class="pt-sub">3,000 BV</span>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="pt-chips">
                 <span class="pt-chip">Member's Matching Bonus: <b><?= money($pairPay) ?></b></span>
-                <span class="pt-chip gold">Your <?= e($plan['sponsor_matching_percent']) ?>% Direct Sponsor Bonus: <b><?= money($pairPay * $plan['sponsor_matching_percent'] / 100) ?></b></span>
+                <span class="pt-chip gold">Your 50% Direct Sponsor Bonus: <b><?= money($pairPay * $plan['sponsor_matching_percent'] / 100) ?></b></span>
             </div>
             <div class="plan-box">
                 When a <b>directly sponsored downline member in your LEFT leg</b> or in your
                 <b>RIGHT leg</b> completes their own first Matching Pair Income (<?= money($pairPay) ?>), you receive
                 <b><?= e($plan['sponsor_matching_percent']) ?>%</b> of that matching income —
                 <b><?= money($pairPay * $plan['sponsor_matching_percent'] / 100) ?></b> — as your Direct Sponsor Matching Bonus.
-                It is paid <b>once per direct member</b>, based on the sponsor and placement when the pair was earned. The original sponsor must be active and green when it settles; otherwise this first-pair bonus is not paid.
+                It is paid <b>once per direct member</b> (their first pair is the only paid pair).
                 <table class="kv-table" style="width:100%;margin-top:10px">
                     <tr><td>Sponsor matching earned</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
                 </table>
@@ -183,8 +196,10 @@ $pairPay = $plan['binary_type'] === 'percent'
         <div class="card" style="border:1.5px solid var(--accent)">
             <div class="card-title">⭐ Points</div>
             <div class="plan-box">
-                Each <?= bv($unit) ?> left + <?= bv($unit) ?> right pair earns <b><?= (int)$plan['points_per_unit'] ?> point(s)</b>.
-                Points are added for <b>every matched pair</b>. Matching income is paid for every qualifying pair of team BV. Points need your own ID to be green (through approved joining BV or manual activation) and drive the <b>rank achievements</b> (each rank
+                <b>1 point = 3,000 BV on your left + 3,000 BV on your right</b> (both sides together).
+                Points are added for <b>every matched pair</b> — the first pair pays the ₹450 Matching Pair Income,
+                and every further pair adds points to your tally. Points need your own
+                <b>Self 3,000 BV</b> completed and drive the <b>rank achievements</b> (each rank
                 pays its reward into your wallet) and the <b>award milestones</b> below
                 (recognition only).
                 <table class="kv-table" style="width:100%;margin-top:10px">
@@ -197,7 +212,7 @@ $pairPay = $plan['binary_type'] === 'percent'
         <div class="card">
             <div class="card-title">🏅 Rank Achievements</div>
             <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">
-                Your points: <b><?= number_format($points) ?> P</b> (<?= (int)$plan['points_per_unit'] ?> P per <?= bv($unit) ?> matched pair)
+                Your points: <b><?= number_format($points) ?> P</b> (1 P = 3,000 BV left + 3,000 BV right)
             </p>
             <?php $currentRankId = (int)$u['rank_id']; ?>
             <?php foreach ($ranks as $r): ?>
@@ -215,7 +230,7 @@ $pairPay = $plan['binary_type'] === 'percent'
         <div class="card">
             <div class="card-title">🏆 Award Rewards</div>
             <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">
-                Lifetime points milestones — <b><?= (int)$plan['points_per_unit'] ?> point(s) per <?= bv($unit) ?> matched pair</b>. Recognition only — no award commission is credited.
+                Lifetime points milestones — <b>1 point = 3,000 BV left + 3,000 BV right</b>. Recognition only — no award commission is credited.
             </p>
             <?php foreach ($awards as $a): ?>
                 <?php $got = array_key_exists((int)$a['id'], $earn['award_by_id']); ?>
@@ -235,9 +250,9 @@ $pairPay = $plan['binary_type'] === 'percent'
             <div class="card-title">⚙️ Other Rules</div>
             <table class="kv-table" style="width:100%">
                 <tr><td>Joining / eligibility BV</td><td><?= e($plan['activation_bv']) ?> BV self purchase</td></tr>
-                <tr><td>Matching unit</td><td><?= bv($unit) ?> left + <?= bv($unit) ?> right</td></tr>
+                <tr><td>Point value (1 point)</td><td>3,000 BV left + 3,000 BV right</td></tr>
                 <tr><td>Points per matched pair</td><td><?= (int)$plan['points_per_unit'] ?> P</td></tr>
-                <tr><td>Payout commission</td><td><?= money((float)$plan['activation_bv'] * (float)$plan['sponsor_percent'] / 100) ?> per green direct member + <?= money($pairPay) ?> per eligible pair + <?= money($pairPay * (float)$plan['sponsor_matching_percent'] / 100) ?> first-pair sponsor matching bonus + rank rewards</td></tr>
+                <tr><td>Payout commission</td><td>₹300 direct sponsor leg income (L+R) + ₹450 first matching pair + ₹225 direct sponsor matching bonus + rank rewards</td></tr>
                 <tr><td>Rank rewards</td><td>credited to your wallet when the rank is achieved — included in payouts</td></tr>
                 <tr><td>Payout minimum</td><td><?= money($plan['payout_min']) ?></td></tr>
                 <tr><td>TDS on payout</td><td><?= e($plan['tds_percent']) ?>%</td></tr>

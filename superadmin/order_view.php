@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/init.php';
 $a = require_superadmin();
 
 $id = get_int('id');
-$o = q_row("SELECT o.*, u.username, u.full_name, u.mobile, u.status AS member_status FROM orders o
+$o = q_row("SELECT o.*, u.username, u.full_name, u.mobile FROM orders o
             JOIN users u ON u.id = o.user_id WHERE o.id = ?", [$id]);
 if (!$o) {
     flash('error', 'Order not found.');
@@ -16,15 +16,12 @@ if (is_post()) {
     verify_csrf();
     $action = post_str('action');
     if ($action === 'authorize_payment') {
-        $authorized = db_tx(function () use ($id) {
-            lock_network_mutation();
-            $order = q_row("SELECT o.status, o.payment_status, u.status AS member_status FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = ? FOR UPDATE", [$id]);
-            if (!$order || $order['status'] !== 'pending' || $order['payment_status'] === 'paid' || $order['member_status'] === 'deleted') { return false; }
+        if ($o['status'] !== 'pending' || $o['payment_status'] === 'paid') {
+            flash('error', 'Payment cannot be authorized for this order.');
+        } else {
             q("UPDATE orders SET payment_status = 'paid' WHERE id = ?", [$id]);
-            return true;
-        });
-        if (!$authorized) { flash('error', 'Payment cannot be authorized for this order.'); }
-        else { flash('success', 'Payment authorized for ' . $o['order_no'] . '. You can now approve the order.'); }
+            flash('success', 'Payment authorized for ' . $o['order_no'] . '. You can now approve the order.');
+        }
         redirect('order_view.php?id=' . $id);
     } elseif ($action === 'approve') {
         /* one click: authorize the payment AND approve + deliver the order */
@@ -84,16 +81,14 @@ require __DIR__ . '/../includes/dash_header.php';
                 Payment is authorized. The button below
             <?php endif; ?>
             approves and delivers the order, immediately crediting <b><?= e($o['total_bv']) ?> BV</b>
-            and applying the current green-ID sponsor and team-BV matching rules.
+            to the network and paying sponsor / level / binary matching commissions as per the MLM plan.
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <?php if ($o['member_status'] !== 'deleted'): ?>
             <form method="post" class="inline-form" data-confirm="Authorize payment, approve and deliver this order? Commissions will be credited immediately.">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="approve">
                 <button class="btn btn-primary" type="submit">✅ Approve, Authorize Payment &amp; Deliver</button>
             </form>
-            <?php else: ?><div class="alert alert-danger">This member is deleted; this order cannot be approved. You may reject it.</div><?php endif; ?>
             <form method="post" class="inline-form" style="display:flex;gap:8px;flex-wrap:wrap">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="reject">

@@ -15,7 +15,7 @@ if (is_post()) {
     if ($errors) {
         foreach ($errors as $er) { flash('error', $er); }
     } else {
-        q("UPDATE users SET password = ?, must_change_password = 0 WHERE id = ? AND status = 'active' ",
+        q("UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?",
           [password_hash($new, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $u['id']]);
         flash('success', 'Password changed successfully.');
     }

@@ -42,9 +42,6 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/font-awesome/css/all.min.css') ?>?v=<?= APP_VERSION ?>">
 <link rel="stylesheet" href="<?= url('assets/css/dash.css') ?>?v=<?= APP_VERSION ?>">
-<?php if (!empty($pageStylesFiles)): foreach ((array)$pageStylesFiles as $stylesheet): ?>
-<link rel="stylesheet" href="<?= e($stylesheet) ?>">
-<?php endforeach; endif; ?>
 <link rel="manifest" href="<?= e(url('manifest.php')) ?>">
 <meta name="theme-color" content="#103a14">
 <meta name="mobile-web-app-capable" content="yes">
@@ -52,7 +49,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Yashasavi">
 </head>
-<body class="dash-body area-<?= e($area) ?><?= !empty($bodyClass) ? ' ' . e($bodyClass) : '' ?>">
+<body class="dash-body area-<?= e($area) ?>">
 
 <div class="dash">
     <aside class="sidebar" id="sidebar">
@@ -102,7 +99,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
         </nav>
         <div class="side-foot">
             <span class="sf-txt"><?= e($siteName) ?> · v<?= APP_VERSION ?></span>
-            <a class="sf-logout" href="<?= e(url(($area === 'user' ? 'user/' : $area . '/') . 'logout.php')) ?>" data-confirm="Logout from your account?"><i class="fas fa-sign-out-alt" aria-hidden="true"></i> Logout</a>
+            <a class="sf-logout" href="<?= e(url(($area === 'user' ? 'user/' : $area . '/') . 'logout.php')) ?>" data-confirm="Logout from your account?">⏻ Logout</a>
         </div>
     </aside>
     <div class="side-overlay" id="sideOverlay"></div>

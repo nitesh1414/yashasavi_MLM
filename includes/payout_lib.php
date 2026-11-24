@@ -9,8 +9,8 @@
  *
  * Everything is computed LIVE from the member's own credited
  * commissions, so the reports always mirror the actual performance:
- *   - incentive income  = sponsor (Direct Sponsor ₹300 per green direct),
- *                         binary (₹450 per qualifying matching pair),
+ *   - incentive income  = sponsor (Direct Sponsor ₹300 L/R),
+ *                         binary (First Matching Pair ₹450 + matching),
  *                         sponsor_matching (Direct Sponsor Matching ₹225)
  *   - reward income     = rank + award (Cash Reward), car_fund (Car Fund),
  *                         level (Royalty)
@@ -255,7 +255,6 @@ function payout_statement_html(array $st)
     </div>
 
     <div class="pst-note">
-        Illustrative report using current deduction rates; actual payout requests retain their original recorded amounts.<br>
         This is a computer generated statement, no signature is required.
     </div>
 </div>
@@ -358,9 +357,8 @@ function payout_statement_pdf(array $st)
     /* footer */
     $fy = MiniPDF::PH - 34;
     $p->hline($M, $R, $fy - 12, 0.5, 0.85);
-    $p->text($M, $fy - 1, 7.4, false, 'Illustrative at current deduction rates; actual payout records retain their original amounts.', 'L', $gray);
-    $p->text($M, $fy + 10, 7.6, false, 'This is a computer generated statement, no signature is required.', 'L', $gray);
-    $p->text($R, $fy + 10, 7.6, false, $c['name'], 'R', $gray);
+    $p->text($M, $fy, 7.6, false, 'This is a computer generated statement, no signature is required.', 'L', $gray);
+    $p->text($R, $fy, 7.6, false, $c['name'], 'R', $gray);
 
     return $p->output();
 }

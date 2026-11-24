@@ -22,7 +22,7 @@ if (is_post()) {
             foreach ($errors as $er) { flash('error', $er); }
         } else {
             q("UPDATE users SET full_name=?, email=?, mobile=?, dob=?, marital_status=?, nationality=?,
-               address=?, city=?, state=?, pincode=?, nominee_name=?, nominee_relation=? WHERE id=? AND status = 'active' ",
+               address=?, city=?, state=?, pincode=?, nominee_name=?, nominee_relation=? WHERE id=?",
               [$full_name, $email ?: null, $mobile, post_str('dob') ?: null, post_str('marital_status'),
                post_str('nationality'), post_str('address'), post_str('city'), post_str('state'),
                post_str('pincode'), post_str('nominee_name'), post_str('nominee_relation'), $u['id']]);
@@ -46,7 +46,7 @@ if (is_post()) {
             foreach ($errors as $er) { flash('error', $er); }
         } else {
             q("UPDATE users SET bank_holder=?, bank_account_no=?, bank_ifsc=?, bank_name=?, bank_branch=?,
-               aadhaar_no=?, pan_no=? WHERE id=? AND status = 'active' ",
+               aadhaar_no=?, pan_no=? WHERE id=?",
               [post_str('bank_holder'), $acct ?: null, $ifsc ?: null, post_str('bank_name'),
                post_str('bank_branch'), $aadhaar ?: null, $pan ?: null, $u['id']]);
             flash('success', 'Bank & KYC details updated.');

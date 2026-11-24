@@ -1,27 +1,45 @@
 <?php
-/** MLM engine: prospective direct-sponsor and team-BV matching income,
- * points/ranks, wallet and payout processing. Past financial entries are
- * preserved. See income_policy.php for activation and matching rules. */
+/**
+ * =====================================================================
+ *  MLM ENGINE
+ * ---------------------------------------------------------------------
+ *  Binary tree (left / right placement) with:
+ *   - Leg completion bonus             : Rs 300 once when the LEFT leg's
+ *                                        total team business completes
+ *                                        3,000 BV, Rs 300 once for the
+ *                                        RIGHT leg (max Rs 600 / member)
+ *   - Binary pair matching income      : first matching pair only
+ *                                        (3,000 + 3,000 BV = Rs 450),
+ *                                        further pairs add POINTS
+ *   - 50% direct sponsor bonus         : Rs 225 when a direct member
+ *                                        completes their first pair
+ *   - Points / ranks / awards          : 1 point per matched pair unit
+ *   - E-wallet, commissions & payouts
+ *
+ *  Every amount/rate above is configurable from the Super Admin panel
+ *  (plan settings, rank table, award rewards).
+ * =====================================================================
+ */
 
 /* ------------------------------------------------------------------ */
 /*  Plan settings (cached)                                             */
 /* ------------------------------------------------------------------ */
 
-function get_plan($refresh = false)
+function get_plan()
 {
     static $plan = null;
-    if ($plan === null || $refresh) {
+    if ($plan === null) {
         $plan = q_row("SELECT * FROM plan_settings WHERE id = 1");
         if (!$plan) {
             $plan = [
-                'id' => 1, 'activation_bv' => 3000, 'sponsor_percent' => 10,
+                'id' => 1, 'activation_bv' => 500, 'sponsor_percent' => 10,
                 'pair_unit_bv' => 3000, 'binary_type' => 'fixed', 'binary_value' => 450,
                 'level_depth' => 0, 'daily_cap' => 320000, 'monthly_cap' => 800000,
                 'carry_forward' => 1,
                 'matching_requires_active' => 1, 'level_requires_active' => 1,
                 'sponsor_matching_percent' => 50, 'points_per_unit' => 1, 'point_bv' => 400,
                 'car_fund_points' => 500, 'car_fund_amount' => 150000,
-                'tds_percent' => 5, 'admin_charge_percent' => 5, 'payout_min' => 500,
+                'tds_percent' => 5, 'admin_charge_percent' => 7, 'payout_min' => 500,
             ];
         }
     }
@@ -81,15 +99,15 @@ function find_user($idOrName)
         return null;
     }
     if (ctype_digit((string)$idOrName)) {
-        return q_row("SELECT * FROM users WHERE (id = ? OR username = ?) AND status <> 'deleted' LIMIT 1", [$idOrName, strtoupper($idOrName)]);
+        return q_row("SELECT * FROM users WHERE id = ? OR username = ? LIMIT 1", [$idOrName, strtoupper($idOrName)]);
     }
-    return q_row("SELECT * FROM users WHERE (username = ? OR email = ?) AND status <> 'deleted' LIMIT 1", [$idOrName, $idOrName]);
+    return q_row("SELECT * FROM users WHERE username = ? OR email = ? LIMIT 1", [$idOrName, $idOrName]);
 }
 
 /** Children (direct placements) of a user: ['L' => row|null, 'R' => row|null]. */
 function user_children($userId)
 {
-    $rows = q_all("SELECT * FROM users WHERE placement_id = ? AND status <> 'deleted'", [$userId]);
+    $rows = q_all("SELECT * FROM users WHERE placement_id = ?", [$userId]);
     $out = ['L' => null, 'R' => null];
     foreach ($rows as $r) {
         $out[$r['leg']] = $r;
@@ -179,48 +197,42 @@ function team_counts($user)
  */
 function register_distributor($data)
 {
-    if (!income_policy_ready()) { return [false, 0, 'Run the database upgrade before registering members.']; }
     return db_tx(function () use ($data) {
-        // Only a signed-in superadmin may establish a new first root after
-        // the previous last member was archived. Serialize competing roots.
-        lock_network_mutation();
-        $firstRoot = !empty($data['_first_root']) && current_admin('superadmin')
-            && (int)q_val("SELECT COUNT(*) FROM users WHERE status <> 'deleted'") === 0;
-        $sponsor = $firstRoot ? null : find_user($data['sponsor']);
-        if (!$firstRoot && !$sponsor) { return [false, 0, 'Sponsor ID not found.']; }
-        if ($sponsor) {
-            $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$sponsor['id']]);
-            if (!$sponsor || $sponsor['status'] !== 'active') { return [false, 0, 'Sponsor account is not active.']; }
+        $sponsor = find_user($data['sponsor']);
+        if (!$sponsor) {
+            return [false, 0, 'Sponsor ID not found.'];
         }
-        // Member-panel placement authority may have changed while the
-        // registration form was open (or while waiting for this lock).
-        if (!empty($data['_member_actor_id'])) {
-            $actor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [(int)$data['_member_actor_id']]);
-            if (!$actor || $actor['status'] !== 'active' || !$sponsor
-                || ((int)$sponsor['id'] !== (int)$actor['id'] && strpos($sponsor['path'], $actor['path']) !== 0)) {
-                return [false, 0, 'Your account or sponsor position changed. Please review the registration.'];
-            }
+        if ($sponsor['status'] !== 'active') {
+            return [false, 0, 'Sponsor account is not active.'];
         }
-        $placementId = null; $leg = 'L'; $parent = null;
-        if (!$firstRoot) {
-            if (!empty($data['placement'])) {
-                $puser = ctype_digit((string)$data['placement'])
-                    ? q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [(int)$data['placement']])
-                    : find_user((string)$data['placement']);
-                $pleg = (($data['placement_leg'] ?? $data['leg']) === 'R') ? 'R' : 'L';
-                if ($puser && $puser['status'] === 'active') {
-                    $ch = user_children($puser['id']);
-                    if ($ch[$pleg] === null) { $placementId = (int)$puser['id']; $leg = $pleg; }
+
+        /* NOTE: email and mobile are no longer unique — one family may share
+         * contact details across several distributor IDs. */
+
+        /* explicit placement (bulk tools) or the standard spillover search */
+        $placementId = null; $leg = null;
+        if (!empty($data['placement'])) {
+            $puser = ctype_digit((string)$data['placement'])
+                ? q_row("SELECT * FROM users WHERE id = ?", [(int)$data['placement']])
+                : find_user((string)$data['placement']);
+            $pleg = (($data['placement_leg'] ?? $data['leg']) === 'R') ? 'R' : 'L';
+            if ($puser) {
+                $ch = user_children($puser['id']);
+                if ($ch[$pleg] === null) {
+                    $placementId = (int)$puser['id'];
+                    $leg = $pleg;
                 }
             }
-            if (!$placementId) {
-                $pos = find_position($sponsor['id'], $data['leg']);
-                if (!$pos) { return [false, 0, 'No free position available under this sponsor.']; }
-                [$placementId, $leg] = $pos;
-            }
-            $parent = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$placementId]);
-            if (!$parent || $parent['status'] === 'deleted') { return [false, 0, 'Placement member is no longer available.']; }
         }
+        if (!$placementId) {
+            $pos = find_position($sponsor['id'], $data['leg']);
+            if (!$pos) {
+                return [false, 0, 'No free position available under this sponsor.'];
+            }
+            [$placementId, $leg] = $pos;
+        }
+
+        $parent = q_row("SELECT * FROM users WHERE id = ?", [$placementId]);
 
         // insert
         q("INSERT INTO users
@@ -241,15 +253,14 @@ function register_distributor($data)
                $data['bank_name'], $data['bank_branch'],
                $data['aadhaar_no'], $data['pan_no'],
                $data['pan_image'] ?? null, $data['aadhaar_image'] ?? null,
-               $sponsor ? $sponsor['id'] : null, $placementId, $leg, now(),
+               $sponsor['id'], $placementId, $leg, now(),
            ]);
 
         $id = (int)db()->lastInsertId();
         $username = 'YSH' . (100000 + $id);
-        $path = ($parent ? $parent['path'] : '/') . $id . '/';
+        $path = $parent['path'] . $id . '/';
         q("UPDATE users SET username = ?, path = ?, depth = ? WHERE id = ?",
-          [$username, $path, $parent ? (int)$parent['depth'] + 1 : 0, $id]);
-        q("INSERT IGNORE INTO matching_state (user_id) VALUES (?)", [$id]);
+          [$username, $path, (int)$parent['depth'] + 1, $id]);
 
         return [true, $id, $username];
     });
@@ -263,7 +274,10 @@ function register_distributor($data)
  * Credit a user's wallet inside the current transaction.
  * Returns the new balance.
  */
-/** Timestamp used for new commission and wallet rows. */
+/** Timestamp used for new commission / wallet rows and for daily-cap
+ *  windows. During a full recalculation (recalculate_all_incomes) it is
+ *  set to the replayed order's approval time, so daily / monthly caps
+ *  apply to each order's ORIGINAL day instead of "today". */
 function commission_now()
 {
     return (!empty($GLOBALS['__commission_clock'])) ? $GLOBALS['__commission_clock'] : now();
@@ -277,11 +291,8 @@ function credit_wallet($userId, $amount, $refType, $refId, $note)
     }
     $u = q_row("SELECT wallet_balance FROM users WHERE id = ? FOR UPDATE", [$userId]);
     $newBal = round((float)$u['wallet_balance'] + $amount, 2);
-    // A returned purchase/payout debit restores the balance but is not new
-    // income. Preserve the income counter when issuing a refund.
-    $earnedIncrement = $refType === 'refund' ? 0 : $amount;
     q("UPDATE users SET wallet_balance = ?, total_earned = total_earned + ? WHERE id = ?",
-      [$newBal, $earnedIncrement, $userId]);
+      [$newBal, $amount, $userId]);
     q("INSERT INTO wallet_transactions (user_id, type, amount, balance_after, ref_type, ref_id, note, created_at)
        VALUES (?, 'credit', ?, ?, ?, ?, ?, ?)",
       [$userId, $amount, $newBal, $refType, $refId, $note, commission_now()]);
@@ -387,10 +398,246 @@ function check_rank($userId, $orderId = null)
 /*  Binary matching                                                    */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Run pair matching for a user after their leg BV changed.
+ * Pays income for newly matched pair units (weaker leg), respects the
+ * daily cap and carries the remaining units forward.
+ */
+function run_binary_matching($user, $orderId)
+{
+    $plan = get_plan();
+    $unit = max(1, (float)$plan['pair_unit_bv']);
+    $left = (float)$user['left_bv'];
+    $right = (float)$user['right_bv'];
+    $unitsAvailable = (int)floor(min($left, $right) / $unit);
+    $newUnits = $unitsAvailable - (int)$user['matched_pairs'];
+    /* every matched unit is COUNTED, but the matching commission is paid
+     * only ONCE — for the member's FIRST matching pair (₹450). Further
+     * pairs add POINTS only (see update_reward_points). */
+    if ($newUnits > 0) {
+        q("UPDATE users SET matched_pairs = matched_pairs + ? WHERE id = ?", [$newUnits, $user['id']]);
+    }
+
+    $alreadyPaid = (int)q_val(
+        "SELECT COUNT(*) FROM commissions WHERE type = 'binary' AND user_id = ?",
+        [$user['id']]
+    );
+    if ($alreadyPaid || $unitsAvailable < 1) {
+        return 0.0; // first pair already paid, or no matched pair yet
+    }
+    if ((int)$plan['matching_requires_active'] === 1 && (int)$user['is_active'] !== 1) {
+        return 0.0; // inactive members match pairs but are not paid
+    }
+    if ($user['status'] !== 'active') {
+        return 0.0;
+    }
+    /* rule c): the ₹450 matching pair commission is paid ONLY when the
+     * member has also earned at least a) or b) — a directly sponsored
+     * downline member in the left or right leg completed their joining */
+    $hasSponsorIncome = (int)q_val(
+        "SELECT COUNT(*) FROM commissions WHERE type = 'sponsor' AND user_id = ?",
+        [$user['id']]
+    );
+    if (!$hasSponsorIncome) {
+        return 0.0;
+    }
+    if ($plan['binary_type'] === 'fixed') {
+        $income = round((float)$plan['binary_value'], 2);
+    } else {
+        $income = round($unit * ((float)$plan['binary_value'] / 100), 2);
+    }
+    if ($income <= 0) {
+        return 0.0;
+    }
+    add_commission($user['id'], $orderId, 'binary', $income, $unit, 1,
+        'First matching pair: ' . bv($left) . ' left + ' . bv($right) . ' right (direct sponsor leg income completed)');
+
+    /* Direct Sponsor Matching Bonus (rules d + e): when a DIRECTLY
+       SPONSORED downline member in the member's left or right leg
+       completes their own first matching pair (rule c), the member
+       receives 50% (₹225). Paid once per direct member. */
+    $smPct = isset($plan['sponsor_matching_percent']) ? (float)$plan['sponsor_matching_percent'] : 0.0;
+    if ($smPct > 0 && $user['sponsor_id']) {
+        $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$user['sponsor_id']]);
+        /* the member must be a downline member of the sponsor (left or right leg) */
+        $side = $user['leg'];
+        $sponsorIsUpline = false;
+        foreach (ancestor_chain($user) as $anc) {
+            if ((int)$anc['id'] === (int)$user['sponsor_id']) {
+                $sponsorIsUpline = true;
+                break;
+            }
+            $side = $anc['leg'];
+        }
+        $smAmt = round($income * $smPct / 100, 2);
+        if ($sponsor && $sponsorIsUpline && $smAmt > 0
+            && $sponsor['status'] === 'active' && (int)$sponsor['is_active'] === 1) {
+            add_commission($sponsor['id'], $orderId, 'sponsor_matching', $smAmt, 0, 1,
+                $smPct . '% bonus — direct ' . ($side === 'R' ? 'right' : 'left') . ' downline member '
+                . $user['username'] . ' completed the first matching pair');
+        }
+    }
+    return $income;
+}
+
+/**
+ * Points: 1 point per matched pair unit (3,000 BV left + 3,000 BV right).
+ * Points are added ONLY to members who completed their own Self 3,000 BV
+ * (rule: self BV is never counted in any calculation — it only makes the
+ * member eligible for commission and points). Every points change is
+ * logged (points_logs) and drives the rank achievements and the award
+ * milestones from the MLM points PDF.
+ *
+ * Each rank achievement credits that rank's reward amount to the member's
+ * WALLET balance (see check_rank) — wallet income that is included in
+ * the payout-eligible income. Award milestones are recognition only and
+ * no car fund exists.
+ */
+function update_reward_points($userId, $orderId = null)
+{
+    $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
+    if (!$u || (int)$u['is_active'] !== 1 || $u['status'] !== 'active') {
+        return 0;   // needs Self 3,000 BV completed
+    }
+    $plan = get_plan();
+    $unit = max(1, (float)$plan['pair_unit_bv']);
+    $ppu = max(0, (int)(isset($plan['points_per_unit']) ? $plan['points_per_unit'] : 1));
+    if ($ppu <= 0) {
+        return 0;
+    }
+    $target = (int)floor(min((float)$u['left_bv'], (float)$u['right_bv']) / $unit) * $ppu;
+    $cur = (int)$u['reward_points'];
+    if ($target <= $cur) {
+        return 0;
+    }
+    $add = $target - $cur;
+    q("UPDATE users SET reward_points = ? WHERE id = ?", [$target, $userId]);
+    q("INSERT INTO points_logs (user_id, order_id, points, total_points, left_bv, right_bv, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [$userId, $orderId, $add, $target, (float)$u['left_bv'], (float)$u['right_bv'], commission_now()]);
+    check_rank($userId, $orderId);
+    return $add;
+}
+
+/**
+ * Direct Sponsor Leg Income (rules a + b): the one-time Rs 300 is paid to
+ * the member when a DIRECTLY SPONSORED downline member placed in the
+ * member's LEFT leg completes their own 3,000 BV joining (level 1), and
+ * once when a directly sponsored member in the RIGHT leg completes it
+ * (level 2). Fires at the exact moment the downline member completes
+ * their joining BV — called with the member row of the member who just
+ * completed it. Maximum Rs 600 per member: one payment per leg, forever.
+ */
+function pay_direct_sponsor_leg_bonus(array $buyer, $orderId)
+{
+    $plan = get_plan();
+    $threshold = (float)$plan['activation_bv'];
+    $amt = round($threshold * (float)$plan['sponsor_percent'] / 100, 2);
+    if ($amt <= 0 || !(int)$buyer['sponsor_id']) {
+        return 0;
+    }
+    $sponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$buyer['sponsor_id']]);
+    if (!$sponsor || (int)$sponsor['id'] === (int)$buyer['id']) {
+        return 0;
+    }
+    /* the sponsor must be an ancestor of the member (the member is a
+     * downline member in the sponsor's left or right leg) */
+    $side = $buyer['leg'];
+    $leg = null;
+    foreach (ancestor_chain($buyer) as $anc) {
+        if ((int)$anc['id'] === (int)$sponsor['id']) {
+            $leg = $side;
+            break;
+        }
+        $side = $anc['leg'];
+    }
+    if ($leg === null) {
+        return 0; // sponsor is not in the upline — no leg income
+    }
+    $lvl = ($leg === 'R') ? 2 : 1; // commissions.level: 1 = left leg, 2 = right leg
+    $already = (int)q_val(
+        "SELECT COUNT(*) FROM commissions WHERE type = 'sponsor' AND user_id = ? AND level = ?",
+        [$sponsor['id'], $lvl]
+    );
+    if ($already || $sponsor['status'] !== 'active' || (int)$sponsor['is_active'] !== 1) {
+        return 0; // already paid for this leg, or sponsor not yet eligible
+    }
+    add_commission($sponsor['id'], $orderId, 'sponsor', $amt, $threshold, $lvl,
+        'Direct ' . ($leg === 'R' ? 'right' : 'left') . ' downline member ' . $buyer['username']
+        . ' completed ' . bv($threshold) . ' joining');
+    /* rule c): earning a) or b) may make a pending first matching pair payable */
+    $sponsor = q_row("SELECT * FROM users WHERE id = ?", [$sponsor['id']]);
+    run_binary_matching($sponsor, $orderId);
+    return 1;
+}
+
+/**
+ * Direct Sponsor Leg Income catch-up: if a directly sponsored downline
+ * member completed their 3,000 BV joining while the member was not yet
+ * eligible (own joining not complete), the pending Rs 300 per leg is paid
+ * as soon as the member becomes eligible. Maximum one left + one right
+ * payment, ever.
+ */
+function pay_pending_sponsor_legs($userId, $orderId = null)
+{
+    $plan = get_plan();
+    $threshold = (float)$plan['activation_bv'];
+    $amt = round($threshold * (float)$plan['sponsor_percent'] / 100, 2);
+    if ($amt <= 0) {
+        return 0;
+    }
+    $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$userId]);
+    if (!$u) {
+        return 0;
+    }
+    $paid = 0;
+    foreach (['L' => 1, 'R' => 2] as $leg => $lvl) {
+        $already = (int)q_val(
+            "SELECT COUNT(*) FROM commissions WHERE type = 'sponsor' AND user_id = ? AND level = ?",
+            [$userId, $lvl]
+        );
+        if ($already) {
+            continue;
+        }
+        /* is there a directly sponsored member in this leg (the leg child
+         * or anywhere below it) who already completed their joining? */
+        $child = q_row("SELECT * FROM users WHERE placement_id = ? AND leg = ?", [$userId, $leg]);
+        if (!$child) {
+            continue;
+        }
+        $done = (int)q_val(
+            "SELECT COUNT(*) FROM users
+             WHERE sponsor_id = ? AND is_active = 1
+               AND (id = ? OR path LIKE ?)",
+            [$userId, (int)$child['id'], $child['path'] . '%']
+        );
+        if (!$done) {
+            continue;
+        }
+        add_commission($userId, $orderId, 'sponsor', $amt, $threshold, $lvl,
+            ($lvl === 2 ? 'Right' : 'Left') . ' leg — direct sponsored downline member completed ' . bv($threshold) . ' joining');
+        $paid++;
+    }
+    if ($paid) {
+        /* rule c): earning a) or b) may make a pending first matching pair payable */
+        $u = q_row("SELECT * FROM users WHERE id = ?", [$userId]);
+        run_binary_matching($u, $orderId);
+    }
+    return $paid;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Order approval — the commission pipeline                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Approve a pending order: credit BV, activate the buyer, propagate BV
+ * up the binary tree and pay the three payout incomes (direct sponsor
+ * leg, first matching pair, direct sponsor matching bonus). Everything
+ * runs in a single transaction.
+ *
+ * Returns [ok(bool), message].
+ */
 /**
  * Move a member (with their entire downline) to a new position in the
  * binary tree. The new slot is found with the same spillover search as
@@ -404,15 +651,9 @@ function check_rank($userId, $orderId = null)
 function move_user_position($userId, $targetId, $leg, $adminId)
 {
     return db_tx(function () use ($userId, $targetId, $leg, $adminId) {
-        lock_network_mutation();
-        $u = q_row("SELECT * FROM users WHERE id = ? AND status <> 'deleted' FOR UPDATE", [(int)$userId]);
+        $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [(int)$userId]);
         if (!$u) {
             return [false, 'Member not found.'];
-        }
-        if (!income_policy_ready()) { return [false, 'Run the database upgrade before moving members.']; }
-        $beforeBv = [];
-        foreach (q_all("SELECT id, left_bv, right_bv FROM users WHERE status <> 'deleted'") as $row) {
-            $beforeBv[(int)$row['id']] = min((float)$row['left_bv'], (float)$row['right_bv']);
         }
         if ((int)$u['placement_id'] === 0 || $u['path'] === '/') {
             return [false, 'The company root cannot be moved.'];
@@ -451,9 +692,9 @@ function move_user_position($userId, $targetId, $leg, $adminId)
         $oldPath = $u['path'];
         $newPath = $newParent['path'] . $u['id'] . '/';
 
-        /* users.path is TEXT: reject moves that would exceed its byte limit. */
+        /* path is VARCHAR(255) — make sure the deepest descendant still fits */
         $maxLen = (float)q_val("SELECT COALESCE(MAX(LENGTH(path)), 0) FROM users WHERE path LIKE ?", [$oldPath . '%']);
-        if (strlen($newPath) + ((float)$maxLen - strlen($oldPath)) > 65535) {
+        if (strlen($newPath) + ((float)$maxLen - strlen($oldPath)) > 255) {
             return [false, 'The member\'s downline is too deep to move to this position.'];
         }
 
@@ -495,29 +736,6 @@ function move_user_position($userId, $targetId, $leg, $adminId)
                 : null;
         }
 
-        // A move reassigns team BV. Watermark newly matched historical
-        // volume without creating commissions or points for the move.
-        $live = [];
-        foreach (q_all("SELECT id, path, leg, self_bv, is_active, left_bv, right_bv FROM users WHERE status <> 'deleted' ORDER BY id FOR UPDATE") as $row) {
-            $live[(int)$row['id']] = $row;
-        }
-        $unit = max(1, (float)get_plan()['pair_unit_bv']);
-        foreach ($live as $mid => $member) {
-            $state = lock_matching_state($mid);
-            $newL = (float)$member['left_bv']; $newR = (float)$member['right_bv'];
-            $processed = (float)$state['processed_bv'];
-            if (min($newL, $newR) > min((float)$state['left_eligible_bv'], (float)$state['right_eligible_bv']) + .001) {
-                $processed = max($processed, floor(min($newL, $newR) / $unit) * $unit);
-            }
-            $pointProcessed = (float)$state['points_processed_bv'];
-            $newMin = min((float)$member['left_bv'], (float)$member['right_bv']);
-            if ($newMin > ($beforeBv[$mid] ?? 0) + .001) {
-                $pointProcessed = max($pointProcessed, floor($newMin / $unit) * $unit);
-            }
-            q("UPDATE matching_state SET left_eligible_bv=?, right_eligible_bv=?, processed_bv=?, points_processed_bv=? WHERE user_id=?",
-              [$newL, $newR, $processed, $pointProcessed, $mid]);
-        }
-
         return [true, $u['username'] . ' moved under ' . $newParent['username'] . ' (' . ($newLeg === 'R' ? 'RIGHT' : 'LEFT') . ' leg)'
             . ($bvDelta > 0 ? ' — ' . number_format($bvDelta, 0) . ' BV relocated with the team.' : '.')];
     });
@@ -529,28 +747,28 @@ function move_user_position($userId, $targetId, $leg, $adminId)
  */
 function authorize_and_approve_order($orderId, $adminId)
 {
-    if (!income_policy_ready()) { return [false, 'Run install/upgrade.php before approving orders.']; }
-    return db_tx(function () use ($orderId, $adminId) {
-        lock_network_mutation();
-        $order = q_row("SELECT * FROM orders WHERE id = ? FOR UPDATE", [$orderId]);
-        if (!$order) { return [false, 'Order not found.']; }
-        if ($order['status'] !== 'pending') { return [false, 'Order is not pending (current status: ' . $order['status'] . ').']; }
-        $buyer = q_row("SELECT status FROM users WHERE id = ? FOR UPDATE", [(int)$order['user_id']]);
-        if (!$buyer || $buyer['status'] === 'deleted') { return [false, 'Buyer account is missing or deleted; reject or resolve the order instead.']; }
-        $authorized = $order['payment_status'] !== 'paid';
-        if ($authorized) { q("UPDATE orders SET payment_status = 'paid' WHERE id = ?", [$orderId]); }
-        $res = approve_order($orderId, $adminId);
-        if (!$res[0] && $authorized) { q("UPDATE orders SET payment_status = ? WHERE id = ?", [$order['payment_status'], $orderId]); }
-        if ($res[0] && $authorized) { $res[1] = 'Payment authorized. ' . $res[1]; }
-        return $res;
-    });
+    $order = q_row("SELECT * FROM orders WHERE id = ?", [$orderId]);
+    if (!$order) {
+        return [false, 'Order not found.'];
+    }
+    if ($order['status'] !== 'pending') {
+        return [false, 'Order is not pending (current status: ' . $order['status'] . ').'];
+    }
+    $authorized = false;
+    if ($order['payment_status'] !== 'paid') {
+        q("UPDATE orders SET payment_status = 'paid' WHERE id = ?", [$orderId]);
+        $authorized = true;
+    }
+    $res = approve_order($orderId, $adminId);
+    if ($res[0] && $authorized) {
+        $res[1] = 'Payment authorized. ' . $res[1];
+    }
+    return $res;
 }
 
 function approve_order($orderId, $adminId)
 {
-    if (!income_policy_ready()) { return [false, 'Run install/upgrade.php before approving orders.']; }
     return db_tx(function () use ($orderId, $adminId) {
-        lock_network_mutation();
         $order = q_row("SELECT * FROM orders WHERE id = ? FOR UPDATE", [$orderId]);
         if (!$order) {
             return [false, 'Order not found.'];
@@ -566,7 +784,7 @@ function approve_order($orderId, $adminId)
          *      leg income, binary matching, points (shared with the full
          *      plan recalculation) */
         if (!apply_order_business_effects($order)) {
-            return [false, 'Buyer account is missing or deleted; reject or resolve the order instead.'];
+            return [false, 'Buyer account missing.'];
         }
 
         /* 6) finalize order + stock */
@@ -581,65 +799,197 @@ function approve_order($orderId, $adminId)
     });
 }
 
-/** Approved orders update self and team BV. All approved team BV can
- * match; direct sponsors receive one bonus per green direct, independent
- * of placement. */
+/**
+ * Core business effects of an approved order: self BV + activation,
+ * direct sponsor leg income, BV propagation up the placement tree with
+ * binary matching, and points + rank rewards (credited to the wallet).
+ * Shared by approve_order() and the full plan recalculation
+ * (recalculate_all_incomes()); payment status, order status and stock
+ * are the caller's business. Returns false when the buyer is missing.
+ */
+/**
+ * The commission pipeline of an approved order.
+ *
+ * The plan (all amounts one-time, per the official rules):
+ *  1. Self BV of the buyer grows (dashboard display + eligibility only —
+ *     self BV is never counted in any commission or points calculation).
+ *     Completing Self 3,000 BV makes the member eligible for commission
+ *     and points.
+ *  2. Direct Sponsor Leg Income (rules a + b): ₹300 paid ONCE per leg
+ *     (left and right) — but only when the downline member who completed
+ *     their own 3,000 BV joining in that leg is DIRECTLY SPONSORED by the
+ *     member. Max ₹600 / member.
+ *  3. BV propagates up the placement tree (logged in bv_logs).
+ *  4. Matching Pair Income (rule c): ₹450 paid ONCE, for the member's
+ *     FIRST matching pair (3,000 BV left + 3,000 BV right) — only when the
+ *     member has also earned a) or b) (at least one directly sponsored
+ *     downline member completed their joining). Further pairs add POINTS.
+ *  5. Direct Sponsor Matching Bonus (rules d + e): ₹225 paid ONCE to the
+ *     member when a DIRECTLY SPONSORED downline member in their left or
+ *     right leg completes the member's own first matching pair (rule c).
+ *  6. Points: +1 per matched 3,000 BV pair (left + right). Every rank
+ *     level reached credits that rank's reward amount to the member's
+ *     wallet balance — jumps pay each crossed level, none is skipped
+ *     (wallet income, included in payouts; award milestones stay
+ *     recognition only).
+ *
+ * There is NO level income, NO car fund, NO award money and NO other
+ * commission of any kind.
+ */
 function apply_order_business_effects(array $order, $payoutOnly = false)
 {
-    if (!income_policy_ready()) { throw new RuntimeException('Run install/upgrade.php before applying the new income policy.'); }
     $totalBv = (float)$order['total_bv'];
     $buyer = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$order['user_id']]);
-    if (!$buyer || $buyer['status'] === 'deleted') { return false; }
+    if (!$buyer) {
+        return false;
+    }
     $plan = get_plan();
-    $preActive = (int)$buyer['is_active'] === 1;
+
+    /* 1) self BV (display + eligibility) + joining completion at 3,000 BV */
+    $threshold = (float)$plan['activation_bv'];
+    $preSelf = (float)$buyer['self_bv'];
     q("UPDATE users SET self_bv = self_bv + ? WHERE id = ?", [$totalBv, $buyer['id']]);
-    $buyer['self_bv'] = (float)$buyer['self_bv'] + $totalBv;
+    $buyer['self_bv'] = $preSelf + $totalBv;
     q("INSERT INTO bv_logs (user_id, order_id, kind, bv, balance_after, note, created_at)
        VALUES (?, ?, 'self', ?, ?, ?, ?)",
       [$buyer['id'], $order['id'], $totalBv, $buyer['self_bv'],
        'Purchase ' . ($order['order_no'] ?? '') . ' — self BV', commission_now()]);
+    /* the moment the member completes their own 3,000 BV joining: every
+     * ancestor who is ALSO the member's direct sponsor earns the one-time
+     * ₹300 Direct Sponsor Leg Income for the leg the member sits in
+     * (rules a + b — sponsor of the downline member, left / right leg) */
+    if ($preSelf < $threshold && $buyer['self_bv'] >= $threshold) {
+        pay_direct_sponsor_leg_bonus($buyer, $order['id']);
+    }
+    if ((int)$buyer['is_active'] !== 1 && $buyer['self_bv'] >= $threshold) {
+        q("UPDATE users SET is_active = 1, activated_at = ? WHERE id = ?", [now(), $buyer['id']]);
+        $buyer['is_active'] = 1;
+        /* the buyer is now eligible: pay any ₹300 direct sponsor leg incomes
+         * pending from directly sponsored members who completed their joining
+         * earlier (retroactive eligibility), catch up a pending first
+         * matching pair and grant points for already-matched leg BV */
+        pay_pending_sponsor_legs($buyer['id'], $order['id']);
+        run_binary_matching($buyer, $order['id']);
+        update_reward_points($buyer['id'], $order['id']);
+    }
 
-    $justGreen = !$preActive && $buyer['self_bv'] >= (float)$plan['activation_bv'];
-    if ($justGreen) { $buyer = mark_member_green($buyer, $order['id']); }
-    $leg = $buyer['leg'];
-    foreach (ancestor_chain($buyer) as $anc) {
-        $col = $leg === 'R' ? 'right_bv' : 'left_bv';
+    /* 2) propagate BV up the placement tree (logged) + binary matching
+     *    (₹450 first pair, ₹225 sponsor matching) + points for every
+     *    ancestor — team BV counts from ANY downline member, sponsored
+     *    or not */
+    $chain = ancestor_chain($buyer); // nearest first
+    $leg = $buyer['leg'];            // leg of buyer relative to its parent
+    foreach ($chain as $anc) {
+        $col = ($leg === 'R') ? 'right_bv' : 'left_bv';
         q("UPDATE users SET $col = $col + ? WHERE id = ?", [$totalBv, $anc['id']]);
-        $anc = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$anc['id']]);
+        $anc[$col] = (float)$anc[$col] + $totalBv;
         q("INSERT INTO bv_logs (user_id, order_id, kind, bv, balance_after, note, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)",
           [$anc['id'], $order['id'], $leg === 'R' ? 'right' : 'left', $totalBv, $anc[$col],
            'Team BV from ' . $buyer['username'] . ' (' . ($leg === 'R' ? 'right' : 'left') . ' leg)', commission_now()]);
-        add_qualified_team_bv($anc['id'], $leg, $totalBv);
         run_binary_matching($anc, $order['id']);
         update_reward_points($anc['id'], $order['id']);
-        $leg = $anc['leg'];
+        $leg = $anc['leg']; // leg of this ancestor relative to its own parent
     }
+
     return true;
 }
 
-/** Historical replay is deliberately disabled by the prospective policy. */
+/**
+ * Recalculate the Total Income and BV of ALL members from the approved
+ * order history using the CURRENT plan settings. Run from the MLM plan
+ * settings page after the admin changes any plan value.
+ *
+ * The rebuild generates exactly the three payout incomes — Direct
+ * Sponsor Leg Income (₹300 left / right, only when the completing
+ * downline member is directly sponsored by the member), the first
+ * Matching Pair ₹450 (only with a) or b) earned) and the Direct Sponsor
+ * Matching Bonus ₹225 — PLUS every achieved rank's reward amount, which
+ * is re-credited to the member's wallet (wallet income, included in
+ * payouts). Level income, car fund and award rewards do not
+ * exist in this plan: any old entries are cleared and NOT rebuilt.
+ * Left / right / self BV, matched pairs, points, rank achievements,
+ * activation and the wallet ledger rows for these incomes are rebuilt.
+ * Manual commissions ('other', 'retail') and the payout history are
+ * kept. Wallet balances are rebuilt from the complete ledger afterwards.
+ * Members are only ever ACTIVATED by the replay, never de-activated —
+ * manual activations survive.
+ *
+ * Returns [ok(bool), stats(array)].
+ */
 function recalculate_all_incomes()
 {
-    throw new LogicException('Historical income recalculation is disabled: existing commissions and payouts must remain unchanged.');
+    $t0 = microtime(true);
+    $stats = ['orders' => 0, 'commissions' => 0, 'earned' => 0.0, 'members' => 0, 'seconds' => 0.0];
+
+    db_tx(function () use (&$stats, $t0) {
+        $plan = get_plan();
+
+        /* 1) wipe the derived data of every member (including points) */
+        q("UPDATE users SET left_bv = 0, right_bv = 0, self_bv = 0, matched_pairs = 0, reward_points = 0, total_earned = 0, rank_id = NULL");
+
+        /* 2) remove the automatic commissions and their wallet ledger
+         *    rows — manual ('other' / 'retail') entries and payouts stay */
+        q("DELETE wt FROM wallet_transactions wt
+           JOIN commissions c ON c.id = wt.ref_id AND wt.ref_type = 'commission'
+           WHERE c.type IN ('sponsor','binary','level','sponsor_matching','rank','car_fund','award')");
+        q("DELETE FROM commissions WHERE type IN ('sponsor','binary','level','sponsor_matching','rank','car_fund','award')");
+        /* BV and points logs are rebuilt from the replay as well */
+        q("DELETE FROM bv_logs");
+        q("DELETE FROM points_logs");
+        $kept = (int)q_val("SELECT COUNT(*) FROM commissions");
+
+        /* 3) replay every approved order chronologically under the NEW
+         *    settings; the commission clock runs at each order's approval
+         *    time so daily / monthly caps apply to the original days */
+        $orders = q_all("SELECT * FROM orders WHERE status = 'approved'
+                         ORDER BY COALESCE(approved_at, created_at) ASC, id ASC");
+        foreach ($orders as $order) {
+            $GLOBALS['__commission_clock'] = $order['approved_at'] ?: $order['created_at'];
+            apply_order_business_effects($order, true);   /* payout incomes only */
+            $stats['orders']++;
+        }
+        $GLOBALS['__commission_clock'] = null;
+
+        /* 4) activation only ever upgrades (manual activations survive) */
+        q("UPDATE users SET is_active = 1, activated_at = COALESCE(activated_at, ?)
+           WHERE is_active = 0 AND self_bv >= ?", [now(), (float)$plan['activation_bv']]);
+
+        /* 5) wallet balances = the complete ledger */
+        q("UPDATE users u SET wallet_balance =
+             (SELECT COALESCE(SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE -t.amount END), 0)
+              FROM wallet_transactions t WHERE t.user_id = u.id)");
+
+        $stats['commissions'] = (int)q_val("SELECT COUNT(*) FROM commissions") - $kept;
+        $stats['earned'] = (float)q_val(
+            "SELECT COALESCE(SUM(amount),0) FROM commissions
+             WHERE type IN ('sponsor','binary','level','sponsor_matching','rank','car_fund','award')");
+        $stats['members'] = (int)q_val("SELECT COUNT(*) FROM users WHERE total_earned > 0");
+        $stats['points'] = (int)q_val("SELECT COALESCE(SUM(reward_points), 0) FROM users");
+        $stats['seconds'] = round(microtime(true) - $t0, 1);
+    });
+
+    return [true, $stats];
 }
 
 /** Reject a pending order. */
 function reject_order($orderId, $adminId, $reason)
 {
-    return db_tx(function () use ($orderId, $adminId, $reason) {
-        lock_network_mutation();
-        $order = q_row("SELECT * FROM orders WHERE id = ? FOR UPDATE", [$orderId]);
-        if (!$order) { return [false, 'Order not found.']; }
-        if ($order['status'] !== 'pending') { return [false, 'Only pending orders can be rejected.']; }
-        if ($order['payment_mode'] === 'wallet' && $order['payment_status'] === 'paid') {
-            credit_wallet($order['user_id'], (float)$order['total_dp'], 'refund', $order['id'],
-                'Refund for rejected order ' . $order['order_no']);
-        }
-        q("UPDATE orders SET status = 'rejected', remark = ?, approved_by = ?, approved_at = ? WHERE id = ?",
-          [$reason, $adminId, now(), $orderId]);
-        return [true, 'Order rejected.'];
-    });
+    $order = q_row("SELECT * FROM orders WHERE id = ? FOR UPDATE", [$orderId]);
+    if (!$order) {
+        return [false, 'Order not found.'];
+    }
+    if ($order['status'] !== 'pending') {
+        return [false, 'Only pending orders can be rejected.'];
+    }
+    // refund wallet payment if it was paid from wallet
+    if ($order['payment_mode'] === 'wallet' && $order['payment_status'] === 'paid') {
+        credit_wallet($order['user_id'], (float)$order['total_dp'], 'refund', $order['id'],
+            'Refund for rejected order ' . $order['order_no']);
+    }
+    q("UPDATE orders SET status = 'rejected', remark = ?, approved_by = ?, approved_at = ? WHERE id = ?",
+      [$reason, $adminId, now(), $orderId]);
+    return [true, 'Order rejected.'];
 }
 
 /* ------------------------------------------------------------------ */
@@ -658,7 +1008,6 @@ function request_payout($userId, $amount)
         return [false, 'Minimum payout amount is ' . money_txt($plan['payout_min']) . '.'];
     }
     $u = q_row("SELECT * FROM users WHERE id = ?", [$userId]);
-    if (!$u || $u['status'] !== 'active') { return [false, 'This member account is not available for payout.']; }
     /* payout is only done when KYC and bank details are completed */
     if ($u['kyc_status'] !== 'verified') {
         return [false, 'Your KYC is not completed yet — the payout cannot be done. Please complete your KYC.'];
@@ -671,23 +1020,12 @@ function request_payout($userId, $amount)
      * member's payout */
     $eligible = payout_eligible_amount($userId);
     if ($amount > $eligible) {
-        return [false, 'Amount exceeds your eligible payout income (' . money_txt($eligible) . '). Only Direct Sponsor Income, Matching Income, Direct Sponsor Matching Bonus and Rank Rewards are payable.'];
+        return [false, 'Amount exceeds your eligible payout income (' . money_txt($eligible) . '). Only Direct Sponsor Leg Income (₹300 left / right), First Matching Pair (₹450), Direct Sponsor Matching Bonus (₹225) and Rank Rewards are payable.'];
     }
     if ($amount > (float)$u['wallet_balance']) {
         return [false, 'Amount exceeds your wallet balance.'];
     }
     return db_tx(function () use ($u, $amount, $plan) {
-        lock_network_mutation();
-        $plan = get_plan(true);
-        $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$u['id']]);
-        if (!$u || $u['status'] !== 'active') { return [false, 'This member account is not available for payout.']; }
-        if ($u['kyc_status'] !== 'verified' || trim((string)$u['bank_name']) === '' || trim((string)$u['bank_account_no']) === '' || trim((string)$u['bank_ifsc']) === '') {
-            return [false, 'Your KYC or bank details changed. Please review them before requesting payout.'];
-        }
-        if ($amount < (float)$plan['payout_min']) { return [false, 'The minimum payout amount changed.']; }
-        if ($amount > (float)$u['wallet_balance'] || $amount > payout_eligible_amount($u['id'])) {
-            return [false, 'Your available payout balance changed; please review it and try again.'];
-        }
         $tds   = round($amount * (float)$plan['tds_percent'] / 100, 2);
         $admin = round($amount * (float)$plan['admin_charge_percent'] / 100, 2);
         $net   = round($amount - $tds - $admin, 2);
@@ -705,8 +1043,8 @@ function request_payout($userId, $amount)
 
 /**
  * Amount currently eligible for payout: the three plan incomes —
- * Direct Sponsor Income, Matching
- * Income (₹450 for each qualifying pair) and the Direct Sponsor Matching Bonus —
+ * Direct Sponsor Leg Income (₹300 once per leg), the first Matching
+ * Pair Income (₹450) and the Direct Sponsor Matching Bonus (₹225) —
  * PLUS the Rank Rewards credited for rank achievements, minus payouts
  * already generated / paid. Car fund, award rewards and level income do
  * not exist. Manual entries are not added to a member's payout either.
@@ -748,20 +1086,19 @@ function payout_eligible_amount($userId, $upto = null)
  */
 function generate_payout_report()
 {
+    $plan = get_plan();
     /* income is counted up to the last Saturday 11:59 PM (the completed
      * Sunday → Saturday week); the report is generated every Monday */
     $sat = date('Y-m-d', strtotime('last saturday'));
     $cut = $sat . ' 23:59:59';
+    $min = (float)$plan['payout_min'];
+    $tdsPct = (float)$plan['tds_percent'];
+    $admPct = (float)$plan['admin_charge_percent'];
 
     $stats = ['created' => 0, 'blocked' => 0, 'skipped' => 0, 'total' => 0.0, 'net' => 0.0, 'statement_id' => 0];
     $runTs = null;
 
-    db_tx(function () use ($cut, &$stats, &$runTs) {
-        lock_network_mutation();
-        $plan = get_plan();
-        $min = (float)$plan['payout_min'];
-        $tdsPct = (float)$plan['tds_percent'];
-        $admPct = (float)$plan['admin_charge_percent'];
+    db_tx(function () use ($cut, $min, $tdsPct, $admPct, &$stats, &$runTs) {
         $cands = q_all(
             "SELECT u.id, u.username, u.full_name, u.mobile, u.wallet_balance, u.kyc_status,
                     u.bank_name, u.bank_account_no, u.bank_ifsc, u.bank_holder,
@@ -772,7 +1109,7 @@ function generate_payout_report()
                           AND created_at <= ? GROUP BY user_id) c ON c.user_id = u.id
              LEFT JOIN (SELECT user_id, SUM(amount) AS taken FROM payouts
                         WHERE status IN ('pending','paid') GROUP BY user_id) p ON p.user_id = u.id
-             WHERE u.status = 'active' FOR UPDATE",
+             WHERE u.status = 'active'",
             [$cut]);
         $runTs = now();
 
@@ -838,10 +1175,8 @@ function generate_payout_report()
               [$u['id'], $no, $amount, $tds, $adm, $net,
                $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'], $runTs]);
             $pid = (int)db()->lastInsertId();
-            if (debit_wallet($u['id'], $amount, 'payout', $pid,
-                'Payout report ' . $no . ' (' . date('d M Y', strtotime($cut)) . ')') === null) {
-                throw new RuntimeException('Payout wallet balance changed; the report was not generated.');
-            }
+            debit_wallet($u['id'], $amount, 'payout', $pid,
+                'Payout report ' . $no . ' (' . date('d M Y', strtotime($cut)) . ')');
 
             q("INSERT INTO payout_statement_rows
                (statement_id, user_id, username, full_name, mobile, bank_name, bank_account_no, bank_ifsc, bank_holder,
@@ -910,7 +1245,6 @@ function payout_report_rows($runTs)
 function process_payout($payoutId, $action, $adminId, $reason = '')
 {
     return db_tx(function () use ($payoutId, $action, $adminId, $reason) {
-        lock_network_mutation();
         $p = q_row("SELECT * FROM payouts WHERE id = ? FOR UPDATE", [$payoutId]);
         if (!$p) {
             return [false, 'Payout request not found.'];
