@@ -15,24 +15,30 @@ $items = q_all("SELECT * FROM order_items WHERE order_id = ?", [$id]);
 if (is_post()) {
     verify_csrf();
     $action = post_str('action');
-    if ($action === 'authorize_payment') {
-        if ($o['status'] !== 'pending' || $o['payment_status'] === 'paid') {
-            flash('error', 'Payment cannot be authorized for this order.');
-        } else {
-            q("UPDATE orders SET payment_status = 'paid' WHERE id = ?", [$id]);
-            flash('success', 'Payment authorized for ' . $o['order_no'] . '. You can now approve the order.');
+    try {
+        if ($action === 'authorize_payment') {
+            [$ok, $msg] = db_tx(function () use ($id) {
+                income_rules_ready(true);
+                $current = q_row("SELECT * FROM orders WHERE id = ? FOR UPDATE", [$id]);
+                if (!$current || $current['status'] !== 'pending' || $current['payment_status'] === 'paid') {
+                    return [false, 'Payment cannot be authorized for this order.'];
+                }
+                q("UPDATE orders SET payment_status = 'paid' WHERE id = ?", [$id]);
+                return [true, 'Payment authorized for ' . $current['order_no'] . '. You can now approve the order.'];
+            });
+            $ok ? flash('success', $msg) : flash('error', $msg);
+        } elseif ($action === 'approve') {
+            [$ok, $msg] = authorize_and_approve_order($id, $a['id']);
+            $ok ? flash('success', $msg) : flash('error', $msg);
+        } elseif ($action === 'reject') {
+            [$ok, $msg] = reject_order($id, $a['id'], post_str('reason'));
+            $ok ? flash('success', $msg) : flash('error', $msg);
         }
-        redirect('order_view.php?id=' . $id);
-    } elseif ($action === 'approve') {
-        /* one click: authorize the payment AND approve + deliver the order */
-        [$ok, $msg] = authorize_and_approve_order($id, $a['id']);
-        $ok ? flash('success', $msg) : flash('error', $msg);
-        redirect('order_view.php?id=' . $id);
-    } elseif ($action === 'reject') {
-        [$ok, $msg] = reject_order($id, $a['id'], post_str('reason'));
-        $ok ? flash('success', $msg) : flash('error', $msg);
-        redirect('order_view.php?id=' . $id);
+    } catch (Throwable $ex) {
+        error_log('Order operation failed: ' . $ex->getMessage());
+        flash('error', $ex instanceof PDOException ? 'Order operation failed; no changes were saved.' : $ex->getMessage());
     }
+    redirect('order_view.php?id=' . $id);
 }
 $commissions = q_all("SELECT c.*, u.username FROM commissions c JOIN users u ON u.id = c.user_id WHERE c.order_id = ? ORDER BY c.type", [$id]);
 
@@ -81,7 +87,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 Payment is authorized. The button below
             <?php endif; ?>
             approves and delivers the order, immediately crediting <b><?= e($o['total_bv']) ?> BV</b>
-            to the network and paying sponsor / level / binary matching commissions as per the MLM plan.
+            to the network and paying sponsor / binary matching / placement first-match commissions as per the MLM plan.
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
             <form method="post" class="inline-form" data-confirm="Authorize payment, approve and deliver this order? Commissions will be credited immediately.">

@@ -9,11 +9,16 @@ $plan = get_plan();
 if (is_post() && post_str('action') === 'request') {
     verify_csrf();
     $amount = (float)post_str('amount');
-    [$ok, $res] = request_payout($u['id'], $amount);
-    if ($ok) {
-        flash('success', 'Payout request submitted. You will be notified once processed.');
-    } else {
-        flash('error', $res);
+    try {
+        [$ok, $res] = request_payout($u['id'], $amount);
+        if ($ok) {
+            flash('success', 'Payout request submitted. You will be notified once processed.');
+        } else {
+            flash('error', $res);
+        }
+    } catch (Throwable $ex) {
+        error_log('Payout request failed: ' . $ex->getMessage());
+        flash('error', $ex instanceof PDOException ? 'Payout request failed; no funds were held.' : $ex->getMessage());
     }
     redirect('payout-balance.php');
 }
@@ -23,35 +28,11 @@ $bankComplete = trim((string)$u['bank_name']) !== '' && trim((string)$u['bank_ac
 $kycComplete = $u['kyc_status'] === 'verified';
 $myStatements = member_payout_statements($u['id']);
 $rows = q_all("SELECT * FROM payouts WHERE user_id = ? ORDER BY id DESC", [$u['id']]);
-$pendingHeld = (float)q_val("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE user_id = ? AND status = 'pending'", [$u['id']]);
 
-/* ---------------- the payout ledger ----------------
- * Weekly / reward closings credit the NET payout income of each
- * completed period; payment releases and held payout requests debit
- * the balance. */
-$ledger = [];
-foreach (payout_report_periods($u['id'], 'incentive') as $p) {
-    $ledger[] = ['date' => $p['to'], 'ord' => 1,
-        'desc' => 'BY WEEKLY PAYOUT CLOSING ON ' . dmy($p['to']), 'cr' => $p['net'], 'dr' => 0.0];
-}
-foreach (payout_report_periods($u['id'], 'reward') as $p) {
-    $ledger[] = ['date' => $p['to'], 'ord' => 1,
-        'desc' => 'BY REWARD PAYOUT CLOSING ON ' . dmy($p['to']), 'cr' => $p['net'], 'dr' => 0.0];
-}
-foreach (q_all("SELECT request_no, amount, status, paid_at, created_at FROM payouts
-                WHERE user_id = ? AND status IN ('paid','pending')", [$u['id']]) as $py) {
-    if ($py['status'] === 'paid') {
-        $ledger[] = ['date' => date('Y-m-d', strtotime($py['paid_at'] ?: $py['created_at'])), 'ord' => 2,
-            'desc' => 'BY WEEKLY PAYMENT RELEASE ON ' . dmy($py['paid_at'] ?: $py['created_at']), 'cr' => 0.0, 'dr' => (float)$py['amount']];
-    } else {
-        $ledger[] = ['date' => date('Y-m-d', strtotime($py['created_at'])), 'ord' => 2,
-            'desc' => 'PAYOUT REQUEST ' . $py['request_no'] . ' (HELD)', 'cr' => 0.0, 'dr' => (float)$py['amount']];
-    }
-}
-usort($ledger, function ($a, $b) { return [$a['date'], $a['ord']] <=> [$b['date'], $b['ord']]; });
-$bal = 0.0;
-foreach ($ledger as &$l) { $bal = round($bal + $l['cr'] - $l['dr'], 2); $l['bal'] = $bal; }
-unset($l);
+/* A gross entitlement view, distinct from the actual wallet ledger. */
+$entitlementLedger = payout_entitlement_ledger($u['id']);
+$ledger = $entitlementLedger['rows'];
+$bal = $entitlementLedger['balance'];
 
 $activeKey = 'payout-balance';
 $pageTitle = 'My Balance Payout';
@@ -65,7 +46,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
 <div class="stat-grid">
     <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(gross income credited)</span></div></div>
     <div class="stat-card gold"><div class="st-ico">✅</div><div><b><?= money($eligible) ?></b><span>Eligible for Payout<br>(before TDS + charges)</span></div></div>
-    <div class="stat-card teal"><div class="st-ico">⚖️</div><div><b><?= money($bal) ?></b><span>Payout Ledger Balance<br>(net of TDS + charges)</span></div></div>
+    <div class="stat-card teal"><div class="st-ico">⚖️</div><div><b><?= money($bal) ?></b><span>Gross entitlement balance<br>(before deductions)</span></div></div>
     <div class="stat-card red"><div class="st-ico">🏦</div><div><b><?= money($u['total_withdrawn']) ?></b><span>Total Withdrawn</span></div></div>
 </div>
 
@@ -80,15 +61,16 @@ $adminFee = (float)$plan['admin_charge_percent'];
 <?php endif; ?>
 
 <div class="card">
-    <div class="card-title">🧾 My Balance Payout</div>
+    <div class="card-title">🧾 Gross Payout Entitlement</div>
     <p class="form-hint" style="margin:4px 0 10px">
-        Your payout account: every completed week and reward period closes with its <b>net</b> payout income
-        (after <?= e($tds) ?>% TDS + <?= e($adminFee) ?>% admin charges); payment releases and held payout
-        requests reduce the balance.
+        Eligible gross commissions and corrections, including the current period, less the gross amount of
+        pending or paid requests. Rejected requests are excluded. This is a live eligibility view, not the
+        wallet ledger; purchases and non-payout income can make the wallet different. A negative balance
+        indicates prior payouts exceed current eligible income; the requestable amount is never below zero
+        and is also limited by your wallet. Actual deductions are shown in payout history and receipts.
     </p>
     <?php if (!$ledger): ?>
-        <div class="empty-state"><span class="es-ico">🧾</span>No payout balance yet. Weekly closings appear here
-            once your first completed week ends.</div>
+        <div class="empty-state"><span class="es-ico">🧾</span>No eligible income or payout requests yet.</div>
     <?php else: ?>
     <div class="table-wrap" style="box-shadow:none">
         <table class="table table-dt">
@@ -115,7 +97,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
     <div class="card">
         <div class="card-title">🏦 Request a Payout</div>
         <p style="font-size:12.5px;color:var(--ink-soft)">
-            Payable income = <b>Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225) + Rank Rewards</b>;
+            Payable income = <b>Direct Sponsor Income + Matching Pair Income + Placement Child First-Match Bonus + Rank Rewards</b>;
             rank achievements are credited to your wallet and are payable.
         </p>
         <?php if ($eligible < (float)$plan['payout_min']): ?>
@@ -168,8 +150,9 @@ $adminFee = (float)$plan['admin_charge_percent'];
 <div class="card">
     <div class="card-title">📊 My Weekly Payout Statements</div>
     <p class="form-hint" style="margin:6px 0 10px">The company generates the payout statement <b>every Monday</b>.
-        It lists every eligible member with the payout amounts, and whether the payout will be done
-        (KYC + bank details completed) or not.</p>
+        It lists eligible members and the amounts calculated at generation. A created request remains pending
+        until processed; its current status is shown below. For rows without a request, any shown deductions are
+        illustrative and were not applied.</p>
     <?php if (!$myStatements): ?>
         <div class="empty-state"><span class="es-ico">📊</span>No payout statements yet. Your weekly statement appears here
             once the company generates the weekly payout report and you are payout-eligible.</div>
@@ -192,12 +175,9 @@ $adminFee = (float)$plan['admin_charge_percent'];
                 <td><?= money($st['admin_charge']) ?></td>
                 <td><b><?= money($st['net']) ?></b></td>
                 <td>
-                    <?php if ((int)$st['payout_done']): ?>
-                        <?= badge('✔ Payout will be done', 'success') ?>
-                    <?php else: ?>
-                        <?= badge('✖ Payout will not be done', 'danger') ?><br>
-                        <small style="color:#000"><?= e($st['reason']) ?></small>
-                    <?php endif; ?>
+                    <?php [$statusLabel, $statusStyle] = payout_statement_status($st); ?>
+                    <?= badge($statusLabel, $statusStyle) ?>
+                    <?php if (!(int)$st['payout_done'] && $st['reason']): ?><br><small style="color:#000"><?= e($st['reason']) ?></small><?php endif; ?>
                 </td>
                 <td><a class="btn btn-outline btn-sm" href="receipt.php?statement=<?= (int)$st['id'] ?>">⬇ Receipt</a></td>
             </tr>

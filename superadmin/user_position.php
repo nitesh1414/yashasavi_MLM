@@ -2,8 +2,8 @@
 /** Change a member's position in the binary tree (super admin).
  *  Moves the member WITH their entire downline to the first free slot under
  *  the chosen target member + leg — the same spillover search used at
- *  registration. Sponsor, orders, wallets and paid commissions stay put;
- *  leg BV counters of the affected uplines are rebalanced automatically.
+ *  registration. Sponsor, orders and paid commissions stay put; affected
+ *  leg BV is rebalanced and newly formed eligible pairs may pay immediately.
  */
 require_once __DIR__ . '/../includes/init.php';
 $a = require_superadmin();
@@ -19,8 +19,13 @@ if (is_post()) {
     verify_csrf();
     $targetId = (int)post_str('target_id');
     $leg = post_str('leg') === 'R' ? 'R' : 'L';
-    [$ok, $msg] = move_user_position((int)$u['id'], $targetId, $leg, (int)$a['id']);
-    $ok ? flash('success', $msg) : flash('error', $msg);
+    try {
+        [$ok, $msg] = move_user_position((int)$u['id'], $targetId, $leg, (int)$a['id']);
+        $ok ? flash('success', $msg) : flash('error', $msg);
+    } catch (Throwable $ex) {
+        error_log('Placement move failed: ' . $ex->getMessage());
+        flash('error', $ex instanceof PDOException ? 'The move failed; no placement or financial data was changed.' : $ex->getMessage());
+    }
     redirect('user_view.php?id=' . (int)$u['id']);
 }
 
@@ -74,6 +79,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><b><?= $team ?></b> member<?= $team === 1 ? '' : 's' ?> (the whole downline)
                     <?= $teamBv > 0 ? ' carrying <b>' . number_format($teamBv, 0) . '</b> confirmed BV' : '' ?></td></tr>
             <tr><td>Sponsor (introducer)</td><td>Stays unchanged — only the position moves.</td></tr>
+            <tr><td>Income effect</td><td>Previously paid income is not reversed. Newly formed eligible pairs can credit income immediately; already processed pairs are not paid twice. Use the <a href="income_recalculate.php">historical preview</a> to review a full current-tree recalculation.</td></tr>
         </table>
     </div>
 

@@ -7,25 +7,30 @@ if (is_post()) {
     verify_csrf();
     $action = post_str('action');
     $id = (int)post_str('id');
-    if ($action === 'paid' || $action === 'reject') {
-        [$ok, $msg] = process_payout($id, $action, $a['id'], post_str('reason'));
-        $ok ? flash('success', $msg) : flash('error', $msg);
-    }
-    if ($action === 'generate') {
-        /* weekly payout report + statement — income counted up to the last
-         * Saturday 11:59 PM; generated only here at the Superadmin end */
-        [$ok, $runTs, $st] = generate_payout_report();
-        if (!$ok || (!$st['created'] && !$st['blocked'] && !$st['skipped'])) {
-            flash('warning', 'Weekly payout report: no eligible members found (eligible income = Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225) + Rank Rewards, minimum ' . money_txt(get_plan()['payout_min']) . ').');
-            redirect('payouts.php');
+    try {
+        if ($action === 'paid' || $action === 'reject') {
+            [$ok, $msg] = process_payout($id, $action, $a['id'], post_str('reason'));
+            $ok ? flash('success', $msg) : flash('error', $msg);
         }
-        flash('success',
-            'Weekly payout statement generated: ' . number_format($st['created']) . ' payout(s) '
-            . money_txt($st['total']) . ' gross → ' . money_txt($st['net']) . ' net'
-            . ($st['blocked'] ? ' · ' . number_format($st['blocked']) . ' member(s) listed as PAYOUT WILL NOT BE DONE (KYC / bank details incomplete)' : '')
-            . ($st['skipped'] ? ' · ' . number_format($st['skipped']) . ' skipped (wallet below minimum)' : '')
-            . '. Members now see the statement in their dashboard and can download the receipt.');
-        redirect('payouts.php?statement=' . (int)$st['statement_id']);
+        if ($action === 'generate') {
+            /* weekly payout report + statement — income counted up to the last
+             * Saturday 11:59 PM; generated only here at the Superadmin end */
+            [$ok, $runTs, $st] = generate_payout_report();
+            if (!$ok || (!$st['created'] && !$st['blocked'] && !$st['skipped'])) {
+                flash('warning', $st['error'] ?? ('Weekly payout report: no eligible members found (sponsor, matching, placement first-match and rank income; minimum ' . money_txt(get_plan()['payout_min']) . ').'));
+                redirect('payouts.php');
+            }
+            flash('success',
+                'Weekly payout statement generated: ' . number_format($st['created']) . ' payout(s) '
+                . money_txt($st['total']) . ' gross → ' . money_txt($st['net']) . ' net'
+                . ($st['blocked'] ? ' · ' . number_format($st['blocked']) . ' member(s) listed as PAYOUT WILL NOT BE DONE (KYC / bank details incomplete)' : '')
+                . ($st['skipped'] ? ' · ' . number_format($st['skipped']) . ' skipped (wallet below minimum)' : '')
+                . '. Members now see the statement in their dashboard and can download the receipt.');
+            redirect('payouts.php?statement=' . (int)$st['statement_id']);
+        }
+    } catch (Throwable $ex) {
+        error_log('Payout operation failed: ' . $ex->getMessage());
+        flash('error', $ex instanceof PDOException ? 'Payout operation failed; no changes were saved.' : $ex->getMessage());
     }
     redirect('payouts.php' . (get_str('status') ? '?status=' . urlencode(get_str('status')) : ''));
 }
@@ -48,7 +53,7 @@ if ($statement && get_str('download') !== '') {
                   $r['bank_name'], $r['bank_account_no'], $r['bank_ifsc'],
                   $r['kyc_status'], $r['bank_ok'] ? 'Completed' : 'Not completed',
                   $r['gross'], $r['tds'], $r['admin_charge'], $r['net'],
-                  $r['payout_done'] ? 'Payout will be done' : ($r['reason'] ?: 'Payout will not be done')];
+                  $r['payout_done'] ? payout_statement_status($r)[0] : ($r['reason'] ?: 'No payout created')];
     }
     output_csv('payout-statement-' . date('Ymd', strtotime($statement['run_ts'])) . '.csv',
         ['User ID', 'Name', 'Mobile', 'Bank Name', 'Account No', 'IFSC', 'KYC', 'Bank Details',
@@ -102,9 +107,9 @@ require __DIR__ . '/../includes/dash_header.php';
         Run this <b>every Monday</b>. Income is counted <b>up to the last Saturday 11:59 PM</b> — the completed
         <b>Sunday → Saturday</b> week. It creates the <b>weekly payout statement</b> listing every eligible
         member with amounts, KYC status and bank details. Members with <b>completed KYC + bank details</b>
-        get a pending payout (wallet debited) — <b>payout will be done</b>. Members with incomplete KYC or
-        bank details are listed as <b>payout will not be done</b> and keep their balance for the next week.
-        Eligible income = <b>Direct Sponsor Leg Income (₹300 L/R) + First Matching Pair (₹450) + Direct Sponsor Matching Bonus (₹225)</b> only, minimum
+        get a pending payout request (wallet debited); payment is a separate processing step. Members with incomplete KYC or
+        bank details have no request created and keep their balance for the next week.
+        Eligible income = <b>sponsor income + every matching pair + placement-child first-match bonuses + rank rewards</b>, minimum
         <?= money(get_plan()['payout_min']) ?>. <?= e(get_plan()['tds_percent']) ?>% TDS and
         <?= e(get_plan()['admin_charge_percent']) ?>% admin charge are deducted from the payout amount.
     </p>
@@ -163,28 +168,28 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= money($r['admin_charge']) ?></td>
                 <td><b><?= money($r['net']) ?></b></td>
                 <td>
-                    <?php if ((int)$r['payout_done']): ?>
-                        <?= badge('✔ Payout will be done', 'success') ?>
-                    <?php else: ?>
-                        <?= badge('✖ Payout will not be done', 'danger') ?>
+                    <?php [$statusLabel, $statusStyle] = payout_statement_status($r); ?>
+                    <?= badge($statusLabel, $statusStyle) ?>
+                    <?php if (!(int)$r['payout_done'] && $r['reason']): ?>
                         <br><small style="color:#000"><?= e($r['reason']) ?></small>
                     <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>
             <tr style="background:var(--soft,#f6f8f6)">
-                <th colspan="5">TOTAL (payouts done)</th>
+                <th colspan="5">TOTAL (requests created at generation)</th>
                 <th><?= money($statement['total_gross']) ?></th>
                 <th><?= money($statement['total_tds']) ?></th>
                 <th><?= money($statement['total_admin']) ?></th>
                 <th><?= money($statement['total_net']) ?></th>
-                <th><?= (int)$statement['members_done'] ?> done · <?= (int)$statement['members_blocked'] ?> not done</th>
+                <th><?= (int)$statement['members_done'] ?> created · <?= (int)$statement['members_blocked'] ?> not created</th>
             </tr>
         </table>
     </div>
     <p class="form-hint" style="margin-top:10px">
-        <?= (int)$statement['members_done'] ?> member(s) with completed KYC &amp; bank details — payout will be done.
-        <?= (int)$statement['members_blocked'] ? (int)$statement['members_blocked'] . ' member(s) — payout will not be done (complete KYC / bank details; the amount stays in the wallet for the next week).' : '' ?>
+        These totals record requests created when the statement was generated, not payments completed.
+        Individual request statuses above are current; blocked amounts were not held. Any deductions shown
+        on a row without a request are illustrative and were not applied.
     </p>
 </div>
 <?php endif; ?>
@@ -195,7 +200,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="table-wrap" style="box-shadow:none">
         <table class="table table-dt">
             <thead>
-                <tr><th>Statement</th><th>Week</th><th>Generated</th><th>Members</th><th>Gross</th><th>Net Paid</th><th>Not done</th><th></th></tr>
+                <tr><th>Statement</th><th>Week</th><th>Generated</th><th>Members</th><th>Gross requested</th><th>Net requested</th><th>Not created</th><th></th></tr>
             </thead>
             <tbody>
 <?php foreach ($recentStatements as $st): ?>
@@ -206,7 +211,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= (int)$st['members_done'] + (int)$st['members_blocked'] ?></td>
                 <td><?= money($st['total_gross']) ?></td>
                 <td><b><?= money($st['total_net']) ?></b></td>
-                <td><?= (int)$st['members_blocked'] ? badge((int)$st['members_blocked'] . ' will not be done', 'warning') : '—' ?></td>
+                <td><?= (int)$st['members_blocked'] ? badge((int)$st['members_blocked'] . ' not created', 'warning') : '—' ?></td>
                 <td><a class="btn btn-outline btn-sm" href="payouts.php?statement=<?= (int)$st['id'] ?>">View Statement →</a></td>
             </tr>
             <?php endforeach; ?>

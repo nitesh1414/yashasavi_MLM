@@ -11,6 +11,7 @@ if (is_post()) {
     $errors = [];
     if (!password_verify($current, $u['password'])) { $errors[] = 'Current password is incorrect.'; }
     if ($e = strong_password_error($new)) { $errors[] = $e; }
+    if ($new === $current) { $errors[] = 'The new password must differ from the current password.'; }
     if ($new !== $new2) { $errors[] = 'New passwords do not match.'; }
     if ($errors) {
         foreach ($errors as $er) { flash('error', $er); }

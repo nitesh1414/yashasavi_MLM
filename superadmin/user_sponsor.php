@@ -28,64 +28,53 @@ if (is_post()) {
             redirect('user_sponsor.php');
         }
 
-        $changed = [];
-        $skipped = [];
-        foreach ($ids as $id) {
-            $u = q_row("SELECT * FROM users WHERE id = ?", [$id]);
-            if (!$u) {
-                $skipped[] = [$id, 'member not found'];
-                continue;
-            }
-            if ((int)$u['id'] === (int)$sponsor['id']) {
-                $skipped[] = [$u['username'], 'the member is the new sponsor'];
-                continue;
-            }
-            if ((int)$u['sponsor_id'] === (int)$sponsor['id']) {
-                $skipped[] = [$u['username'], 'already has this sponsor'];
-                continue;
-            }
-            /* the new sponsor must not be in the member's downline */
-            if (strpos($sponsor['path'], $u['path']) === 0) {
-                $skipped[] = [$u['username'], 'the new sponsor is in this member\'s downline'];
-                continue;
-            }
-            /* the member must not appear in the new sponsor's sponsor chain (sponsor cycle) */
-            $cycle = false;
-            $sid = (int)$sponsor['id'];
-            for ($i = 0; $i < 100; $i++) {
-                $row = $sid ? q_row("SELECT id, sponsor_id FROM users WHERE id = ?", [$sid]) : null;
-                if (!$row) { break; }
-                if ((int)$row['id'] === (int)$u['id']) { $cycle = true; break; }
-                $sid = (int)$row['sponsor_id'];
-            }
-            if ($cycle) {
-                $skipped[] = [$u['username'], 'this member is in the new sponsor\'s sponsor chain (cycle)'];
-                continue;
-            }
-            q("UPDATE users SET sponsor_id = ? WHERE id = ?", [(int)$sponsor['id'], (int)$u['id']]);
-            $changed[] = $u['username'];
+        try {
+            [$changed, $skipped] = db_tx(function () use ($ids, $sponsor) {
+                income_rules_ready(true); // coordinate with orders and reconciliation
+                $lockedSponsor = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [(int)$sponsor['id']]);
+                if (!$lockedSponsor || $lockedSponsor['status'] !== 'active') {
+                    throw new RuntimeException('The chosen sponsor is no longer active.');
+                }
+                $changed = []; $skipped = [];
+                foreach ($ids as $id) {
+                    $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$id]);
+                    if (!$u) { $skipped[] = [$id, 'member not found']; continue; }
+                    if ((int)$u['id'] === (int)$lockedSponsor['id']) { $skipped[] = [$u['username'], 'the member is the new sponsor']; continue; }
+                    if ((int)$u['sponsor_id'] === (int)$lockedSponsor['id']) { $skipped[] = [$u['username'], 'already has this sponsor']; continue; }
+                    // Sponsorship is independent of placement, but sponsor cycles are invalid.
+                    $sid = (int)$lockedSponsor['id']; $seen = []; $cycle = false;
+                    while ($sid > 0) {
+                        if ($sid === (int)$u['id'] || isset($seen[$sid])) { $cycle = true; break; }
+                        $seen[$sid] = true;
+                        $chainRow = q_row("SELECT id, sponsor_id FROM users WHERE id = ?", [$sid]);
+                        if (!$chainRow) { $cycle = true; break; }
+                        $sid = (int)$chainRow['sponsor_id'];
+                    }
+                    if ($cycle) { $skipped[] = [$u['username'], 'the change would create or join an invalid sponsor chain']; continue; }
+                    q("UPDATE users SET sponsor_id = ? WHERE id = ?", [(int)$lockedSponsor['id'], (int)$u['id']]);
+                    $changed[] = $u['username'];
+                }
+                return [$changed, $skipped];
+            });
+        } catch (Throwable $ex) {
+            error_log('Sponsor change failed: ' . $ex->getMessage());
+            flash('error', $ex instanceof PDOException ? 'Sponsor change failed; no changes were saved.' : $ex->getMessage());
+            redirect('user_sponsor.php');
         }
-
         if ($changed) {
-            /* rebuild every member's income from the order history so the
-             * commission goes to the NEW sponsor from the beginning */
-            [$ok, $st] = recalculate_all_incomes();
-            $msg = 'Sponsor changed to <b>' . e($sponsor['username']) . '</b> for ' . count($changed) . ' member(s): '
-                 . e(implode(', ', $changed)) . '. '
-                 . 'All incomes were recalculated from the order history (' . number_format($st['orders']) . ' orders replayed, '
-                 . number_format($st['commissions']) . ' payout income entries rebuilt — ₹' . number_format($st['earned'], 2) . ').';
+            $msg = 'Sponsor changed to ' . $sponsor['username'] . ' for ' . count($changed) . ' member(s): '
+                 . implode(', ', $changed) . '. Existing earnings and pending events were not rewritten. '
+                 . 'Use the historical income preview if past income should follow the new sponsor.';
             if ($skipped) {
-                $msg .= ' Skipped: ';
                 $parts = [];
-                foreach ($skipped as $sk) { $parts[] = e($sk[0]) . ' (' . e($sk[1]) . ')'; }
-                $msg .= implode(', ', $parts) . '.';
+                foreach ($skipped as $sk) { $parts[] = $sk[0] . ' (' . $sk[1] . ')'; }
+                $msg .= ' Skipped: ' . implode(', ', $parts) . '.';
             }
             flash(count($skipped) ? 'warning' : 'success', $msg);
         } else {
-            $msg = 'No member was changed. ';
             $parts = [];
-            foreach ($skipped as $sk) { $parts[] = e($sk[0]) . ' (' . e($sk[1]) . ')'; }
-            flash('error', $msg . ($parts ? 'Skipped: ' . implode(', ', $parts) . '.' : ''));
+            foreach ($skipped as $sk) { $parts[] = $sk[0] . ' (' . $sk[1] . ')'; }
+            flash('error', 'No member was changed. ' . ($parts ? 'Skipped: ' . implode(', ', $parts) . '.' : ''));
         }
         redirect('user_sponsor.php');
     }
@@ -125,10 +114,10 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
         <p style="font-size:13px;color:var(--ink-soft)">
             Select <b>any number of members</b> below and enter the <b>new sponsor</b> — all selected members will be
-            moved to that sponsor. After the change, <b>all incomes are recalculated</b> from the full order history,
-            so the direct sponsor leg income (₹300 L/R) and the direct sponsor matching bonus (₹225) go to the
-            <b>new</b> sponsor from the beginning. The <b>position in the tree does not change</b> — only the sponsor.
-            Use the search box and the column filters to find members quickly.
+            assigned to that sponsor. Their <b>position in the tree does not change</b>.
+            Existing earnings and pending events remain with the original sponsor; future qualifying referrals use the sponsor at qualification.
+            To change past income using the new sponsor, review the separate <a href="income_recalculate.php">historical income preview</a>.
+            First-match bonuses follow placement, not sponsorship.
         </p>
         <div class="filter-form" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
             <div class="form-group" style="margin:0">
@@ -141,7 +130,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <input class="form-control" type="text" name="sponsor" value="<?= e(post_str('sponsor')) ?>" placeholder="e.g. YSH100005" required style="min-width:180px">
             </div>
             <button class="btn btn-primary" type="submit"
-                    data-confirm="Change the sponsor of ALL selected members and recalculate every member's income from the order history?">
+                    data-confirm="Change the sponsor of ALL selected members? Existing income will not be recalculated automatically.">
                 🔗 Change Sponsor of Selected Members
             </button>
         </div>

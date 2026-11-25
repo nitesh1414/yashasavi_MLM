@@ -7,14 +7,19 @@ $earn = user_earnings_breakdown($u['id']);
 $teamCounts = team_counts($u);
 $rank = $u['rank_id'] ? q_row("SELECT * FROM ranks WHERE id = ?", [$u['rank_id']]) : null;
 $directs = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ?", [$u['id']]);
-$directActive = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ? AND is_active = 1", [$u['id']]);
 $plan = get_plan();
-$pairUnits = floor(min((float)$u['left_bv'], (float)$u['right_bv']) / max(1, (float)$plan['pair_unit_bv']));
-$carry = max((float)$u['left_bv'], (float)$u['right_bv']) - min((float)$u['left_bv'], (float)$u['right_bv']);
+$directActive = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ? AND status = 'active'
+                            AND (is_active = 1 OR self_bv >= ?)", [$u['id'], $plan['activation_bv']]);
+$rulesReady = income_rules_ready();
+$matchingState = $rulesReady ? q_row("SELECT processed_bv FROM income_matching_state WHERE user_id = ?", [$u['id']]) : null;
+$unmatchedLeft = $matchingState ? max(0, round((float)$u['left_bv'] - (float)$matchingState['processed_bv'], 2)) : null;
+$unmatchedRight = $matchingState ? max(0, round((float)$u['right_bv'] - (float)$matchingState['processed_bv'], 2)) : null;
 $announcements = q_all("SELECT * FROM announcements WHERE status='active' ORDER BY created_at DESC LIMIT 3");
-$latestStatement = q_row("SELECT s.*, r.payout_done, r.gross, r.tds, r.admin_charge, r.net, r.reason
+$latestStatement = q_row("SELECT s.*, r.payout_done, r.gross, r.tds, r.admin_charge, r.net, r.reason,
+                                 p.status AS payout_status
                           FROM payout_statement_rows r
                           JOIN payout_statements s ON s.id = r.statement_id
+                          LEFT JOIN payouts p ON p.id = r.payout_id AND p.user_id = r.user_id
                           WHERE r.user_id = ? ORDER BY s.id DESC LIMIT 1", [$u['id']]);
 $recentTx = q_all("SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY id DESC LIMIT 6", [$u['id']]);
 $recentOrders = q_all("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5", [$u['id']]);
@@ -25,7 +30,7 @@ require __DIR__ . '/_nav.php';
 require __DIR__ . '/../includes/dash_header.php';
 ?>
 
-<?php if (!$u['is_active']): ?>
+<?php if (!income_can_earn($u, $plan)): ?>
 <div class="alert alert-warning">
     ⚠️ Your account is <b>not activated</b> yet. Purchase products worth at least
     <b><?= e($plan['activation_bv']) ?> BV</b> (lifetime) from the <a href="shop.php"><b>Shop</b></a> to activate your
@@ -60,9 +65,11 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Left Team BV</td><td><b><?= bv($u['left_bv']) ?></b> &nbsp;<?= badge($teamCounts['L'] . ' members', 'info') ?></td></tr>
                 <tr><td>Right Team BV</td><td><b><?= bv($u['right_bv']) ?></b> &nbsp;<?= badge($teamCounts['R'] . ' members', 'info') ?></td></tr>
                 <tr><td>Self Purchase BV</td><td><b><?= bv($u['self_bv']) ?></b></td></tr>
-                <tr><td>Carry Forward (unmatched BV)</td><td><b><?= bv($carry) ?></b></td></tr>
-                <tr><td>Direct Referrals</td><td><b><?= $directs ?></b> (<?= $directActive ?> active)</td></tr>
-                <tr><td>Account Status</td><td><?= (int)$u['is_active'] ? badge('Active', 'success') : badge('Inactive', 'warning') ?></td></tr>
+                <tr><td>Unmatched team BV (left / right)</td><td><?php if ($matchingState): ?>
+                    <b><?= number_format($unmatchedLeft, 2) ?> / <?= number_format($unmatchedRight, 2) ?> BV</b>
+                    <?php else: ?><?= $rulesReady ? 'Unavailable — contact support' : 'Available after income review' ?><?php endif; ?></td></tr>
+                <tr><td>Direct Referrals</td><td><b><?= $directs ?></b> (<?= $directActive ?> earning eligible)</td></tr>
+                <tr><td>Earning Status</td><td><?= income_can_earn($u, $plan) ? badge('Eligible', 'success') : badge('Not yet eligible', 'warning') ?></td></tr>
                 <tr><td>KYC Status</td><td><?= status_badge($u['kyc_status']) ?></td></tr>
                 <tr><td>Total Withdrawn</td><td><b><?= money($u['total_withdrawn']) ?></b></td></tr>
             </table>
@@ -108,22 +115,23 @@ require __DIR__ . '/../includes/dash_header.php';
         <div class="card">
             <div class="card-title">💹 Income Breakdown</div>
             <table class="kv-table" style="width:100%">
-                <tr><td>Direct Sponsor Leg Income (₹300 L + ₹300 R)</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
-                <tr><td>Matching Pair Income (first pair ₹450)</td><td><b><?= money($earn['binary']) ?></b></td></tr>
-                <tr><td>Direct Sponsor Matching Bonus (₹225)</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
+                <tr><td>Direct Sponsor Income</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
+                <tr><td>Matching Pair Income</td><td><b><?= money($earn['binary']) ?></b></td></tr>
+                <tr><td>Placement Child First-Match Bonus</td><td><b><?= money($earn['sponsor_matching']) ?></b></td></tr>
                 <tr><td>Rank Rewards</td><td><b><?= money($earn['rank']) ?></b></td></tr>
-                <tr><td>Points — rank ladder (1 P = 3,000 BV left + right)</td><td><b><?= number_format((float)$u['reward_points']) ?> P</b></td></tr>
+                <tr><td>Points — rank ladder</td><td><b><?= number_format((float)$u['reward_points']) ?> P</b></td></tr>
                 <?php
                 $bal = (float)$u['wallet_balance'];
-                $tdsAmt = round($bal * (float)$plan['tds_percent'] / 100, 2);
-                $admAmt = round($bal * (float)$plan['admin_charge_percent'] / 100, 2);
+                $available = min(max(0, $bal), payout_eligible_amount($u['id']));
+                [$tdsAmt, $admAmt] = payout_deductions($available, $plan);
                 ?>
                 <tr><td><b>Wallet Balance (before deduction)</b></td><td><b><?= money($bal) ?></b></td></tr>
-                <tr><td>TDS (<?= e($plan['tds_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($tdsAmt) ?></b></td></tr>
-                <tr><td>Admin Charges (<?= e($plan['admin_charge_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($admAmt) ?></b></td></tr>
-                <tr><td><b>Net Payable After Deduction</b></td><td><b><?= money($bal - $tdsAmt - $admAmt) ?></b></td></tr>
+                <tr><td>Eligible gross, limited by wallet</td><td><b><?= money($available) ?></b></td></tr>
+                <tr><td>Estimated TDS (<?= e($plan['tds_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($tdsAmt) ?></b></td></tr>
+                <tr><td>Estimated admin charge (<?= e($plan['admin_charge_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($admAmt) ?></b></td></tr>
+                <tr><td><b>Estimated net on that gross</b></td><td><b><?= money($available - $tdsAmt - $admAmt) ?></b></td></tr>
             </table>
-            <p class="form-hint" style="margin-top:8px">Your wallet balance is shown <b>before deduction</b>. TDS <?= e($plan['tds_percent']) ?>% + Admin <?= e($plan['admin_charge_percent']) ?>% are deducted from the payout amount when the payout is generated.</p>
+            <p class="form-hint" style="margin-top:8px">This is an illustration using current rates, not a payout or a guarantee. Requests also require the minimum amount, active status, KYC and bank details. Actual deductions are recorded when a payout is created.</p>
             <a class="btn btn-outline btn-sm mt-2" href="earnings.php">Full Statement →</a>
         </div>
 
@@ -133,8 +141,8 @@ require __DIR__ . '/../includes/dash_header.php';
             $bvLogs = q_all("SELECT * FROM bv_logs WHERE user_id = ? ORDER BY id DESC LIMIT 6", [$u['id']]);
             $ptLogs = q_all("SELECT * FROM points_logs WHERE user_id = ? ORDER BY id DESC LIMIT 3", [$u['id']]);
             $logs = [];
-            foreach ($ptLogs as $p) { $logs[] = ['d' => $p['created_at'], 't' => 'point', 'txt' => '+' . (int)$p['points'] . ' points (total ' . number_format((int)$p['total_points']) . ' P) — L ' . bv($p['left_bv']) . ' / R ' . bv($p['right_bv'])]; }
-            foreach ($bvLogs as $b) { $logs[] = ['d' => $b['created_at'], 't' => $b['kind'], 'txt' => '+' . bv($b['bv']) . ' ' . $b['kind'] . ' BV (total ' . bv($b['balance_after']) . ')']; }
+            foreach ($ptLogs as $p) { $logs[] = ['d' => $p['created_at'], 't' => 'point', 'txt' => ((int)$p['points'] >= 0 ? '+' : '') . (int)$p['points'] . ' points (total ' . number_format((int)$p['total_points']) . ' P) — L ' . bv($p['left_bv']) . ' / R ' . bv($p['right_bv'])]; }
+            foreach ($bvLogs as $b) { $logs[] = ['d' => $b['created_at'], 't' => $b['kind'], 'txt' => ((float)$b['bv'] >= 0 ? '+' : '') . bv($b['bv']) . ' ' . $b['kind'] . ' (total ' . bv($b['balance_after']) . ')']; }
             usort($logs, function ($x, $y) { return strcmp($y['d'], $x['d']); });
             ?>
             <?php if (!$logs): ?>
@@ -168,13 +176,15 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Week</td><td><b><?= payout_statement_week_label($latestStatement) ?></b></td></tr>
                 <tr><td>Generated</td><td><?= dmy($latestStatement['run_ts'], true) ?></td></tr>
                 <tr><td>Payout amount (gross)</td><td><b><?= money($latestStatement['gross']) ?></b></td></tr>
-                <tr><td>TDS + Admin charges</td><td>− <?= money((float)$latestStatement['tds'] + (float)$latestStatement['admin_charge']) ?></td></tr>
-                <tr><td><b>Net payable</b></td><td><b><?= money($latestStatement['net']) ?></b></td></tr>
+                <tr><td>TDS + Admin at generation<?= (int)$latestStatement['payout_done'] ? '' : ' (illustrative)' ?></td><td>− <?= money((float)$latestStatement['tds'] + (float)$latestStatement['admin_charge']) ?></td></tr>
+                <tr><td><b>Net at generation</b></td><td><b><?= money($latestStatement['net']) ?></b></td></tr>
                 <tr><td>Payout status</td><td>
-                    <?php if ((int)$latestStatement['payout_done']): ?><?= badge('✔ Payout will be done', 'success') ?>
-                    <?php else: ?><?= badge('✖ Payout will not be done', 'danger') ?><br><small><?= e($latestStatement['reason']) ?></small><?php endif; ?>
+                    <?php [$statusLabel, $statusStyle] = payout_statement_status($latestStatement); ?>
+                    <?= badge($statusLabel, $statusStyle) ?>
+                    <?php if (!(int)$latestStatement['payout_done'] && $latestStatement['reason']): ?><br><small><?= e($latestStatement['reason']) ?></small><?php endif; ?>
                 </td></tr>
             </table>
+            <?php if (!(int)$latestStatement['payout_done']): ?><p class="form-hint">No request was created; any displayed deductions were not applied.</p><?php endif; ?>
             <a class="btn btn-outline btn-sm mt-2" href="payout.php">All statements →</a>
         </div>
         <?php endif; ?>

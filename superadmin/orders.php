@@ -7,13 +7,18 @@ if (is_post()) {
     verify_csrf();
     $action = post_str('action');
     $id = (int)post_str('id');
-    if ($action === 'approve') {
-        /* one click: authorize the payment AND approve + deliver the order */
-        [$ok, $msg] = authorize_and_approve_order($id, $a['id']);
-        $ok ? flash('success', $msg) : flash('error', $msg);
-    } elseif ($action === 'reject') {
-        [$ok, $msg] = reject_order($id, $a['id'], post_str('reason'));
-        $ok ? flash('success', $msg) : flash('error', $msg);
+    try {
+        if ($action === 'approve') {
+            /* one click: authorize the payment AND approve + deliver the order */
+            [$ok, $msg] = authorize_and_approve_order($id, $a['id']);
+            $ok ? flash('success', $msg) : flash('error', $msg);
+        } elseif ($action === 'reject') {
+            [$ok, $msg] = reject_order($id, $a['id'], post_str('reason'));
+            $ok ? flash('success', $msg) : flash('error', $msg);
+        }
+    } catch (Throwable $ex) {
+        error_log('Order operation failed: ' . $ex->getMessage());
+        flash('error', $ex instanceof PDOException ? 'Order operation failed; no changes were saved.' : $ex->getMessage());
     }
     redirect('orders.php' . (get_str('status') ? '?status=' . urlencode(get_str('status')) : ''));
 }

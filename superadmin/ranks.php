@@ -16,30 +16,43 @@ if (is_post()) {
         $errors = [];
         if (strlen($name) < 2) { $errors[] = 'Rank name required.'; }
         if ($minPoints < 0) { $errors[] = 'Points cannot be negative.'; }
-        if (q_val("SELECT COUNT(*) FROM ranks WHERE name = ? AND id != ?", [$name, $editId])) { $errors[] = 'Rank name already exists.'; }
-        if ($errors) {
-            foreach ($errors as $er) { flash('error', $er); }
-        } else {
-            $badgeSlug = strtolower(str_replace(' ', '-', $name));
-            if ($editId) {
-                q("UPDATE ranks SET name=?, min_points=?, reward_amount=?, badge=?, sort_order=? WHERE id=?",
-                  [$name, $minPoints, $reward, $badgeSlug, $sort, $editId]);
-                flash('success', 'Rank updated.');
-            } else {
-                q("INSERT INTO ranks (name, min_points, reward_amount, badge, sort_order)
-                   VALUES (?, ?, ?, ?, ?)", [$name, $minPoints, $reward, $badgeSlug, $sort]);
-                flash('success', 'Rank created.');
+        if (!is_finite($reward) || $reward < 0 || $reward > 9999999999.99) { $errors[] = 'Rank reward is outside the allowed range.'; }
+        if (!$errors) {
+            try {
+                db_tx(function () use ($name, $minPoints, $reward, $sort, $editId) {
+                    income_rules_ready(true); // serialize with rank awards and reconciliation
+                    if (q_val("SELECT COUNT(*) FROM ranks WHERE name = ? AND id != ?", [$name, $editId])) {
+                        throw new RuntimeException('Rank name already exists.');
+                    }
+                    $badgeSlug = strtolower(str_replace(' ', '-', $name));
+                    if ($editId) {
+                        q("UPDATE ranks SET name=?, min_points=?, reward_amount=?, badge=?, sort_order=? WHERE id=?",
+                          [$name, $minPoints, $reward, $badgeSlug, $sort, $editId]);
+                    } else {
+                        q("INSERT INTO ranks (name, min_points, reward_amount, badge, sort_order)
+                           VALUES (?, ?, ?, ?, ?)", [$name, $minPoints, $reward, $badgeSlug, $sort]);
+                    }
+                });
+                flash('success', $editId ? 'Rank updated.' : 'Rank created.');
+                redirect('ranks.php');
+            } catch (Throwable $ex) {
+                error_log('Rank update failed: ' . $ex->getMessage());
+                $errors[] = $ex instanceof PDOException ? 'Rank update failed; no changes were saved.' : $ex->getMessage();
             }
-            redirect('ranks.php');
         }
+        foreach ($errors as $er) { flash('error', $er); }
     } elseif ($action === 'delete') {
         $id = (int)post_str('id');
-        $inUse = (int)q_val("SELECT COUNT(*) FROM users WHERE rank_id = ?", [$id]);
-        if ($inUse) {
-            flash('error', 'Rank is held by ' . $inUse . ' user(s) — cannot delete.');
-        } else {
-            q("DELETE FROM ranks WHERE id = ?", [$id]);
+        try {
+            db_tx(function () use ($id) {
+                income_rules_ready(true);
+                $inUse = (int)q_val("SELECT COUNT(*) FROM users WHERE rank_id = ?", [$id]);
+                if ($inUse) { throw new RuntimeException('Rank is held by ' . $inUse . ' user(s) — cannot delete.'); }
+                q("DELETE FROM ranks WHERE id = ?", [$id]);
+            });
             flash('success', 'Rank deleted.');
+        } catch (Throwable $ex) {
+            flash('error', $ex instanceof PDOException ? 'Rank could not be deleted.' : $ex->getMessage());
         }
         redirect('ranks.php');
     }
@@ -47,7 +60,7 @@ if (is_post()) {
 
 $editRank = $editId ? q_row("SELECT * FROM ranks WHERE id = ?", [$editId]) : null;
 $ranks = q_all("SELECT r.*, (SELECT COUNT(*) FROM users u WHERE u.rank_id = r.id) AS holders
-                FROM ranks r ORDER BY r.min_team_bv, r.id");
+                FROM ranks r ORDER BY r.min_points ASC, r.id ASC");
 
 $activeKey = 'ranks';
 $pageTitle = 'Ranks';
@@ -86,7 +99,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 </tbody>
                 </table>
         </div>
-        <p class="form-hint">1 point = 3,000 BV left + 3,000 BV right (matched pair). Ranks are re-checked automatically whenever points grow; the one-time cash reward is paid as wallet income on promotion (never part of the payout commission).</p>
+        <p class="form-hint">Points are awarded per eligible matched pair at the configured rate. Ranks are re-checked whenever points grow; the one-time cash reward is credited to the wallet and is eligible for payout.</p>
     </div>
 
     <div class="card">
@@ -100,7 +113,7 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
             <div class="form-grid3">
                 <div class="form-group">
-                    <label>Points Required (1 point = 3,000 BV left + 3,000 BV right)</label>
+                    <label>Points Required</label>
                     <input class="form-control" type="number" min="0" name="min_points" value="<?= (int)($editRank['min_points'] ?? 0) ?>">
                 </div>
                 <div class="form-group">

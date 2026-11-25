@@ -165,7 +165,7 @@ function seed_data()
         // title, subtitle, description, image, btn_text, btn_link
         ['100% Natural • No Preservatives', 'Health • Wealth • Wellness', 'Discover the authentic power of Ayurveda with the premium Yashasavi Veda Herbals range — 16+ products for health, personal, home and agro care.', 'sliders/slide-1.jpg', 'Explore Products', 'products.php'],
         ['Your Dream, Your Better', 'Build Multiple Sources of Income', 'Retail income, direct sponsor income, binary matching income, cash rewards, car fund and much more — a proven plan from ₹3,000 up to ₹25 crore.', 'sliders/slide-2.jpg', 'View the Plan', 'opportunity.php'],
-        ['No Level Limit • Carry Forward', 'Unlimited Income Opportunity', 'Left-right carry forward business, no need to manage rank, daily capping ₹3,20,000 — simple, powerful and transparent.', 'sliders/slide-3.jpg', 'Join Now', 'register.php'],
+        ['No Level Limit • Carry Forward', 'Build Your Team', 'Left-right carry forward business and automatic points as eligible teams grow.', 'sliders/slide-3.jpg', 'Join Now', 'register.php'],
     ],
 
     /* Testimonials */

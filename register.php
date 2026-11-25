@@ -65,16 +65,20 @@ if (is_post()) {
     }
 
     if (!$errors) {
-        [$ok, $uid, $msg] = register_distributor($f);
+        $f['use_username_password'] = true;
+        try {
+            [$ok, $uid, $msg] = register_distributor($f);
+        } catch (Throwable $ex) {
+            error_log('Registration failed: ' . $ex->getMessage());
+            [$ok, $uid, $msg] = [false, 0, $ex instanceof PDOException ? 'Registration failed; no account was created.' : $ex->getMessage()];
+        }
         if ($ok) {
-            $u = q_row("SELECT username FROM users WHERE id = ?", [$uid]);
-            /* first-time password = the User ID; must be changed after first login */
-            q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
-              [password_hash($u['username'], PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
             /* PRG: show the login-details + welcome popup on the follow-up GET */
             $_SESSION['reg_popup'] = ['uid' => (int)$uid, 'self' => true];
             redirect('register.php');
         }
+        if (is_string($panImg)) { delete_upload($panImg); }
+        if (is_string($aadImg)) { delete_upload($aadImg); }
         $errors[] = $msg;
     }
 }

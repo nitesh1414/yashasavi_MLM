@@ -34,13 +34,15 @@ $admPct = rtrim(rtrim(number_format((float)$plan['admin_charge_percent'], 2, '.'
     <div class="card-title">
         🏆 Reward Payout Report (15 Days)
         <span class="right" style="font-size:11px;color:var(--ink-soft)">
-            Periods: 1st–15th &amp; 16th–month end · TDS <?= e($tdsPct) ?>% + Admin Charges <?= e($admPct) ?>%
+            Periods: 1st–15th &amp; 16th–month end · illustrative rates: TDS <?= e($tdsPct) ?>% + admin <?= e($admPct) ?>%
         </span>
     </div>
     <p class="form-hint" style="margin:4px 0 10px">
         Your reward income (cash rewards for rank achievements, car fund and royalty) for every completed
         15-day period. The running period (<b><?= e(dmy($curFrom)) ?> – <?= e(dmy($curTo)) ?></b>) closes on
-        <?= e(dmy($curTo)) ?> and appears here afterwards. Click <b>Statement</b> for the payout statement of a period.
+        <?= e(dmy($curTo)) ?> and appears here afterwards. Deductions and net amounts are <b>estimates using today's rates</b>,
+        not records of actual payouts. See <a href="payout-balance.php">payout history and receipts</a> for recorded amounts.
+        Click <b>Estimate</b> for a period breakdown; legacy reward types are not necessarily payout-eligible.
     </p>
 
     <?php if (!$rows): ?>
@@ -57,9 +59,9 @@ $admPct = rtrim(rtrim(number_format((float)$plan['admin_charge_percent'], 2, '.'
                     <th>Sr.No.</th><th>From Date</th><th>To Date</th>
                     <?php foreach ($map as [, $label]): ?><th><?= e($label) ?></th><?php endforeach; ?>
                     <th>Total Amount</th>
-                    <th>TDS (<?= e($tdsPct) ?>%)</th>
-                    <th>Admin Charges (<?= e($admPct) ?>%)</th>
-                    <th>Net Amount</th>
+                    <th>Est. TDS (<?= e($tdsPct) ?>%)</th>
+                    <th>Est. Admin (<?= e($admPct) ?>%)</th>
+                    <th>Est. Net</th>
                     <th></th>
                 </tr>
             </thead>
@@ -77,7 +79,7 @@ $admPct = rtrim(rtrim(number_format((float)$plan['admin_charge_percent'], 2, '.'
                 <td style="white-space:nowrap">
                     <button type="button" class="btn btn-primary btn-sm"
                             data-statement="<?= e($r['from'] . '|' . $r['to']) ?>" data-kind="reward"
-                            data-label="Period <?= e(dmy($r['from']) . ' – ' . dmy($r['to'])) ?>">Statement</button>
+                            data-label="Period <?= e(dmy($r['from']) . ' – ' . dmy($r['to'])) ?>">Estimate</button>
                 </td>
             </tr>
 <?php endforeach; ?>
@@ -91,9 +93,9 @@ $admPct = rtrim(rtrim(number_format((float)$plan['admin_charge_percent'], 2, '.'
             <span><?= e($label) ?>: <b><?= money_txt($tot[$pk]) ?></b></span>
         <?php endforeach; ?>
         <span>Gross: <b><?= money_txt($tot['gross']) ?></b></span>
-        <span>TDS: <b><?= money_txt($tot['tds']) ?></b></span>
-        <span>Admin Charges: <b><?= money_txt($tot['admin']) ?></b></span>
-        <span class="pt-net">Net Amount: <b><?= money_txt($tot['net']) ?></b></span>
+        <span>Est. TDS: <b><?= money_txt($tot['tds']) ?></b></span>
+        <span>Est. Admin: <b><?= money_txt($tot['admin']) ?></b></span>
+        <span class="pt-net">Est. Net: <b><?= money_txt($tot['net']) ?></b></span>
     </div>
     <?php endif; ?>
 </div>

@@ -12,11 +12,14 @@ if (is_post() && post_str('action') === 'adjust') {
     $target = q_row("SELECT * FROM users WHERE id = ?", [$userId]);
     if (!$target) {
         flash('error', 'User not found.');
-    } elseif ($amount <= 0) {
-        flash('error', 'Amount must be positive.');
+    } elseif (!is_finite($amount) || $amount <= 0) {
+        flash('error', 'Amount must be positive and finite.');
+    } elseif (!in_array($direction, ['credit', 'debit'], true)) {
+        flash('error', 'Choose a valid wallet adjustment direction.');
     } else {
         try {
             db_tx(function () use ($target, $amount, $direction, $note, $userId) {
+                income_rules_ready(true); // coordinate wallet edits with historical reconciliation
                 if ($direction === 'debit') {
                     $newBal = debit_wallet($userId, $amount, 'admin', null, $note);
                     if ($newBal === null) {
@@ -28,7 +31,8 @@ if (is_post() && post_str('action') === 'adjust') {
             });
             flash('success', 'Wallet ' . ($direction === 'debit' ? 'debited' : 'credited') . ' for ' . $target['username'] . '.');
         } catch (Throwable $tx) {
-            flash('error', $tx->getMessage() ?: 'Adjustment failed.');
+            error_log('Wallet adjustment failed: ' . $tx->getMessage());
+            flash('error', $tx instanceof PDOException ? 'Adjustment failed; no changes were saved.' : ($tx->getMessage() ?: 'Adjustment failed.'));
         }
     }
     redirect('wallets.php');

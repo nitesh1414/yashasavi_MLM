@@ -7,17 +7,13 @@ if (is_post()) {
     verify_csrf();
     $action = post_str('action');
     $id = (int)post_str('id');
-    $user = q_row("SELECT * FROM users WHERE id = ?", [$id]);
-    if ($user) {
-        if ($action === 'block') {
-            q("UPDATE users SET status='blocked' WHERE id = ?", [$id]);
-            flash('success', 'User ' . $user['username'] . ' blocked.');
-        } elseif ($action === 'unblock') {
-            q("UPDATE users SET status='active' WHERE id = ?", [$id]);
-            flash('success', 'User ' . $user['username'] . ' unblocked.');
-        } elseif ($action === 'activate') {
-            q("UPDATE users SET is_active = 1, activated_at = COALESCE(activated_at, ?) WHERE id = ?", [now(), $id]);
-            flash('success', 'User ' . $user['username'] . ' manually activated (can now earn commissions).');
+    if (in_array($action, ['block', 'unblock', 'activate'], true)) {
+        try {
+            [$ok, $message] = income_change_member_status($id, $action);
+            flash($ok ? 'success' : 'error', $message);
+        } catch (Throwable $ex) {
+            error_log('Member status change failed: ' . $ex->getMessage());
+            flash('error', $ex instanceof PDOException ? 'Member status could not be changed; no changes were saved.' : $ex->getMessage());
         }
     }
     redirect('users.php' . (get_str('q') ? '?q=' . urlencode(get_str('q')) : ''));

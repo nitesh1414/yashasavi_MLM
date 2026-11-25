@@ -19,8 +19,8 @@ super-admin MLM management console, in one self-contained PHP + MySQL codebase w
 - Binary genealogy tree viewer (re-root into your own downline)
 - Team lists (direct / full downline with search)
 - Shop with cart, wallet or bank-transfer checkout, order history & invoice view
-- Earnings breakdown (sponsor / binary / level / rank), wallet statement
-- Payout requests with live TDS + admin-charge + net preview
+- Earnings breakdown (sponsor / matching / placement first-match / rank), wallet statement
+- Payout requests with recorded TDS and admin deductions; current-rate estimates are labelled separately
 - Profile (personal / bank / KYC) and password management
 
 **CMS admin** (`admin/`)
@@ -38,31 +38,39 @@ super-admin MLM management console, in one self-contained PHP + MySQL codebase w
 - Commission ledger with filters + CSV export
 - Payouts: approve / reject (reject refunds the wallet), CSV export for the bank run
 - E-wallets: full transaction ledger + manual credit/debit adjustments
-- MLM plan settings (activation BV, sponsor %, binary % / fixed per pair, pair unit,
-  daily cap, carry-forward, level depth, TDS, admin charge, payout minimum) and
-  level percentages (1–10)
-- Rank ladder (team BV + active directs → one-time rewards), announcements,
-  staff accounts, business reports (top earners/sponsors/products, legs, 6-month trend)
+- MLM plan settings (joining BV, sponsor rate, pair unit and rate, placement first-match
+  percentage, points, TDS, admin charge and payout minimum)
+- Points-based rank ladder and one-time rank rewards, announcements, staff accounts and
+  business reports
+- Reviewed historical income/BV reconciliation with an audit trail and CSV exports
 
 ## The MLM engine
 
-| Income stream | Default |
+| Income stream | Fresh-install default |
 |---|---|
-| Activation | 100 BV lifetime self-purchase |
-| Direct sponsor bonus | 5% of order BV |
-| Level income (5 levels) | 5% / 3% / 2% / 1% / 1% of order BV |
-| Binary matching | 10% of matched BV, 1:1 units of 100 BV |
-| Daily cap / carry forward | ₹5,000 / unmatched BV carries forward |
-| Rank rewards | Silver → Crown Star (₹0 – ₹25,000 one-time) |
-| Payouts | min ₹500, TDS 5%, admin charge 5% |
+| Joining eligibility | 3,000 saved Self BV, or manual earning activation |
+| Direct sponsor bonus | ₹300 once per personally sponsored member completing joining BV |
+| Binary matching | ₹450 for each eligible 3,000 left + 3,000 right BV pair |
+| Placement first-match bonus | ₹225 once to the matched member's immediate placement parent |
+| Points and ranks | 1 point per eligible pair; one-time rewards at configured rank thresholds |
+| Payouts | ₹500 minimum, 5% TDS and 5% admin charge |
 
-Commissions are credited to e-wallets atomically (MySQL transactions) when an order is
-approved; binary legs, matched pairs, team BV, ranks and wallets are updated in the same
-transaction. All parameters above are editable from the Super Admin panel.
+Sponsor and placement relationships are independent. The sponsor receives the direct
+bonus; the immediate placement parent receives the first-match bonus. Matching does not
+require prior sponsor income. Unmatched BV and ineligible income can carry forward.
+The actual thresholds and rates are configurable, and existing installations retain
+their own settings. There is no automatic level income. The legacy `daily_cap` and
+`monthly_cap` fields are **not enforced** by this engine.
+
+Order approval updates BV, commissions and wallets in a transaction. A historical
+reconciliation instead projects current settings and relationships using saved Self BV,
+flags differences from approved-order BV and appends auditable corrections; it does not
+rewrite the original orders, payout records or financial ledgers. Review the safety and
+deployment procedure in [DATABASE_CHANGES.sql](DATABASE_CHANGES.sql) before use.
 
 ## Requirements
 
-- PHP **7.4+** (8.x ready) with `pdo_mysql`, `mbstring` (uses only standard extensions)
+- 64-bit PHP **7.4+** (8.x ready) with `pdo_mysql`, `mbstring` (uses only standard extensions)
 - MySQL **5.7+** / MariaDB 10.3+
 - Apache (or any web server) with `mod_rewrite` optional — pretty URLs work both ways
 
@@ -70,10 +78,14 @@ transaction. All parameters above are editable from the Super Admin panel.
 
 1. Upload the repository to your web root.
 2. Create an empty MySQL database (or let the installer create it).
-3. Browse to **`/install/`** and fill in the database details — tables, seed data
-   (10 products, 6 categories, 6 pages, sliders, testimonials, documents, MLM plan,
-   ranks) and demo media are installed automatically.
+3. Browse to **`/install/`** and fill in the database details — tables, reference
+   content, MLM plan, ranks and demo media are installed automatically.
 4. Delete the `install/` directory (or leave `install/install.lock` in place) when done.
+
+These instructions are for a **new, empty database only**. For an existing installation,
+never run the fresh installer or seed on production: rehearse with a restored staging
+copy and follow the maintenance, backup, SQL and review steps in
+[DATABASE_CHANGES.sql](DATABASE_CHANGES.sql).
 
 ## Default credentials (change after first login!)
 

@@ -90,7 +90,9 @@ if (is_post()) {
         }
 
         // create order
+        try {
         db_tx(function () use (&$orderNo, $items, $totalDp, $totalMrp, $totalBv, $paymentMode, $txnRef, $u, $shipName, $shipMobile, $shipAddress, $shipCity, $shipState, $shipPin) {
+            income_rules_ready(true); // serialize wallet purchases with reconciliation
             $orderNo = order_no();
             q("INSERT INTO orders (order_no, user_id, total_mrp, total_dp, total_bv, payment_mode, payment_status,
                txn_ref, status, ship_name, ship_mobile, ship_address, ship_city, ship_state, ship_pincode, created_at)
@@ -106,10 +108,17 @@ if (is_post()) {
                    $it['qty'], (float)$it['p']['dp'] * $it['qty'], (float)$it['p']['bv'] * $it['qty']]);
             }
             if ($paymentMode === 'wallet') {
-                debit_wallet($u['id'], $totalDp, 'purchase', $oid, 'Purchase payment for order ' . $orderNo);
+                if (debit_wallet($u['id'], $totalDp, 'purchase', $oid, 'Purchase payment for order ' . $orderNo) === null) {
+                    throw new RuntimeException('Wallet balance changed. Please review your cart and try again.');
+                }
             }
             return $oid;
         });
+        } catch (Throwable $ex) {
+            error_log('Checkout failed: ' . $ex->getMessage());
+            flash('error', $ex instanceof PDOException ? 'Checkout failed. Please try again.' : $ex->getMessage());
+            redirect('cart.php');
+        }
 
         $_SESSION['cart'] = [];
         if ($paymentMode === 'cash') {

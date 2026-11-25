@@ -25,8 +25,13 @@ if (is_post()) {
         q("UPDATE users SET kyc_status='rejected', kyc_remark=? WHERE id=?", [post_str('remark') ?: 'Rejected by admin', $id]);
         flash('success', 'KYC marked rejected.');
     } elseif ($action === 'activate') {
-        q("UPDATE users SET is_active=1, activated_at=COALESCE(activated_at, ?) WHERE id=?", [now(), $id]);
-        flash('success', 'User activated.');
+        try {
+            [$ok, $message] = income_change_member_status($id, 'activate');
+            flash($ok ? 'success' : 'error', $message);
+        } catch (Throwable $ex) {
+            error_log('Member activation failed: ' . $ex->getMessage());
+            flash('error', $ex instanceof PDOException ? 'Activation failed; no changes were saved.' : $ex->getMessage());
+        }
     }
     redirect('user_view.php?id=' . $id);
 }

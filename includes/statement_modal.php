@@ -99,7 +99,7 @@ $pageScripts = <<<JS
         document.body.appendChild(f);
         var d = f.contentDocument || f.contentWindow.document;
         d.open();
-        d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Payout Statement</title>'
+        d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Income Estimate</title>'
             + '<style>@page{size:A4;margin:12mm}@media print{body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>'
             + '</head><body style="margin:0">' + doc.outerHTML + '</body></html>');
         d.close();
@@ -138,10 +138,10 @@ JS;
 ?>
 <div class="stmodal" id="stModal" hidden>
     <div class="stmodal-backdrop" data-stclose></div>
-    <div class="stmodal-box" role="dialog" aria-modal="true" aria-label="Payout statement">
+    <div class="stmodal-box" role="dialog" aria-modal="true" aria-label="Income estimate">
         <div class="stmodal-head">
             <div class="stmodal-ht">
-                <div class="stmodal-title">🧾 Payout Statement</div>
+                <div class="stmodal-title">🧾 Income Estimate</div>
                 <div class="stmodal-sub" id="stModalSub"></div>
             </div>
             <div class="stmodal-actions">

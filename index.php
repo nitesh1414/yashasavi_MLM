@@ -153,9 +153,9 @@ require __DIR__ . '/includes/site_header.php';
         </div>
         <div class="income-grid">
             <div class="income-card"><div class="i-ico">🛍️</div><h3>Retail Income</h3><p>30% to 45% margin between DP and MRP.</p></div>
-            <div class="income-card"><div class="i-ico">🤝</div><h3>Leg Completion Income</h3><p>₹300 when your left leg completes 3,000 BV, ₹300 when your right leg completes 3,000 BV — once per leg.</p></div>
-            <div class="income-card"><div class="i-ico">🔁</div><h3>Binary Matching Income</h3><p>₹450 per 3000:3000 BV pair, with carry forward.</p></div>
-            <div class="income-card"><div class="i-ico">⚖️</div><h3>Sponsor Matching Income</h3><p>50% of the matching income earned by your directs.</p></div>
+            <div class="income-card"><div class="i-ico">🤝</div><h3>Direct Sponsor Income</h3><p>One sponsor bonus per qualifying personally sponsored member, regardless of placement.</p></div>
+            <div class="income-card"><div class="i-ico">🔁</div><h3>Binary Matching Income</h3><p>Income on every eligible left/right BV pair, with carry forward.</p></div>
+            <div class="income-card"><div class="i-ico">⚖️</div><h3>Placement First-Match Bonus</h3><p>One bonus when each immediate placement child earns their first matching pair.</p></div>
             <div class="income-card"><div class="i-ico">🏅</div><h3>Cash Rewards</h3><p>15 ranks — from Silver Star to Chairman (₹25 crore).</p></div>
             <div class="income-card"><div class="i-ico">🚗</div><h3>Car Fund</h3><p>₹1,50,000 car fund at 500 points.</p></div>
             <div class="income-card"><div class="i-ico">🏆</div><h3>Award Rewards</h3><p>Dinner set, mixer grinder, cash funds and more.</p></div>

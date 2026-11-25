@@ -11,15 +11,16 @@ if (!$st) {
 }
 /* own statement row only */
 $mine = q_row(
-    "SELECT * FROM payout_statement_rows WHERE statement_id = ? AND user_id = ?",
+    "SELECT r.*, p.status AS payout_status, p.paid_at AS payout_paid_at
+     FROM payout_statement_rows r
+     LEFT JOIN payouts p ON p.id = r.payout_id AND p.user_id = r.user_id
+     WHERE r.statement_id = ? AND r.user_id = ?",
     [$st['id'], $u['id']]
 );
 if (!$mine) {
     flash('error', 'This payout statement does not belong to your account.');
     redirect('payout.php');
 }
-$plan = get_plan();
-
 $activeKey = 'payout';
 $pageTitle = 'Payout Receipt #' . (int)$st['id'];
 require __DIR__ . '/_nav.php';
@@ -58,27 +59,29 @@ require __DIR__ . '/../includes/dash_header.php';
         <tr><td style="width:30%">Member ID</td><td><b><?= e($u['username']) ?></b></td></tr>
         <tr><td>Member Name</td><td><b><?= e($u['full_name']) ?></b></td></tr>
         <tr><td>Mobile</td><td><?= e($u['mobile']) ?></td></tr>
-        <tr><td>Bank Account</td><td><?= e($u['bank_name'] ?: '—') ?> · <?= e($u['bank_account_no'] ?: '—') ?> · <?= e($u['bank_ifsc'] ?: '—') ?></td></tr>
+        <tr><td>Bank Account at generation</td><td><?= e($mine['bank_name'] ?: '—') ?> · <?= e($mine['bank_account_no'] ?: '—') ?> · <?= e($mine['bank_ifsc'] ?: '—') ?></td></tr>
         <tr><td>KYC Status</td><td><?= $mine['kyc_status'] === 'verified' ? badge('Completed', 'success') : badge('Not completed', 'danger') ?></td></tr>
         <tr><td>Bank Details</td><td><?= (int)$mine['bank_ok'] ? badge('Completed', 'success') : badge('Not completed', 'danger') ?></td></tr>
     </table>
 
     <table class="table" style="width:100%">
         <tr><th>Description</th><th style="text-align:right">Amount</th></tr>
-        <tr><td>Payout amount (gross eligible income for the week)</td><td style="text-align:right"><b><?= money($mine['gross']) ?></b></td></tr>
-        <tr><td>TDS (<?= e($plan['tds_percent']) ?>%)</td><td style="text-align:right">− <?= money($mine['tds']) ?></td></tr>
-        <tr><td>Admin / processing charge (<?= e($plan['admin_charge_percent']) ?>%)</td><td style="text-align:right">− <?= money($mine['admin_charge']) ?></td></tr>
-        <tr style="background:var(--soft,#f6f8f4)"><th>NET PAYABLE</th><th style="text-align:right"><?= money($mine['net']) ?></th></tr>
+        <tr><td>Payout amount (gross available at the cutoff)</td><td style="text-align:right"><b><?= money($mine['gross']) ?></b></td></tr>
+        <tr><td>TDS amount recorded at generation</td><td style="text-align:right">− <?= money($mine['tds']) ?></td></tr>
+        <tr><td>Admin / processing amount recorded at generation</td><td style="text-align:right">− <?= money($mine['admin_charge']) ?></td></tr>
+        <tr style="background:var(--soft,#f6f8f4)"><th>NET AT GENERATION</th><th style="text-align:right"><?= money($mine['net']) ?></th></tr>
     </table>
 
     <div style="margin-top:16px">
-        <?php if ((int)$mine['payout_done']): ?>
-            <?= badge('✔ Payout will be done — transferred to your registered bank account', 'success') ?>
-        <?php else: ?>
-            <?= badge('✖ Payout will not be done', 'danger') ?>
+        <?php [$statusLabel, $statusStyle] = payout_statement_status($mine); ?>
+        <?= badge($statusLabel, $statusStyle) ?>
+        <?php if ($mine['payout_status'] === 'paid' && $mine['payout_paid_at']): ?>
+            <div style="margin-top:6px;font-size:13px">Marked paid on <?= e(dmy($mine['payout_paid_at'], true)) ?>.</div>
+        <?php elseif (!(int)$mine['payout_done']): ?>
             <div style="margin-top:6px;font-size:13px"><?= e($mine['reason']) ?>.
-                The amount stays in your wallet and is included again once your details are completed.</div>
+                No payout was created and the displayed deductions were not applied.</div>
         <?php endif; ?>
+        <div style="margin-top:6px;font-size:13px">Amounts above are the statement snapshot. The status reflects the linked request now.</div>
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:46px">

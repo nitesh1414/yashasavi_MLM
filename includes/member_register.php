@@ -146,16 +146,20 @@ function member_register_handle($opts)
         }
 
         if (!$errors) {
-            [$ok, $uid, $msg] = register_distributor($f);
+            $f['use_username_password'] = true;
+            try {
+                [$ok, $uid, $msg] = register_distributor($f);
+            } catch (Throwable $ex) {
+                error_log('Registration failed: ' . $ex->getMessage());
+                [$ok, $uid, $msg] = [false, 0, $ex instanceof PDOException ? 'Registration failed; no account was created.' : $ex->getMessage()];
+            }
             if ($ok) {
-                $nu = q_row("SELECT username, full_name FROM users WHERE id = ?", [$uid]);
-                /* first-time password = the User ID; must be changed after first login */
-                q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
-                  [password_hash($nu['username'], PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
                 /* PRG: show the login-details + welcome popup on the follow-up GET */
                 $_SESSION['reg_popup'] = ['uid' => (int)$uid, 'self' => false, 'redirect' => $opts['success_url']];
                 redirect(basename($_SERVER['SCRIPT_NAME'] ?? 'add-member.php'));
             }
+            if (is_string($panImg)) { delete_upload($panImg); }
+            if (is_string($aadImg)) { delete_upload($aadImg); }
             $errors[] = $msg;
         }
     } else {

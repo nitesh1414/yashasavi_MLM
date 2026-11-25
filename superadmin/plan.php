@@ -8,74 +8,70 @@ if (is_post()) {
     $tab = post_str('tab', 'main');
 
     if ($tab === 'main') {
+        // Validate against the actual v1.8.48 column ranges; zero is a valid
+        // commission rate, but the joining/pair units and payout minimum must
+        // remain positive. The matching select explicitly posts "0" or "1".
         $fields = [
-            'activation_bv' => 'float_pos',
-            'sponsor_percent' => 'float_pos',
-            'pair_unit_bv' => 'float_pos',
-            'binary_type' => 'enum:percent,fixed',
-            'binary_value' => 'float_pos',
-            'matching_requires_active' => 'bool',
-            'sponsor_matching_percent' => 'float_pos',
-            'points_per_unit' => 'int:0:1000',
-            'tds_percent' => 'float',
-            'admin_charge_percent' => 'float',
-            'payout_min' => 'float_pos',
+            'activation_bv' => ['positive', 9999999999.99],
+            'sponsor_percent' => ['nonnegative', 9999.99],
+            'pair_unit_bv' => ['positive', 9999999999.99],
+            'binary_value' => ['nonnegative', 99999999.99],
+            'sponsor_matching_percent' => ['nonnegative', 9999.99],
+            'tds_percent' => ['nonnegative', 100],
+            'admin_charge_percent' => ['nonnegative', 100],
+            'payout_min' => ['positive', 9999999999.99],
         ];
-        $updates = [];
-        $errors = [];
-        foreach ($fields as $key => $rule) {
-            $val = $_POST[$key] ?? null;
-            if ($val === null) { continue; }
-            if ($rule === 'bool') {
-                $updates[$key] = isset($_POST[$key]) ? 1 : 0;
-                continue;
-            }
-            if ($rule === 'float' || $rule === 'float_pos') {
-                $val = (float)$val;
-                if ($rule === 'float_pos' && $val <= 0) { $errors[] = ucfirst(str_replace('_', ' ', $key)) . ' must be greater than 0.'; continue; }
-                $updates[$key] = $val;
-            }
-            if (strpos($rule, 'enum:') === 0) {
-                $allowed = explode(',', substr($rule, 5));
-                $updates[$key] = in_array($val, $allowed, true) ? $val : $allowed[0];
-            }
-            if (strpos($rule, 'int:') === 0) {
-                [$_, $min, $max] = explode(':', $rule);
-                $val = max((int)$min, min((int)$max, (int)$val));
-                $updates[$key] = $val;
+        $updates = []; $errors = [];
+        foreach ($fields as $key => [$rule, $max]) {
+            if (!array_key_exists($key, $_POST)) { continue; }
+            $raw = $_POST[$key];
+            $val = is_scalar($raw) && is_numeric($raw) ? (float)$raw : NAN;
+            $val = round($val, 2);
+            if (!is_finite($val) || $val > $max || $val < 0 || ($rule === 'positive' && $val <= 0)) {
+                $errors[] = ucfirst(str_replace('_', ' ', $key)) . ' is outside the allowed range.';
+            } else { $updates[$key] = $val; }
+        }
+        if (isset($_POST['binary_type'])) {
+            if (!in_array($_POST['binary_type'], ['percent', 'fixed'], true)) { $errors[] = 'Invalid binary income type.'; }
+            else { $updates['binary_type'] = $_POST['binary_type']; }
+        }
+        if (isset($_POST['matching_requires_active'])) {
+            $choice = (string)$_POST['matching_requires_active'];
+            if (!in_array($choice, ['0', '1'], true)) { $errors[] = 'Invalid matching eligibility option.'; }
+            else { $updates['matching_requires_active'] = (int)$choice; }
+        }
+        if (isset($_POST['points_per_unit'])) {
+            $raw = (string)$_POST['points_per_unit'];
+            if (!ctype_digit($raw) || (int)$raw > 1000) { $errors[] = 'Points per pair must be between 0 and 1000.'; }
+            else { $updates['points_per_unit'] = (int)$raw; }
+        }
+        if (!$errors) {
+            try {
+                db_tx(function () use ($updates) {
+                    income_rules_ready(true); // same lock order as orders and reconciliation
+                    $current = q_row("SELECT * FROM plan_settings WHERE id = 1 FOR UPDATE");
+                    if (!$current) { throw new RuntimeException('MLM plan settings are missing.'); }
+                    $final = array_merge($current, $updates);
+                    if ((float)$final['tds_percent'] + (float)$final['admin_charge_percent'] > 100) {
+                        throw new RuntimeException('TDS and admin charges together cannot exceed 100%.');
+                    }
+                    $sets = []; $params = [];
+                    foreach ($updates as $k => $v) { $sets[] = "$k = ?"; $params[] = $v; }
+                    $sets[] = 'updated_at = ?'; $params[] = now(); $params[] = 1;
+                    q("UPDATE plan_settings SET " . implode(', ', $sets) . " WHERE id = ?", $params);
+                });
+                flash('success', 'MLM plan settings saved.');
+            } catch (Throwable $ex) {
+                error_log('Plan update failed: ' . $ex->getMessage());
+                $errors[] = $ex instanceof PDOException ? 'The plan could not be saved; no settings were changed.' : $ex->getMessage();
             }
         }
-        if ($errors) {
-            foreach ($errors as $er) { flash('error', $er); }
-        } else {
-            $sets = [];
-            $params = [];
-            foreach ($updates as $k => $v) {
-                $sets[] = "$k = ?";
-                $params[] = $v;
-            }
-            $sets[] = 'updated_at = ?';
-            $params[] = now();
-            $params[] = 1;
-            q("UPDATE plan_settings SET " . implode(', ', $sets) . " WHERE id = ?", $params);
-            flash('success', 'MLM plan settings saved.');
-        }
+        foreach ($errors as $er) { flash('error', $er); }
         redirect('plan.php');
     }
 
 
-    if ($tab === 'recalc') {
-        /* recompute Total Income + BV of ALL members from the approved
-         * order history under the CURRENT plan settings */
-        [$ok, $st] = recalculate_all_incomes();
-        flash('success',
-            'Recalculation complete: ' . number_format($st['orders']) . ' approved order(s) replayed from zero under the current settings — '
-            . number_format($st['commissions']) . ' income entries rebuilt (₹' . number_format($st['earned'], 2) . ' total — payout incomes + rank rewards) for '
-            . number_format($st['members']) . ' member(s), ' . number_format($st['points']) . ' points awarded, in ' . $st['seconds'] . 's. '
-            . 'Payout commission (withdrawable) = ₹300 Direct Sponsor Leg Income (L+R, once each, only for directly sponsored downline members) + ₹450 first Matching Pair (only with a) or b) earned) + ₹225 Direct Sponsor Matching Bonus + Rank Rewards (every crossed rank level, credited to the wallet and payable). Award rewards are not rebuilt. '
-            . 'Wallet balances were rebuilt from the ledger; manual entries and payouts were kept.');
-        redirect('plan.php');
-    }
+
 }
 
 $cur = get_str('tab', 'main');
@@ -97,8 +93,8 @@ require __DIR__ . '/../includes/dash_header.php';
         </span>
     </div>
     <p class="form-hint" style="margin-bottom:16px">
-        Changes apply to <b>future</b> orders only — run the recalculation below to also apply them to
-        <b>all existing orders and members</b>. Last updated: <?= dmy($plan['updated_at'], true) ?>.
+        Changes apply to <b>future</b> activity. To apply current settings historically, review the
+        separate income and BV preview below. Last updated: <?= dmy($plan['updated_at'], true) ?>.
     </p>
 
     <?php if ($cur === 'main'): ?>
@@ -111,7 +107,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="form-group">
                 <label>Joining BV (Self BV a member must complete to earn commission &amp; points)</label>
                 <input class="form-control" type="number" step="0.01" name="activation_bv" value="<?= e($plan['activation_bv']) ?>">
-                <div class="form-hint" style="margin-top:6px">Self BV is shown on the member dashboard but is never counted in any commission or points calculation — it only makes the member eligible.</div>
+                <div class="form-hint" style="margin-top:6px">A member's Self BV establishes joining eligibility and contributes to their placement ancestors' team BV. Manual earning activation remains an override.</div>
             </div>
             <div class="form-group">
                 <label>Matching requires eligible member (completed joining BV)</label>
@@ -122,16 +118,16 @@ require __DIR__ . '/../includes/dash_header.php';
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">1 · Direct Sponsor Leg Income (rules a + b — one time per leg, ₹300 + ₹300)</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">1 · Direct Sponsor Income (once per qualifying personally sponsored member)</h4>
         <div class="form-grid2">
             <div class="form-group">
-                <label>Direct sponsor leg income — % of joining BV</label>
+                <label>Direct sponsor income — % of joining BV</label>
                 <input class="form-control" type="number" step="0.01" name="sponsor_percent" value="<?= e($plan['sponsor_percent']) ?>">
-                <div class="form-hint" style="margin-top:6px">10% × 3,000 BV = <b>₹300 per leg</b> — paid <b>once</b> when a <b>directly sponsored downline member in the member's LEFT leg</b> completes their own 3,000 BV joining, and once for a directly sponsored member in the RIGHT leg. The member must be the <b>sponsor</b> of that downline member. Maximum ₹600 per member.</div>
+                <div class="form-hint" style="margin-top:6px">At 10% and 3,000 joining BV, the actual sponsor receives <b>₹300 once per qualifying personally sponsored member</b>, regardless of that member's placement. There is no per-leg limit.</div>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">2 · Matching Pair Income (rule c — first pair only, ₹450)</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">2 · Matching Pair Income (every eligible pair)</h4>
         <div class="form-grid3">
             <div class="form-group">
                 <label>BV per pair unit (1:1 matching unit)</label>
@@ -147,16 +143,16 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="form-group">
                 <label>Value (% or ₹)</label>
                 <input class="form-control" type="number" step="0.01" name="binary_value" value="<?= e($plan['binary_value']) ?>">
-                <div class="form-hint" style="margin-top:6px">3,000 BV left + 3,000 BV right = <b>₹450, paid ONCE for the member's FIRST matching pair — but only when the member has earned a) or b)</b>: at least one directly sponsored downline member in the left or right leg completed their own 3,000 BV joining. Every further pair adds points only.</div>
+                <div class="form-hint" style="margin-top:6px">At the default settings, every 3,000 BV left + 3,000 BV right pair earns <b>₹450</b>. Sponsor income is not required. The joining eligibility setting above still applies.</div>
             </div>
         </div>
 
-        <h4 style="font-size:14px;margin:16px 0 12px">3 · Direct Sponsor Matching Bonus (rules d + e — one time per direct, ₹225)</h4>
+        <h4 style="font-size:14px;margin:16px 0 12px">3 · Placement Parent First-Match Bonus (once per immediate child)</h4>
         <div class="form-grid2">
             <div class="form-group">
-                <label>Bonus — % of the direct's first matching pair income</label>
+                <label>Bonus — % of an immediate placement child's first matching pair income</label>
                 <input class="form-control" type="number" step="0.01" name="sponsor_matching_percent" value="<?= e($plan['sponsor_matching_percent']) ?>">
-                <div class="form-hint" style="margin-top:6px">50% × ₹450 = <b>₹225</b> — paid <b>once</b> when a <b>directly sponsored downline member in the member's left or right leg</b> completes their own first matching pair (their rule c). The member must be the sponsor of that downline member.</div>
+                <div class="form-hint" style="margin-top:6px">At the defaults, 50% × ₹450 = <b>₹225 once</b> to the matched member's immediate placement parent when that child earns their first pair. The child's sponsor may be someone else.</div>
             </div>
         </div>
 
@@ -165,7 +161,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="form-group">
                 <label>Points per matched pair unit</label>
                 <input class="form-control" type="number" min="0" name="points_per_unit" value="<?= e($plan['points_per_unit']) ?>">
-                <div class="form-hint" style="margin-top:6px">1 point = 3,000 BV left + 3,000 BV right (both sides). Points need completed joining BV. Every <a href="ranks.php">rank</a> achievement credits that rank's reward amount to the member's <b>wallet balance</b> (wallet income — included in payouts). <a href="rewards.php">Award milestones</a> are recognition only; no car fund exists.</div>
+                <div class="form-hint" style="margin-top:6px">Points are awarded per matched pair using the configured unit and point rate. Points require joining eligibility or manual earning activation. Every <a href="ranks.php">rank</a> achievement credits that rank's reward amount to the member's <b>wallet balance</b> (wallet income — included in payouts). <a href="rewards.php">Award milestones</a> are recognition only; no car fund exists.</div>
             </div>
         </div>
 
@@ -189,35 +185,14 @@ require __DIR__ . '/../includes/dash_header.php';
     </form>
 
     <div class="card" style="margin-top:18px;border:1.5px dashed var(--accent)">
-        <div class="card-title">🔄 Recalculate Total Income &amp; BV of all members</div>
+        <div class="card-title">🔄 Historical income &amp; BV reconciliation</div>
         <p style="font-size:13px;color:var(--ink-soft)">
-            After changing any setting above, run this to recompute <b>every member's payout commission,
-            Total Income, BV and points</b> from zero, using the full <b>approved order history</b> under
-            the NEW settings: Left / Right / Self BV, matched pairs, points, rank achievements, BV / points logs
-            and the three one-time payout incomes —
-            <b>₹300 Direct Sponsor Leg Income (left + right, once each, only for directly sponsored
-            downline members), ₹450 first Matching Pair (only with a) or b) earned) and
-            ₹225 Direct Sponsor Matching Bonus</b> — plus every achieved rank's reward
-            amount re-credited to the member's wallet.
+            Preview the effect on every member before applying the current plan to their current tree and sponsors.
+            Saved Self BV is preserved; differences from approved-order totals are flagged. Original commissions,
+            wallet transactions, orders, profiles and payout history are retained. Any income differences are
+            recorded as new, auditable wallet and commission adjustments.
         </p>
-        <p style="font-size:12.5px;color:var(--ink-soft);margin:6px 0 0">
-            <b>No other commission exists in this plan:</b> award rewards, level income,
-            car fund and every other commission type are removed — the rebuild clears any old entries and
-            does not re-pay them. Rank rewards are rebuilt and credited to wallets (included in payouts);
-            award milestones remain recognition only.
-        </p>
-        <ul style="font-size:12.5px;color:var(--ink-soft);margin:8px 0 14px 18px">
-            <li>All automatic income entries, points and BV / points logs are wiped and rebuilt chronologically.</li>
-            <li>Wallet balances are rebuilt from the complete ledger — <b>manual income entries and payout history are kept</b>.</li>
-            <li>Members are only ever <b>activated</b> by the recalculation, never de-activated (manual activations survive).</li>
-            <li>Pending / rejected orders are ignored; product stock and order statuses are not touched.</li>
-            <li>Large networks may take a while — everything runs in one database transaction.</li>
-        </ul>
-        <form method="post" data-confirm="Recalculate the Total Income and BV of ALL members from the order history using the CURRENT plan settings? All automatic income entries will be replaced.">
-            <?= csrf_field() ?>
-            <input type="hidden" name="tab" value="recalc">
-            <button class="btn btn-primary" type="submit">🔄 Recalculate Total Income &amp; BV now</button>
-        </form>
+        <a class="btn btn-primary" href="income_recalculate.php">Review recalculation preview</a>
     </div>
 
     <?php endif; ?>

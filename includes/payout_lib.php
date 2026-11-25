@@ -9,12 +9,14 @@
  *
  * Everything is computed LIVE from the member's own credited
  * commissions, so the reports always mirror the actual performance:
- *   - incentive income  = sponsor (Direct Sponsor ₹300 L/R),
- *                         binary (First Matching Pair ₹450 + matching),
- *                         sponsor_matching (Direct Sponsor Matching ₹225)
+ *   - incentive income  = sponsor (one per qualifying referral),
+ *                         binary (every eligible matching pair),
+ *                         sponsor_matching (immediate child's first match)
  *   - reward income     = rank + award (Cash Reward), car_fund (Car Fund),
  *                         level (Royalty)
- * TDS and admin charges are applied with the plan percentages.
+ * Period deductions are illustrations using the CURRENT plan percentages,
+ * not historical payout deductions. Actual amounts are stored on each payout
+ * or generated weekly statement. They cannot be allocated to periods reliably.
  *
  * Period rules: a period appears only once it has fully completed —
  * weeks close after their Saturday, 15-day halves after the 15th / the
@@ -35,7 +37,7 @@ function payout_column_map($kind)
     return [
         ['sponsor', 'Direct Sponsor Income', ['sponsor']],
         ['match', 'Matching Bonus', ['binary']],
-        ['direct', 'Direct Income', ['sponsor_matching']],
+        ['direct', 'Placement First-Match', ['sponsor_matching']],
     ];
 }
 
@@ -62,6 +64,40 @@ function payout_reward_bounds($dateStr)
 function payout_period_bounds($kind, $dateStr)
 {
     return $kind === 'reward' ? payout_reward_bounds($dateStr) : payout_week_bounds($dateStr);
+}
+
+/** Live gross payout-entitlement activity, not the wallet transaction ledger.
+ * Credited eligible income (including signed adjustments) is grouped by day;
+ * pending and paid payout requests reduce entitlement by their GROSS amount
+ * from the day the wallet was held. Rejected requests are excluded. This uses
+ * exactly the same income types and current payout statuses as payout eligibility,
+ * includes the current period, and never applies estimated tax a second time. */
+function payout_entitlement_ledger($userId)
+{
+    $ledger = [];
+    foreach (q_all("SELECT DATE(created_at) AS day, SUM(amount) AS amount FROM commissions
+                    WHERE user_id = ? AND status = 'credited'
+                      AND type IN ('sponsor','binary','sponsor_matching','rank')
+                    GROUP BY DATE(created_at)", [(int)$userId]) as $income) {
+        $amount = round((float)$income['amount'], 2);
+        if ($amount == 0.0) { continue; }
+        $ledger[] = ['date' => $income['day'], 'ord' => 1, 'id' => 0,
+            'desc' => 'ELIGIBLE INCOME / ADJUSTMENTS', 'cr' => max(0, $amount), 'dr' => max(0, -$amount)];
+    }
+    foreach (q_all("SELECT id, request_no, amount, status, created_at FROM payouts
+                    WHERE user_id = ? AND status IN ('paid','pending')", [(int)$userId]) as $payout) {
+        $ledger[] = ['date' => substr($payout['created_at'], 0, 10), 'ord' => 2, 'id' => (int)$payout['id'],
+            'desc' => 'PAYOUT REQUEST ' . $payout['request_no'] . ($payout['status'] === 'paid' ? ' (PAID)' : ' (HELD)'),
+            'cr' => 0.0, 'dr' => (float)$payout['amount']];
+    }
+    usort($ledger, function ($a, $b) { return [$a['date'], $a['ord'], $a['id']] <=> [$b['date'], $b['ord'], $b['id']]; });
+    $balance = 0.0;
+    foreach ($ledger as &$row) {
+        $balance = round($balance + $row['cr'] - $row['dr'], 2);
+        $row['bal'] = $balance;
+    }
+    unset($row);
+    return ['rows' => $ledger, 'balance' => $balance];
 }
 
 /** All COMPLETED periods (newest first) in which this member earned
@@ -105,8 +141,9 @@ function payout_report_periods($userId, $kind)
 function payout_finalize_period(array $p, array $plan)
 {
     $p['gross'] = round(array_sum($p['parts']), 2);
-    $p['tds'] = round($p['gross'] * (float)$plan['tds_percent'] / 100, 2);
-    $p['admin'] = round($p['gross'] * (float)$plan['admin_charge_percent'] / 100, 2);
+    // A negative correction is not a negative taxable payout. The same
+    // paise rounding rule as actual requests keeps small estimates nonnegative.
+    [$p['tds'], $p['admin']] = payout_deductions(max(0, $p['gross']), $plan);
     $p['net'] = round($p['gross'] - $p['tds'] - $p['admin'], 2);
     foreach ($p['parts'] as $k => $v) { $p['parts'][$k] = round((float)$v, 2); }
     return $p;
@@ -198,8 +235,8 @@ function payout_statement_html(array $st)
             <div class="ct">Email ID: <?= e($c['email']) ?><?php if ($c['website']): ?> &nbsp;·&nbsp; Website: <?= e($c['website']) ?><?php endif; ?></div>
         </div>
         <div class="pst-title">
-            <h2>PAYOUT STATEMENT</h2>
-            <div class="no">Statement No: <b><?= e($st['no']) ?></b><br>
+            <h2>INCOME ESTIMATE</h2>
+            <div class="no">Estimate No: <b><?= e($st['no']) ?></b><br>
                 Generated On: <b><?= e(dmy($st['generated'])) ?></b></div>
         </div>
     </div>
@@ -216,7 +253,7 @@ function payout_statement_html(array $st)
 
     <table class="pst-amt">
         <thead>
-            <tr><th>Earnings</th><th class="r">Amount</th><th>Deduction(s)</th><th class="r">Amount</th></tr>
+            <tr><th>Earnings</th><th class="r">Amount</th><th>Estimated deduction(s)</th><th class="r">Amount</th></tr>
         </thead>
         <tbody>
         <?php
@@ -250,12 +287,13 @@ function payout_statement_html(array $st)
     </table>
 
     <div class="pst-net">
-        <span class="lb">NET PAYABLE AMOUNT</span>
+        <span class="lb">ESTIMATED NET AMOUNT</span>
         <span class="vl"><?= money($st['net']) ?></span>
     </div>
 
     <div class="pst-note">
-        This is a computer generated statement, no signature is required.
+        Illustrative only, based on current plan rates. This is not a payout receipt or proof of payment.
+        See payout history and weekly receipts for recorded amounts and status.
     </div>
 </div>
     <?php
@@ -289,8 +327,8 @@ function payout_statement_pdf(array $st)
     $y += 11;
     $p->text($M, $y, 8.2, false, 'Email ID.: ' . $c['email'] . ($c['website'] ? '   Website: ' . $c['website'] : ''), 'L', $gray);
 
-    $p->text($R, 52, 16, true, 'PAYOUT STATEMENT', 'R', $green);
-    $p->text($R, 70, 9, false, 'Statement No: ' . $st['no'], 'R');
+    $p->text($R, 52, 16, true, 'INCOME ESTIMATE', 'R', $green);
+    $p->text($R, 70, 9, false, 'Estimate No: ' . $st['no'], 'R');
     $p->text($R, 81, 9, false, 'Generated On: ' . dmy($st['generated']), 'R');
     $p->hline($M, $R, 100, 2.2, 0.09);
     $y = 116;
@@ -321,7 +359,7 @@ function payout_statement_pdf(array $st)
     $p->rect($M, $y, $W, 17, 0.09);
     $p->text($M + 8, $y + 12, 7.6, true, 'EARNINGS', 'L', [1, 1, 1]);
     $p->text($M + 248, $y + 12, 7.6, true, 'AMOUNT', 'R', [1, 1, 1]);
-    $p->text($M + 258, $y + 12, 7.6, true, 'DEDUCTION(S)', 'L', [1, 1, 1]);
+    $p->text($M + 258, $y + 12, 7.6, true, 'ESTIMATED DEDUCTIONS', 'L', [1, 1, 1]);
     $p->text($R - 8, $y + 12, 7.6, true, 'AMOUNT', 'R', [1, 1, 1]);
     $y += 17;
 
@@ -351,14 +389,14 @@ function payout_statement_pdf(array $st)
 
     /* net payable */
     $p->rect($M, $y, $W, 24, 0.09);
-    $p->text($M + 8, $y + 16, 11, true, 'NET PAYABLE AMOUNT', 'L', [1, 1, 1]);
+    $p->text($M + 8, $y + 16, 11, true, 'ESTIMATED NET AMOUNT', 'L', [1, 1, 1]);
     $p->text($R - 8, $y + 16, 13, true, 'Rs. ' . number_format($st['net'], 2), 'R', [1, 1, 1]);
 
     /* footer */
     $fy = MiniPDF::PH - 34;
     $p->hline($M, $R, $fy - 12, 0.5, 0.85);
-    $p->text($M, $fy, 7.6, false, 'This is a computer generated statement, no signature is required.', 'L', $gray);
-    $p->text($R, $fy, 7.6, false, $c['name'], 'R', $gray);
+    $p->text($M, $fy - 3, 7.6, false, 'Illustration using current rates; not a payout receipt or proof of payment.', 'L', $gray);
+    $p->text($M, $fy + 8, 7.6, false, 'See payout history and weekly receipts for recorded amounts and status.', 'L', $gray);
 
     return $p->output();
 }

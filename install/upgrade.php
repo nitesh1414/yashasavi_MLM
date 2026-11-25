@@ -20,6 +20,8 @@ if (!is_file($configFile)) {
 require_once dirname(__DIR__) . '/includes/init.php';
 require_once __DIR__ . '/seed.php';   /* defines seed_database() + install_schema() — no side effects */
 
+require_superadmin();
+
 $D = seed_data();
 $pdo = db();
 
@@ -134,6 +136,12 @@ function ug_needs_upgrade($pdo)
     if (!ug_table_exists('award_rewards')) {
         return true;
     }
+    foreach (['income_matching_state', 'income_sponsor_events', 'income_rank_events', 'income_recalc_runs', 'income_recalc_entries'] as $table) {
+        if (!ug_table_exists($table)) { return true; }
+    }
+    if (!ug_table_exists('settings') || q_val("SELECT svalue FROM settings WHERE skey = 'income_lock_1850'") !== '1') {
+        return true;
+    }
     /* enum outdated? */
     $type = q_val("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'commissions' AND COLUMN_NAME = 'type'");
     if ($type && stripos($type, 'sponsor_matching') === false) {
@@ -156,17 +164,20 @@ $done = false;
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $refreshContent = isset($_POST['refresh_content']);
     $replaceCatalog = isset($_POST['replace_catalog']);
     try {
         /* 1 — create any missing table (award_rewards, documents, …) */
         $createdTables = 0;
+        $createdTableNames = [];
         foreach (install_schema() as $stmt) {
             $m = [];
             if (preg_match('/CREATE TABLE IF NOT EXISTS `?([a-z_]+)`?/i', $stmt, $m)) {
                 if (!ug_table_exists($m[1])) {
                     $pdo->exec($stmt);
                     $createdTables++;
+                    $createdTableNames[$m[1]] = true;
                     $log[] = 'Created missing table: <code>' . $m[1] . '</code>';
                 }
             } else {
@@ -176,6 +187,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$createdTables) {
             $log[] = 'All tables already present.';
         }
+        // Install the permanent coordination row without marking the new
+        // income rules ready. Only a reviewed reconciliation can do that.
+        q("INSERT IGNORE INTO settings (skey, svalue) VALUES ('income_lock_1850', '1')");
 
         /* 2 — add missing columns */
         $addedCols = [];
@@ -243,27 +257,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                $plan['car_fund_amount'], $plan['tds_percent'], $plan['admin_charge_percent'], $plan['payout_min']]);
             $log[] = 'Created MLM plan settings with the official plan values.';
         } else {
-            /* bring newly added / still-default columns to the official values */
-            $pdfCols = [
-                'monthly_cap' => [$plan['monthly_cap'], '0'],
-                'sponsor_matching_percent' => [$plan['sponsor_matching_percent'], '0'],
-                'point_bv' => [$plan['point_bv'], '400'],
-                'car_fund_points' => [$plan['car_fund_points'], '500'],
-                'car_fund_amount' => [$plan['car_fund_amount'], '150000'],
-                /* the pre-upgrade schema default — sync it to the official ₹3,20,000 */
-                'daily_cap' => [$plan['daily_cap'], '5000'],
-            ];
-            $updated = [];
-            foreach ($pdfCols as $col => [$want, $default]) {
-                $cur = q_val("SELECT `$col` FROM plan_settings WHERE id = 1");
-                if ($cur !== null && (float)$cur === (float)$default && (float)$want !== (float)$default) {
-                    q("UPDATE plan_settings SET `$col` = ? WHERE id = 1", [$want]);
-                    $updated[] = $col . ' = ' . $want;
-                }
-            }
-            $log[] = $updated
-                ? 'Plan settings updated: <code>' . implode('</code>, <code>', $updated) . '</code>'
-                : 'Plan settings already configured.';
+            // An existing zero/default may be an intentional business choice.
+            // Never rewrite configured rates or thresholds during an upgrade.
+            $log[] = 'Existing MLM plan settings preserved.';
         }
 
         /* plan levels */
@@ -271,46 +267,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->exec("INSERT IGNORE INTO plan_levels (level_no, percent) VALUES ($ln, 0)");
         }
 
-        /* 5 — ranks (insert missing, sync official POINTS thresholds by name) */
-        $rankInserts = 0; $rankUpdates = 0;
-        foreach ($D['ranks'] as $r) {
-            $ex = q_row("SELECT * FROM ranks WHERE name = ?", [$r[0]]);
-            if (!$ex) {
+        /* 5–6 — initialize only newly created reference tables. An existing
+         * empty ladder may be intentional and must not be silently repopulated. */
+        if (isset($createdTableNames['ranks'])) {
+            foreach ($D['ranks'] as $r) {
                 q("INSERT INTO ranks (name, min_points, reward_amount, badge, sort_order)
-                   VALUES (?, ?, ?, ?, ?)",
-                  [$r[0], $r[1], $r[2], strtolower(str_replace(' ', '-', $r[0])), $r[3]]);
-                $rankInserts++;
-            } elseif ((int)$ex['min_points'] !== (int)$r[1] || (float)$ex['reward_amount'] !== (float)$r[2]) {
-                q("UPDATE ranks SET min_points = ?, reward_amount = ?, badge = ?, sort_order = ? WHERE id = ?",
-                  [$r[1], $r[2], strtolower(str_replace(' ', '-', $r[0])), $r[3], $ex['id']]);
-                $rankUpdates++;
+                   VALUES (?, ?, ?, ?, ?)", [$r[0], $r[1], $r[2], strtolower(str_replace(' ', '-', $r[0])), $r[3]]);
             }
-        }
-        $log[] = "Ranks: $rankInserts added, $rankUpdates synced to the official plan (1 point = 3,000 BV left + 3,000 BV right).";
-
-        /* 6 — award rewards: replace the old 3-row seed with the official
-         *     12 lifetime-points milestones from the MLM points PDF */
-        $awardInserts = 0; $awardUpdates = 0;
-        /* drop rows that still carry the OLD seed values (safe: identified
-         * by exact old title+points), so the new milestone list applies */
-        q("DELETE FROM award_rewards WHERE reward_title IN ('Cash Fund ₹1,00,000') AND points = 800");
-        $s = 1;
-        foreach ($D['awards'] as $a) {
-            $ex = q_row("SELECT * FROM award_rewards WHERE reward_title = ?", [$a[1]]);
-            if (!$ex) {
+            $log[] = 'Empty rank ladder initialized.';
+        } else { $log[] = 'Existing rank definitions preserved.'; }
+        if (isset($createdTableNames['award_rewards'])) {
+            $s = 1;
+            foreach ($D['awards'] as $award) {
                 q("INSERT INTO award_rewards (points, reward_title, reward_type, amount, description, status, sort_order, created_at)
-                   VALUES (?, ?, ?, ?, ?, 'active', ?, NOW())", [$a[0], $a[1], $a[2], $a[3], $a[4], $s]);
-                $awardInserts++;
-            } elseif ((int)$ex['points'] !== (int)$a[0] || (float)$ex['amount'] !== (float)$a[3]) {
-                q("UPDATE award_rewards SET points = ?, reward_type = ?, amount = ?, description = ?, sort_order = ? WHERE id = ?",
-                  [$a[0], $a[2], $a[3], $a[4], $s, $ex['id']]);
-                $awardUpdates++;
+                   VALUES (?, ?, ?, ?, ?, 'active', ?, NOW())", [$award[0], $award[1], $award[2], $award[3], $award[4], $s++]);
             }
-            $s++;
-        }
-        $log[] = $awardInserts || $awardUpdates
-            ? "Award rewards: $awardInserts added, $awardUpdates synced to the official lifetime-points milestones."
-            : 'Award rewards already present.';
+            $log[] = 'Empty award ladder initialized.';
+        } else { $log[] = 'Existing award definitions preserved.'; }
 
         /* 7 — site settings */
         $setInserts = 0; $setUpdates = 0;
@@ -326,26 +299,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $log[] = "Site settings: $setInserts added" . ($refreshContent ? ", $setUpdates refreshed with current branding" : '') . '.';
 
-        /* 8 — categories */
-        $catIds = [];
-        foreach (q_all("SELECT id, slug FROM categories") as $c) {
-            $catIds[$c['slug']] = $c['id'];
-        }
-        $catInserts = 0;
-        foreach ($D['cats'] as $c) {
-            if (!isset($catIds[$c[1]])) {
-                q("INSERT INTO categories (name, slug, description, image, sort_order, status, created_at)
-                   VALUES (?, ?, ?, ?, ?, 'active', NOW())", [$c[0], $c[1], $c[2], 'categories/' . $c[3], $c[4]]);
-                $catIds[$c[1]] = (int)$pdo->lastInsertId();
-                $catInserts++;
-            }
-        }
-        if ($catInserts) {
-            $log[] = "Categories: $catInserts added.";
-        }
-
-        /* 9 — products */
+        /* 8–9 — preserve the existing catalogue unless explicitly selected. */
         if ($replaceCatalog) {
+            $catIds = [];
+            foreach (q_all("SELECT id, slug FROM categories") as $c) {
+                $catIds[$c['slug']] = $c['id'];
+            }
+            $catInserts = 0;
+            foreach ($D['cats'] as $c) {
+                if (!isset($catIds[$c[1]])) {
+                    q("INSERT INTO categories (name, slug, description, image, sort_order, status, created_at)
+                       VALUES (?, ?, ?, ?, ?, 'active', NOW())", [$c[0], $c[1], $c[2], 'categories/' . $c[3], $c[4]]);
+                    $catIds[$c[1]] = (int)$pdo->lastInsertId();
+                    $catInserts++;
+                }
+            }
+            if ($catInserts) {
+                $log[] = "Categories: $catInserts added.";
+            }
+
+            /* 9 — products */
             $pdfSlugs = array_map(fn($p) => $p[1], $D['products']);
             $in = "'" . implode("','", $pdfSlugs) . "'";
             $deactivated = (int)q_val("SELECT COUNT(*) FROM products WHERE status = 'active' AND slug NOT IN ($in)");
@@ -353,27 +326,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 q("UPDATE products SET status = 'inactive' WHERE status = 'active' AND slug NOT IN ($in)");
                 $log[] = "Product catalogue: $deactivated old product(s) deactivated (rows and past orders are kept).";
             }
-        }
-        $prodInserts = 0;
-        $sortBase = (int)q_val("SELECT COALESCE(MAX(sort_order), 0) FROM products");
-        foreach ($D['products'] as $p) {
-            if (!(int)q_val("SELECT COUNT(*) FROM products WHERE slug = ?", [$p[1]])) {
-                $sortBase++;
-                q("INSERT INTO products (category_id, name, slug, size, mrp, dp, bv, short_desc, description,
-                   benefits, ingredients, how_to_use, image, stock, is_featured, status, sort_order, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 500, ?, 'active', ?, NOW())",
-                  [$catIds[$p[3]], $p[0], $p[1], $p[2], $p[4], $p[5], $p[6], $p[8],
-                   '<p>' . $p[8] . '</p><p>A 100% natural, quality-tested Yashasavi Veda Herbals formulation — pure Ayurveda for a healthy life and wellness for a better tomorrow.</p>',
-                   $p[9],
-                   'Natural Ayurvedic herbs and extracts.',
-                   'Use as directed on the product label or as advised by your physician.',
-                   'products/' . $p[1] . '.jpg', $p[7], $sortBase]);
-                $prodInserts++;
+            $prodInserts = 0;
+            $sortBase = (int)q_val("SELECT COALESCE(MAX(sort_order), 0) FROM products");
+            foreach ($D['products'] as $p) {
+                if (!(int)q_val("SELECT COUNT(*) FROM products WHERE slug = ?", [$p[1]])) {
+                    $sortBase++;
+                    q("INSERT INTO products (category_id, name, slug, size, mrp, dp, bv, short_desc, description,
+                       benefits, ingredients, how_to_use, image, stock, is_featured, status, sort_order, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 500, ?, 'active', ?, NOW())",
+                      [$catIds[$p[3]], $p[0], $p[1], $p[2], $p[4], $p[5], $p[6], $p[8],
+                       '<p>' . $p[8] . '</p><p>A 100% natural, quality-tested Yashasavi Veda Herbals formulation — pure Ayurveda for a healthy life and wellness for a better tomorrow.</p>',
+                       $p[9],
+                       'Natural Ayurvedic herbs and extracts.',
+                       'Use as directed on the product label or as advised by your physician.',
+                       'products/' . $p[1] . '.jpg', $p[7], $sortBase]);
+                    $prodInserts++;
+                }
             }
+            $log[] = $prodInserts
+                ? "Products: $prodInserts added from the official 16-product catalogue (MRP / DP / BV)."
+                : 'Products: official catalogue already present.';
+        } else {
+            $log[] = 'Existing product catalogue and categories preserved.';
         }
-        $log[] = $prodInserts
-            ? "Products: $prodInserts added from the official 16-product catalogue (MRP / DP / BV)."
-            : 'Products: official catalogue already present.';
 
         /* 10 — legal documents */
         $docInserts = 0;
@@ -518,13 +493,14 @@ code{background:#f0f6ef;border:1px solid #dbe5db;padding:1px 6px;border-radius:6
             <?php endif; ?>
 
             <form method="post">
+                <?= csrf_field() ?>
                 <label class="chk">
-                    <input type="checkbox" name="refresh_content" checked>
+                    <input type="checkbox" name="refresh_content">
                     <span><strong>Refresh website content</strong> — update CMS pages and branding (company name,
                     tagline, contact details) to the current Yashasavi Veda Herbals Private Limited content. Uncheck to keep your edited pages.</span>
                 </label>
                 <label class="chk">
-                    <input type="checkbox" name="replace_catalog" checked>
+                    <input type="checkbox" name="replace_catalog">
                     <span><strong>Use the official 16-product catalogue</strong> — old products are deactivated
                     (kept in the database, past orders unaffected) and the official MRP / DP / BV products are added.</span>
                 </label>

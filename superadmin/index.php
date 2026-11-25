@@ -103,7 +103,7 @@ require __DIR__ . '/../includes/dash_header.php';
             $saLogs = [];
             foreach (q_all("SELECT b.*, u.username FROM bv_logs b JOIN users u ON u.id = b.user_id ORDER BY b.id DESC LIMIT 8") as $b) {
                 $saLogs[] = ['d' => $b['created_at'], 'ico' => $b['kind'] === 'self' ? '🛒' : ($b['kind'] === 'left' ? '⬅️' : '➡️'),
-                    'txt' => '+' . bv($b['bv']) . ' ' . $b['kind'] . ' BV — ' . e($b['username']) . ' (total ' . bv($b['balance_after']) . ')'];
+                    'txt' => ((float)$b['bv'] >= 0 ? '+' : '') . bv($b['bv']) . ' ' . $b['kind'] . ' — ' . e($b['username']) . ' (total ' . bv($b['balance_after']) . ')'];
             }
             foreach (q_all("SELECT c.*, u.username FROM commissions c JOIN users u ON u.id = c.user_id ORDER BY c.id DESC LIMIT 8") as $c) {
                 $saLogs[] = ['d' => $c['created_at'], 'ico' => '💰',
@@ -111,7 +111,7 @@ require __DIR__ . '/../includes/dash_header.php';
             }
             foreach (q_all("SELECT p.*, u.username FROM points_logs p JOIN users u ON u.id = p.user_id ORDER BY p.id DESC LIMIT 8") as $p) {
                 $saLogs[] = ['d' => $p['created_at'], 'ico' => '⭐',
-                    'txt' => '+' . (int)$p['points'] . ' points — ' . e($p['username']) . ' (total ' . number_format((int)$p['total_points']) . ' P)'];
+                    'txt' => ((int)$p['points'] >= 0 ? '+' : '') . (int)$p['points'] . ' points — ' . e($p['username']) . ' (total ' . number_format((int)$p['total_points']) . ' P)'];
             }
             usort($saLogs, function ($x, $y) { return strcmp($y['d'], $x['d']); });
             ?>

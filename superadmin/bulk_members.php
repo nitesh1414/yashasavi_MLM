@@ -24,45 +24,67 @@ function ensure_users_path_text()
     }
 }
 
+/** Each generated member, their initial password, activation and optional
+ * Self BV grant commit together. Earlier successful members in a batch are
+ * retained if a later member fails, and the UI reports the exact count. */
+function create_bulk_member_atomic(array $data, $activate, $selfbv)
+{
+    return db_tx(function () use ($data, $activate, $selfbv) {
+        $ready = income_rules_ready(true);
+        if (($activate || $selfbv) && !$ready) { throw new RuntimeException(income_maintenance_message()); }
+        if ($ready) { get_plan(true); }
+        [$ok, $uid, $code] = register_distributor($data);
+        if (!$ok) { throw new RuntimeException($code); }
+        q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
+          [password_hash($code, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
+        if ($activate) {
+            q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
+            income_settle_member($uid);
+        }
+        if ($selfbv) {
+            $joining = (float)get_plan()['activation_bv'];
+            if ($joining <= 0) { throw new RuntimeException('The joining BV must be positive.'); }
+            income_apply_self_bv($uid, $joining, null, 'Bulk member Self BV grant');
+        }
+        return [$uid, $code];
+    });
+}
+
 if (is_post()) {
     verify_csrf();
     $action = post_str('action');
+    if (in_array($action, ['generate', 'lines'], true)
+        && (post_str('selfbv') === '1' || post_str('activate') === '1') && !income_rules_ready()) {
+        flash('error', income_maintenance_message());
+        redirect('bulk_members.php');
+    }
 
     if ($action === 'wipe') {
-        /* Delete EVERY member except the company root (and their business data) */
+        if (!income_rules_ready()) { flash('error', income_maintenance_message()); redirect('bulk_members.php'); }
+        /* Never erase financial or reconciliation history. Wiping is limited
+         * to an entirely unused network; a live network must be preserved. */
         if (!$root) { flash('error', 'Company root member not found.'); redirect('bulk_members.php'); }
         $keep = (int)$root['id'];
-        $del = q_all("SELECT id FROM users WHERE id != ?", [$keep]);
-        $ids = array_map(fn ($r) => (int)$r['id'], $del);
         try {
-            db_tx(function () use ($ids, $keep) {
-                if ($ids) {
-                    $in = implode(',', $ids);
-                    q("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id IN ($in))");
-                    /* commissions: owned by the deleted members OR earned from
-                     * their orders — must run BEFORE the orders themselves are
-                     * deleted (the subquery needs them); note: commissions has
-                     * no from_user_id column, the upline context lives in `note` */
-                    q("DELETE FROM commissions WHERE user_id IN ($in)
-                       OR order_id IN (SELECT id FROM orders WHERE user_id IN ($in))");
-                    q("DELETE FROM orders WHERE user_id IN ($in)");
+            db_tx(function () use ($keep) {
+                if (!income_rules_ready(true)) { throw new RuntimeException(income_maintenance_message()); }
+                foreach (['orders', 'order_items', 'commissions', 'wallet_transactions', 'payouts', 'payout_statements',
+                          'payout_statement_rows', 'bv_logs', 'points_logs', 'income_sponsor_events', 'income_rank_events',
+                          'income_recalc_runs', 'income_recalc_entries'] as $table) {
+                    if ((int)q_val("SELECT COUNT(*) FROM $table") > 0) {
+                        throw new RuntimeException('Wipe is blocked because business or reconciliation history exists. No data was deleted.');
+                    }
                 }
-                /* sweep: commissions whose order no longer exists
-                 * (orphans from older runs / legacy data) */
-                q("DELETE FROM commissions WHERE order_id IS NOT NULL
-                   AND order_id NOT IN (SELECT id FROM orders)");
-                /* wallet history and payouts all belong to the wiped network */
-                q("DELETE FROM wallet_transactions");
-                q("DELETE FROM payouts");
-                if ($ids) {
-                    $in = implode(',', $ids);
-                    q("DELETE FROM users WHERE id IN ($in)");
-                }
-                /* reset the root to a clean company account — the whole
-                 * network (and every commission that fed the wallet) is gone */
-                q("UPDATE users SET left_bv = 0, right_bv = 0, self_bv = 0, matched_pairs = 0,
-                   wallet_balance = 0, total_earned = 0, total_withdrawn = 0 WHERE id = ?", [$keep]);
-                /* the one-time straight-line seed record belongs to the wiped network */
+                $hasValues = (int)q_val("SELECT COUNT(*) FROM users WHERE self_bv <> 0 OR left_bv <> 0 OR right_bv <> 0
+                    OR matched_pairs <> 0 OR reward_points <> 0 OR COALESCE(rank_id, 0) <> 0 OR wallet_balance <> 0
+                    OR total_earned <> 0 OR total_withdrawn <> 0");
+                $hasState = (int)q_val("SELECT COUNT(*) FROM income_matching_state WHERE processed_bv <> 0 OR points_processed_bv <> 0
+                    OR pending_pairs <> 0 OR pending_bv <> 0 OR pending_amount <> 0 OR pending_points <> 0 OR first_match_seen <> 0
+                    OR first_parent_id IS NOT NULL OR first_bonus_amount <> 0 OR first_bonus_order_id IS NOT NULL
+                    OR first_bonus_commission_id IS NOT NULL OR first_bonus_status <> 'none'");
+                if ($hasValues || $hasState) { throw new RuntimeException('Wipe is blocked because BV or income state exists. No data was deleted.'); }
+                q("DELETE FROM income_matching_state WHERE user_id <> ?", [$keep]);
+                q("DELETE FROM users WHERE id <> ?", [$keep]);
                 q("DELETE FROM settings WHERE skey = 'line_seed'");
             });
             /* restart member numbering so the next member becomes id 2 /
@@ -76,8 +98,8 @@ if (is_post()) {
             } catch (Throwable $e) {
                 $freshIds = false;   /* numbering continues — cosmetic only */
             }
-            flash('success', 'Network wiped — all members except ' . e($root['username'])
-                . ' were deleted. Orders, commissions, wallets and network counters were reset.'
+            flash('success', 'Unused network cleared — all members except ' . e($root['username'])
+                . ' were deleted. No business or financial history existed.'
                 . ($freshIds
                     ? ' Member IDs start from the beginning again (next member: YSH'
                         . (100000 + (int)$root['id'] + 1) . ').'
@@ -122,58 +144,52 @@ if (is_post()) {
             /* the first-time password is the member's own User ID — exactly
              * like normal registration (register.php); the random placeholder
              * below is replaced immediately after the account is created */
-            [$ok, $uid, $code] = register_distributor([
-                'sponsor' => $sponsor['username'],
-                'leg' => $leg,
-                'placement' => (int)$anchor['id'],
-                'placement_leg' => $leg,
-                'full_name' => $fullName,
-                'email' => $email,
-                'mobile' => $mobile,
-                'dob' => '1990-01-01',
-                'marital_status' => 'Single',
-                'nationality' => 'Indian',
-                'address' => 'Chandrapur, Maharashtra',
-                'city' => 'Chandrapur',
-                'state' => 'Maharashtra',
-                'pincode' => '442001',
-                'nominee_name' => $fullName,
-                'nominee_relation' => 'Self',
-                'bank_holder' => $fullName,
-                'bank_account_no' => '',
-                'bank_ifsc' => '',
-                'bank_name' => '',
-                'bank_branch' => '',
-                'aadhaar_no' => '',
-                'pan_no' => '',
-                'password' => 'Temp-' . bin2hex(random_bytes(8)),
-            ]);
-            if (!$ok) {
-                flash('error', 'Creation stopped after ' . $made . ' members: ' . e($code));
+            try {
+                [$uid, $code] = create_bulk_member_atomic([
+                    'sponsor' => $sponsor['username'],
+                    'leg' => $leg,
+                    'placement' => (int)$anchor['id'],
+                    'placement_leg' => $leg,
+                    'full_name' => $fullName,
+                    'email' => $email,
+                    'mobile' => $mobile,
+                    'dob' => '1990-01-01',
+                    'marital_status' => 'Single',
+                    'nationality' => 'Indian',
+                    'address' => 'Chandrapur, Maharashtra',
+                    'city' => 'Chandrapur',
+                    'state' => 'Maharashtra',
+                    'pincode' => '442001',
+                    'nominee_name' => $fullName,
+                    'nominee_relation' => 'Self',
+                    'bank_holder' => $fullName,
+                    'bank_account_no' => '',
+                    'bank_ifsc' => '',
+                    'bank_name' => '',
+                    'bank_branch' => '',
+                    'aadhaar_no' => '',
+                    'pan_no' => '',
+                    'password' => 'Temp-' . bin2hex(random_bytes(8)),
+                ], $activate, $selfbv);
+            } catch (Throwable $ex) {
+                error_log('Bulk member creation failed: ' . $ex->getMessage());
+                $reason = $ex instanceof PDOException ? 'Database error; the failed member was not created.' : $ex->getMessage();
+                flash('error', 'Creation stopped after ' . $made . ' member(s). The failed member was not created: ' . e($reason));
                 break;
             }
             $made++;
             if ($firstCode === '') { $firstCode = $code; }
             $lastCode = $code;
-            /* first-time password = the User ID; must be changed after first login */
-            q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
-              [password_hash($code, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
-            if ($activate) {
-                q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
-            }
-            /* optional: give the member their completed joining BV (3,000)
-             * so they count as joining completed and show GREEN in the tree */
-            if ($selfbv) {
-                q("UPDATE users SET self_bv = ? WHERE id = ?", [$joinBv, $uid]);
-            }
             /* the next member goes directly below this one */
             $anchor = q_row("SELECT * FROM users WHERE id = ?", [$uid]);
         }
-        flash('success', $made . ' member' . ($made === 1 ? '' : 's') . ' created'
-            . ($firstCode ? ' (' . e($firstCode) . ' … ' . e($lastCode) . ')' : '')
-            . ($activate ? ' — all ACTIVE and KYC-verified' : '')
-            . ($selfbv ? ' — self BV ' . number_format($joinBv, 0) . ' (joining completed, GREEN in tree)' : '')
-            . '. First-time password: each member\'s own User ID.');
+        if ($made) {
+            flash('success', $made . ' member' . ($made === 1 ? '' : 's') . ' created'
+                . ($firstCode ? ' (' . e($firstCode) . ' … ' . e($lastCode) . ')' : '')
+                . ($activate ? ' — all ACTIVE and KYC-verified' : '')
+                . ($selfbv ? ' — each received Self BV at the current joining threshold' : '')
+                . '. First-time password: each member\'s own User ID.');
+        }
         redirect('bulk_members.php');
     }
 
@@ -229,52 +245,45 @@ if (is_post()) {
                 $anchor = $ch[$leg];
             }
             for ($i = 0; $i < $n; $i++) {
-                [$ok, $uid, $code] = register_distributor([
-                    'sponsor' => $anchor['username'],      /* the member above is the sponsor */
-                    'leg' => $leg,
-                    'placement' => (int)$anchor['id'],     /* directly below the member above */
-                    'placement_leg' => $leg,
-                    'full_name' => $fullName,
-                    'email' => $email,
-                    'mobile' => $mobile,
-                    'dob' => '1990-01-01',
-                    'marital_status' => 'Single',
-                    'nationality' => 'Indian',
-                    'address' => 'Chandrapur, Maharashtra',
-                    'city' => 'Chandrapur',
-                    'state' => 'Maharashtra',
-                    'pincode' => '442001',
-                    'nominee_name' => $fullName,
-                    'nominee_relation' => 'Self',
-                    'bank_holder' => $fullName,
-                    'bank_account_no' => '',
-                    'bank_ifsc' => '',
-                    'bank_name' => '',
-                    'bank_branch' => '',
-                    'aadhaar_no' => '',
-                    'pan_no' => '',
-                    /* first-time password = the User ID, like normal registration;
-                     * replaced immediately after the account is created */
-                    'password' => 'Temp-' . bin2hex(random_bytes(8)),
-                ]);
-                if (!$ok) {
+                try {
+                    [$uid, $code] = create_bulk_member_atomic([
+                        'sponsor' => $anchor['username'],      /* the member above is the sponsor */
+                        'leg' => $leg,
+                        'placement' => (int)$anchor['id'],     /* directly below the member above */
+                        'placement_leg' => $leg,
+                        'full_name' => $fullName,
+                        'email' => $email,
+                        'mobile' => $mobile,
+                        'dob' => '1990-01-01',
+                        'marital_status' => 'Single',
+                        'nationality' => 'Indian',
+                        'address' => 'Chandrapur, Maharashtra',
+                        'city' => 'Chandrapur',
+                        'state' => 'Maharashtra',
+                        'pincode' => '442001',
+                        'nominee_name' => $fullName,
+                        'nominee_relation' => 'Self',
+                        'bank_holder' => $fullName,
+                        'bank_account_no' => '',
+                        'bank_ifsc' => '',
+                        'bank_name' => '',
+                        'bank_branch' => '',
+                        'aadhaar_no' => '',
+                        'pan_no' => '',
+                        /* first-time password = the User ID, like normal registration;
+                         * replaced immediately after the account is created */
+                        'password' => 'Temp-' . bin2hex(random_bytes(8)),
+                    ], $activate, $selfbv);
+                } catch (Throwable $ex) {
+                    error_log('Bulk line creation failed: ' . $ex->getMessage());
+                    $reason = $ex instanceof PDOException ? 'Database error; the failed member was not created.' : $ex->getMessage();
                     $stopped = ($leg === 'L' ? 'Left' : 'Right') . ' line stopped after '
-                        . $madeByLeg[$leg] . ' member' . ($madeByLeg[$leg] === 1 ? '' : 's') . ': ' . $code;
+                        . $madeByLeg[$leg] . ' member(s). The failed member was not created: ' . $reason;
                     break;
                 }
                 $madeByLeg[$leg]++;
                 if ($firstByLeg[$leg] === '') { $firstByLeg[$leg] = $code; }
                 $lastByLeg[$leg] = $code;
-                /* first-time password = the User ID; must be changed after first login */
-                q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
-                  [password_hash($code, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
-                if ($activate) {
-                    q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
-                }
-                /* optional: completed joining BV (3,000) — GREEN in the tree */
-                if ($selfbv) {
-                    q("UPDATE users SET self_bv = ? WHERE id = ?", [$joinBv, $uid]);
-                }
                 $anchor = q_row("SELECT * FROM users WHERE id = ?", [$uid]);
             }
         }
@@ -333,8 +342,8 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
         exactly like normal registrations (the entered sponsor stays the introducer of every member).
         <b>Straight Lines</b> is the one-time setup tool: it places members one below another on the
         left and right of a sponsor (the member above is the sponsor).
-        <b>Wipe</b> deletes <u>every member except the company root</u> together with their orders,
-        commissions, wallets and payouts. All actions are irreversible — use with care.
+        <b>Wipe</b> deletes <u>every member except the company root</u> only when the entire network has no
+        business or reconciliation history. It is blocked once orders, BV, earnings, payouts or an audit exist. All actions are irreversible — use with care.
     </div>
 
     <form method="post" class="mt-2">
@@ -381,11 +390,10 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
                     <input type="checkbox" name="activate" value="1" checked> Active + KYC verified
                 </label>
                 <label style="font-weight:400;display:flex;align-items:center;gap:8px;margin-top:6px">
-                    <input type="checkbox" name="selfbv" value="1"> Self BV <?= number_format($joinBv, 0) ?> (joining completed — GREEN icon in tree)
+                    <input type="checkbox" name="selfbv" value="1"> Self BV <?= number_format($joinBv, 0) ?> (activates eligibility and may immediately credit income)
                 </label>
                 <div class="form-hint" style="margin-top:6px">
-                    Checked: every generated member gets Self BV <?= number_format($joinBv, 0) ?> and shows green in the tree right away.
-                    (The 🔄 Recalculate button on Plan Settings rebuilds BV from real orders only.)
+                    A Self BV grant activates eligibility, propagates team BV and can immediately credit income. No order is created; a historical preview will flag the difference from order totals.
                 </div>
             </div>
         </div>
@@ -460,13 +468,13 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
                 <label>&nbsp;</label>
                 <label style="font-weight:400;display:flex;align-items:center;gap:8px">
                     <input type="checkbox" name="activate" value="1" checked> Active + KYC verified
-                    <span style="font-size:12px;color:var(--ink-soft)">(needed for matching income)</span>
+                    <span style="font-size:12px;color:var(--ink-soft)">(manual earning activation and KYC)</span>
                 </label>
                 <label style="font-weight:400;display:flex;align-items:center;gap:8px;margin-top:6px">
-                    <input type="checkbox" name="selfbv" value="1"> Self BV <?= number_format($joinBv, 0) ?> (joining completed — GREEN icon in tree)
+                    <input type="checkbox" name="selfbv" value="1"> Self BV <?= number_format($joinBv, 0) ?> (activates eligibility and may immediately credit income)
                 </label>
                 <div class="form-hint" style="margin-top:6px">
-                    Checked: every line member gets Self BV <?= number_format($joinBv, 0) ?> and shows green in the tree right away.
+                    Checked: the Self BV grant activates eligibility, propagates team BV and can immediately credit sponsor, matching and rank income. No order is created; it will be flagged in a historical preview.
                 </div>
             </div>
         </div>
@@ -480,12 +488,11 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
         <input type="hidden" name="action" value="wipe">
         <b>Danger zone</b>
         <p style="font-size:13px;color:var(--ink-soft);margin:6px 0 12px">
-            Deletes every member except the company root (<?= e($rootUser ?: '—') ?>) —
-            including their orders, commissions, wallet transactions and payouts — and resets the
-            root's network counters. The root's own orders and wallet are kept.
+            Deletes every member except the company root (<?= e($rootUser ?: '—') ?>) only on an unused network.
+            It is blocked if any order, BV, commission, wallet, payout or reconciliation history exists.
             Member IDs then start from the beginning again (next member: <?= e('YSH' . (100000 + (int)($root['id'] ?? 0) + 1)) ?>).
         </p>
-        <button class="btn btn-danger" type="submit" data-confirm="DELETE EVERY member except the company root? This cannot be undone.">🗑️ Wipe Network (keep root)</button>
+        <button class="btn btn-danger" type="submit" data-confirm="DELETE EVERY member except the company root on this unused network? This cannot be undone.">🗑️ Wipe Unused Network (keep root)</button>
     </form>
 </div>
 

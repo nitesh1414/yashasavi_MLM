@@ -47,6 +47,30 @@ if ($isRoot) { $reasons[] = 'This is the company ROOT position — it can never 
 if ($downline > 0) { $reasons[] = 'This member has <b>' . number_format($downline) . ' downline members</b> below them — deleting would break the network tree. Move / remove the downline first.'; }
 if ($directs > 0) { $reasons[] = 'This member is the <b>direct sponsor of ' . number_format($directs) . ' member(s)</b> — those members would lose their sponsor.'; }
 if ($orders > 0) { $reasons[] = 'This member has <b>' . number_format($orders) . ' order(s)</b> (' . money_txt($orderSum['dp']) . ' DP / ' . number_format((float)$orderSum['bv']) . ' BV) — the BV and commission history of the whole team would become inconsistent.'; }
+$businessRecords = (int)q_val("SELECT COUNT(*) FROM commissions WHERE user_id = ?", [$id])
+    + (int)q_val("SELECT COUNT(*) FROM wallet_transactions WHERE user_id = ?", [$id])
+    + (int)q_val("SELECT COUNT(*) FROM payouts WHERE user_id = ?", [$id])
+    + (int)q_val("SELECT COUNT(*) FROM payout_statement_rows WHERE user_id = ?", [$id])
+    + (int)q_val("SELECT COUNT(*) FROM bv_logs WHERE user_id = ?", [$id])
+    + (int)q_val("SELECT COUNT(*) FROM points_logs WHERE user_id = ?", [$id]);
+if ($businessRecords || (float)$u['self_bv'] != 0 || (float)$u['left_bv'] != 0 || (float)$u['right_bv'] != 0
+    || (float)$u['wallet_balance'] != 0 || (float)$u['total_earned'] != 0 || (float)$u['total_withdrawn'] != 0
+    || (int)$u['matched_pairs'] || (int)$u['reward_points'] || (int)$u['rank_id']) {
+    $reasons[] = 'This member has BV, earnings, wallet, payout or other business history. Block the account instead so its history is preserved.';
+}
+if (income_rules_ready()) {
+    $referenced = (int)q_val("SELECT COUNT(*) FROM income_sponsor_events WHERE member_id = ? OR sponsor_id = ?", [$id, $id])
+        + (int)q_val("SELECT COUNT(*) FROM income_matching_state WHERE first_parent_id = ? AND first_bonus_status IN ('pending_match','pending_parent','paid')", [$id])
+        + (int)q_val("SELECT COUNT(*) FROM income_matching_state WHERE user_id = ? AND (processed_bv <> 0 OR points_processed_bv <> 0
+            OR pending_pairs <> 0 OR pending_bv <> 0 OR pending_amount <> 0 OR pending_points <> 0 OR first_match_seen <> 0
+            OR first_parent_id IS NOT NULL OR first_bonus_amount <> 0 OR first_bonus_order_id IS NOT NULL
+            OR first_bonus_commission_id IS NOT NULL OR first_bonus_status <> 'none')", [$id])
+        + (int)q_val("SELECT COUNT(*) FROM income_rank_events WHERE user_id = ?", [$id])
+        + (int)q_val("SELECT COUNT(*) FROM income_recalc_entries WHERE user_id = ?", [$id]);
+    if ($referenced) { $reasons[] = 'This member is referenced by an income event or reconciliation audit. Block the account instead to retain the audit trail.'; }
+} else {
+    $reasons[] = 'Deletion is paused until the initial historical income review has been completed.';
+}
 $canDelete = !$reasons;
 
 if (is_post()) {
@@ -56,16 +80,42 @@ if (is_post()) {
         flash('error', $u['username'] . ' cannot be deleted (see the reasons on their delete page). You can block them instead.');
         redirect('user_delete.php?id=' . $id);
     }
-    /* re-check under the just-deleted state cannot change here; delete the
-     * member's own money records (commissions, wallet, payout requests) and
-     * the account itself — nothing else references a downline-free,
-     * sponsor-free, order-free member */
-    db_tx(function () use ($id) {
-        q("DELETE FROM commissions WHERE user_id = ?", [$id]);
-        q("DELETE FROM wallet_transactions WHERE user_id = ?", [$id]);
-        q("DELETE FROM payouts WHERE user_id = ?", [$id]);
-        q("DELETE FROM users WHERE id = ?", [$id]);
-    });
+    try {
+        db_tx(function () use ($id) {
+            $ready = income_rules_ready(true);
+            if (!$ready) { throw new RuntimeException(income_maintenance_message()); }
+            $current = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [$id]);
+            if (!$current || !(int)$current['placement_id']) { throw new RuntimeException('The member cannot be deleted.'); }
+            $linked = (int)q_val("SELECT COUNT(*) FROM users WHERE placement_id = ? OR sponsor_id = ?", [$id, $id])
+                + (int)q_val("SELECT COUNT(*) FROM orders WHERE user_id = ?", [$id])
+                + (int)q_val("SELECT COUNT(*) FROM commissions WHERE user_id = ?", [$id])
+                + (int)q_val("SELECT COUNT(*) FROM wallet_transactions WHERE user_id = ?", [$id])
+                + (int)q_val("SELECT COUNT(*) FROM payouts WHERE user_id = ?", [$id])
+                + (int)q_val("SELECT COUNT(*) FROM payout_statement_rows WHERE user_id = ?", [$id])
+                + (int)q_val("SELECT COUNT(*) FROM bv_logs WHERE user_id = ?", [$id])
+                + (int)q_val("SELECT COUNT(*) FROM points_logs WHERE user_id = ?", [$id]);
+            if ($ready) {
+                $linked += (int)q_val("SELECT COUNT(*) FROM income_sponsor_events WHERE member_id = ? OR sponsor_id = ?", [$id, $id])
+                    + (int)q_val("SELECT COUNT(*) FROM income_matching_state WHERE first_parent_id = ? AND first_bonus_status IN ('pending_match','pending_parent','paid')", [$id])
+                    + (int)q_val("SELECT COUNT(*) FROM income_matching_state WHERE user_id = ? AND (processed_bv <> 0 OR points_processed_bv <> 0
+                        OR pending_pairs <> 0 OR pending_bv <> 0 OR pending_amount <> 0 OR pending_points <> 0 OR first_match_seen <> 0
+                        OR first_parent_id IS NOT NULL OR first_bonus_amount <> 0 OR first_bonus_order_id IS NOT NULL
+                        OR first_bonus_commission_id IS NOT NULL OR first_bonus_status <> 'none')", [$id])
+                    + (int)q_val("SELECT COUNT(*) FROM income_rank_events WHERE user_id = ?", [$id])
+                    + (int)q_val("SELECT COUNT(*) FROM income_recalc_entries WHERE user_id = ?", [$id]);
+            }
+            if ($linked || (float)$current['self_bv'] != 0 || (float)$current['left_bv'] != 0 || (float)$current['right_bv'] != 0
+                || (float)$current['wallet_balance'] != 0 || (float)$current['total_earned'] != 0 || (float)$current['total_withdrawn'] != 0
+                || (int)$current['matched_pairs'] || (int)$current['reward_points'] || (int)$current['rank_id']) {
+                throw new RuntimeException('The member now has linked business data. Nothing was deleted; block them instead.');
+            }
+            if ($ready) { q("DELETE FROM income_matching_state WHERE user_id = ?", [$id]); }
+            q("DELETE FROM users WHERE id = ?", [$id]);
+        });
+    } catch (Throwable $ex) {
+        flash('error', $ex->getMessage());
+        redirect('user_delete.php?id=' . $id);
+    }
     flash('success', 'Distributor ' . $u['username'] . ' (' . $u['full_name'] . ') has been deleted permanently.');
     redirect('users.php');
 }
@@ -130,7 +180,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Total withdrawn</td><td><?= money($u['total_withdrawn']) ?></td></tr>
                 <tr><td>Direct sponsor income</td><td><?= money($earn['sponsor']) ?></td></tr>
                 <tr><td>Matching income</td><td><?= money($earn['binary']) ?></td></tr>
-                <tr><td>50% Direct SP Match Income</td><td><?= money($earn['sponsor_matching']) ?></td></tr>
+                <tr><td>Placement Child First-Match Income</td><td><?= money($earn['sponsor_matching']) ?></td></tr>
                 <tr><td>Rank rewards</td><td><?= money($earn['rank']) ?></td></tr>
                 <tr><td>Orders</td><td><?= number_format((int)$orderSum['n']) ?> (<?= money($orderSum['dp']) ?> DP / <?= number_format((float)$orderSum['bv']) ?> BV)</td></tr>
                 <tr><td>Payout requests</td><td><?= number_format($payouts) ?></td></tr>

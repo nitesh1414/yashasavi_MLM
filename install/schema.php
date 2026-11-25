@@ -81,6 +81,65 @@ return [
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
+/* Version 1.8.50 income tracking: additive only. Existing installations
+ * must apply the SQL in DATABASE_CHANGES.sql before enabling the rules. */
+"CREATE TABLE IF NOT EXISTS income_matching_state (
+    user_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    processed_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    points_processed_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_pairs INT UNSIGNED NOT NULL DEFAULT 0,
+    pending_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_points INT UNSIGNED NOT NULL DEFAULT 0,
+    first_match_seen TINYINT(1) NOT NULL DEFAULT 0,
+    first_parent_id INT UNSIGNED NULL,
+    first_bonus_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    first_bonus_order_id INT UNSIGNED NULL,
+    first_bonus_commission_id INT UNSIGNED NULL,
+    first_bonus_status ENUM('none','pending_match','pending_parent','paid') NOT NULL DEFAULT 'none',
+    INDEX idx_parent_bonus (first_parent_id, first_bonus_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS income_sponsor_events (
+    member_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    sponsor_id INT UNSIGNED NULL,
+    order_id INT UNSIGNED NULL,
+    amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    joining_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    status ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
+    commission_id INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL,
+    paid_at DATETIME NULL,
+    INDEX idx_sponsor_pending (sponsor_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS income_rank_events (
+    user_id INT UNSIGNED NOT NULL,
+    rank_id INT UNSIGNED NOT NULL,
+    amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, rank_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS income_recalc_runs (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT UNSIGNED NOT NULL,
+    snapshot_hash CHAR(64) NOT NULL,
+    plan_json LONGTEXT NOT NULL,
+    summary_json LONGTEXT NOT NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS income_recalc_entries (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    run_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    before_json LONGTEXT NOT NULL,
+    after_json LONGTEXT NOT NULL,
+    adjustment_json LONGTEXT NOT NULL,
+    INDEX idx_run (run_id),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
 "CREATE TABLE IF NOT EXISTS categories (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,

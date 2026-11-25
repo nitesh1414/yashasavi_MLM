@@ -18,7 +18,9 @@ function seed_database($fresh = false)
     /*  Drop existing tables (fresh install)                            */
     /* ---------------------------------------------------------------- */
     if ($fresh) {
-        $tables = ['wallet_transactions', 'commissions', 'payouts', 'order_items', 'orders',
+        $tables = ['income_recalc_entries', 'income_recalc_runs', 'income_rank_events', 'income_sponsor_events', 'income_matching_state',
+                   'payout_statement_rows', 'payout_statements', 'points_logs', 'bv_logs',
+                   'wallet_transactions', 'commissions', 'payouts', 'order_items', 'orders',
                    'announcements', 'enquiries', 'documents', 'testimonials', 'sliders',
                    'pages', 'products', 'categories', 'users', 'award_rewards', 'plan_levels',
                    'ranks', 'plan_settings', 'admins', 'settings'];
@@ -96,6 +98,12 @@ function seed_database($fresh = false)
     foreach ($D['settings'] as $k => $v) {
         save_setting($k, $v);
     }
+
+    /* New installations have no history to reconcile. Existing sites must
+     * apply DATABASE_CHANGES.sql and explicitly confirm a recalculation. */
+    save_setting('income_lock_1850', '1');
+    save_setting('income_rules_1850', 'ready');
+    q("INSERT INTO income_matching_state (user_id) SELECT id FROM users");
 
     /* ---------------------------------------------------------------- */
     /*  Categories                                                      */
