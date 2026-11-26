@@ -2,6 +2,12 @@
 /** E-wallet — balance + all transactions */
 require_once __DIR__ . '/../includes/init.php';
 $u = require_user();
+$wallet = weekly_wallet_snapshot($u['id']);
+$u['wallet_balance'] = $wallet['wallet_balance'];
+$u['total_earned'] = $wallet['total_earned'];
+$u['total_withdrawn'] = $wallet['total_withdrawn'];
+$reserved = $wallet['reserved'];
+$spendable = $wallet['available'];
 
 $type = get_str('type', '');
 $where = "user_id = ?";
@@ -20,7 +26,9 @@ require __DIR__ . '/../includes/dash_header.php';
 ?>
 
 <div class="stat-grid">
-    <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Current Balance<br>(before deduction)</span></div></div>
+    <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(includes reserved)</span></div></div>
+    <div class="stat-card gold"><div class="st-ico">📅</div><div><b><?= money($reserved) ?></b><span>Reserved for weekly payouts</span></div></div>
+    <div class="stat-card teal"><div class="st-ico">💳</div><div><b><?= money($spendable) ?></b><span>Available to spend</span></div></div>
     <div class="stat-card gold"><div class="st-ico">💰</div><div><b><?= money($u['total_earned']) ?></b><span>Total Earned (all time)</span></div></div>
     <div class="stat-card red"><div class="st-ico">🏦</div><div><b><?= money($u['total_withdrawn']) ?></b><span>Total Withdrawn</span></div></div>
 </div>

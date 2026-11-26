@@ -22,6 +22,11 @@ function db()
                 PDO::ATTR_EMULATE_PREPARES   => true,
             ]);
         } catch (PDOException $e) {
+            // Cron must fail with a non-zero exit code for monitoring instead
+            // of die() reporting a database outage as a successful run.
+            if (defined('YASH_CLI') && YASH_CLI) {
+                throw new RuntimeException('Database connection failed; check the configured database and server.', 0, $e);
+            }
             if (APP_ENV === 'development') {
                 die('Database connection failed: ' . htmlspecialchars($e->getMessage())
                     . '<br><br>Check the values in <b>config.php</b>. If the database has not been '

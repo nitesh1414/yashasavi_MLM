@@ -306,24 +306,24 @@ function credit_wallet($userId, $amount, $refType, $refId, $note)
     return $newBal;
 }
 
-/** Debit a user's wallet. Returns new balance or null when insufficient. */
+/** Debit only unreserved wallet funds. All debit paths use the same mutex
+ * and row locks as weekly report generation, settlement and reconciliation. */
 function debit_wallet($userId, $amount, $refType, $refId, $note)
 {
     $amount = round((float)$amount, 2);
-    if ($amount <= 0) {
-        return null;
-    }
-    $u = q_row("SELECT wallet_balance FROM users WHERE id = ? FOR UPDATE", [$userId]);
-    if (!$u) { throw new RuntimeException('Wallet owner not found.'); }
-    if ((float)$u['wallet_balance'] < $amount) {
-        return null;
-    }
-    $newBal = round((float)$u['wallet_balance'] - $amount, 2);
-    q("UPDATE users SET wallet_balance = ? WHERE id = ?", [$newBal, $userId]);
-    q("INSERT INTO wallet_transactions (user_id, type, amount, balance_after, ref_type, ref_id, note, created_at)
-       VALUES (?, 'debit', ?, ?, ?, ?, ?, ?)",
-      [$userId, $amount, $newBal, $refType, $refId, $note, now()]);
-    return $newBal;
+    if (!is_finite($amount) || $amount <= 0) { return null; }
+    return db_tx(function () use ($userId, $amount, $refType, $refId, $note) {
+        income_rules_ready(true); // serialize even when called without an outer transaction
+        $u = q_row("SELECT id, wallet_balance FROM users WHERE id = ? FOR UPDATE", [(int)$userId]);
+        if (!$u) { throw new RuntimeException('Wallet owner not found.'); }
+        if ($amount > weekly_available_wallet($u, true)) { return null; }
+        $newBal = round((float)$u['wallet_balance'] - $amount, 2);
+        q("UPDATE users SET wallet_balance = ? WHERE id = ?", [$newBal, $userId]);
+        q("INSERT INTO wallet_transactions (user_id, type, amount, balance_after, ref_type, ref_id, note, created_at)
+           VALUES (?, 'debit', ?, ?, ?, ?, ?, ?)",
+          [$userId, $amount, $newBal, $refType, $refId, $note, now()]);
+        return $newBal;
+    });
 }
 
 /** Record a commission row and credit the wallet. */
@@ -621,7 +621,10 @@ function request_payout($userId, $amount)
         if ($amount > $eligible) {
             return [false, 'Amount exceeds your eligible payout income (' . money_txt($eligible) . '). Sponsor, matching, placement first-match and rank income are payable.'];
         }
-        if ($amount > (float)$u['wallet_balance']) { return [false, 'Amount exceeds your wallet balance.']; }
+        $available = weekly_available_wallet($u, true);
+        if ($amount > $available) {
+            return [false, 'Amount exceeds your available wallet balance (' . money_txt($available) . '); weekly payout reservations cannot be spent.'];
+        }
         [$tds, $admin, $net] = payout_deductions($amount, $plan);
         $no = payout_no();
         q("INSERT INTO payouts (user_id, request_no, amount, tds_amount, admin_charge, net_amount,
@@ -648,6 +651,14 @@ function request_payout($userId, $amount)
  */
 function payout_eligible_amount($userId, $upto = null, $lock = false)
 {
+    return max(0.0, payout_entitlement_difference($userId, $upto, $lock));
+}
+
+/** Signed entitlement. For settlement, $throughPayoutId limits cutoff
+ * consumption to requests created no later than this reservation. Later-week
+ * reservations cannot invalidate an earlier report merely by existing. */
+function payout_entitlement_difference($userId, $upto = null, $lock = false, $throughPayoutId = null)
+{
     $sql = "SELECT COALESCE(SUM(amount), 0) FROM commissions
             WHERE user_id = ? AND status = 'credited'
               AND type IN ('sponsor','binary','sponsor_matching','rank')";
@@ -659,8 +670,10 @@ function payout_eligible_amount($userId, $upto = null, $lock = false)
     if ($lock) { $sql .= ' FOR UPDATE'; }
     $gross = (float)q_val($sql, $params);
     $payoutSql = "SELECT COALESCE(SUM(amount), 0) FROM payouts WHERE user_id = ? AND status IN ('pending','paid')";
+    $payoutParams = [(int)$userId];
+    if ($throughPayoutId !== null) { $payoutSql .= ' AND id <= ?'; $payoutParams[] = (int)$throughPayoutId; }
     if ($lock) { $payoutSql .= ' FOR UPDATE'; }
-    $taken = (float)q_val($payoutSql, [(int)$userId]);
+    $taken = (float)q_val($payoutSql, $payoutParams);
     $postCutoffDebits = 0.0;
     if ($upto) {
         // Do not let a new, not-yet-closed week's earnings replace older
@@ -679,152 +692,19 @@ function payout_eligible_amount($userId, $upto = null, $lock = false)
             $postCutoffDebits += min(0.0, (float)$adjustment['net']);
         }
     }
-    return max(0.0, round($gross + $postCutoffDebits - $taken, 2));
+    return round($gross + $postCutoffDebits - $taken, 2);
 }
 
-/**
- * Generate the WEEKLY payout report + payout statement (super admin only,
- * run every Monday): income is counted up to the LAST SATURDAY 11:59 PM,
- * so the statement covers the completed Sunday-to-Saturday week. Every
- * member whose eligible income — the three plan incomes plus rank
- * rewards — has
- * reached the payout minimum is listed on the statement. Members with completed KYC and bank
- * details get a pending payout (wallet debited, TDS + admin charge
- * deducted from the payout amount); members with incomplete KYC or bank
- * details are listed with "payout will not be done" and keep their
- * balance for the next week. Returns the run timestamp identifying the
- * rows (payout_report_rows) plus the created statement id.
- *
- * Returns [ok(bool), runTs(string|null), stats(array)] with
- * stats = [created, blocked, skipped, total, net, statement_id].
- */
-function generate_payout_report()
-{
-    /* income is counted up to the last Saturday 11:59 PM (the completed
-     * Sunday → Saturday week); the report is generated every Monday */
-    $sat = date('Y-m-d', strtotime('last saturday'));
-    $cut = $sat . ' 23:59:59';
-
-    $stats = ['created' => 0, 'blocked' => 0, 'skipped' => 0, 'total' => 0.0, 'net' => 0.0, 'statement_id' => 0];
-    $runTs = null;
-
-    db_tx(function () use ($cut, &$stats, &$runTs) {
-        if (!income_rules_ready(true)) { $stats['error'] = income_maintenance_message(); return; }
-        $plan = get_plan(true);
-        if (!payout_settings_valid($plan)) { $stats['error'] = 'Payout settings are invalid; check TDS, admin charges and the minimum.'; return; }
-        $min = (float)$plan['payout_min'];
-        $cands = q_all(
-            "SELECT u.id, u.username, u.full_name, u.mobile, u.wallet_balance, u.kyc_status,
-                    u.bank_name, u.bank_account_no, u.bank_ifsc, u.bank_holder,
-                    COALESCE(c.gross, 0) AS gross, COALESCE(p.taken, 0) AS taken
-             FROM users u
-             LEFT JOIN (SELECT user_id, SUM(amount) AS gross FROM commissions
-                        WHERE status = 'credited' AND type IN ('sponsor','binary','sponsor_matching','rank')
-                          AND created_at <= ? GROUP BY user_id) c ON c.user_id = u.id
-             LEFT JOIN (SELECT user_id, SUM(amount) AS taken FROM payouts
-                        WHERE status IN ('pending','paid') GROUP BY user_id) p ON p.user_id = u.id
-             WHERE u.status = 'active'",
-            [$cut]);
-        $runTs = now();
-
-        /* statement header — one per report run */
-        q("INSERT INTO payout_statements (run_ts, period_date, total_gross, total_tds, total_admin, total_net, members_done, members_blocked, created_at)
-           VALUES (?, ?, 0, 0, 0, 0, 0, 0, ?)", [$runTs, substr($cut, 0, 10), $runTs]);
-        $statementId = (int)db()->lastInsertId();
-        $stats['statement_id'] = $statementId;
-        $totGross = $totTds = $totAdm = $totNet = 0.0;
-
-        foreach ($cands as $candidate) {
-            $u = q_row("SELECT * FROM users WHERE id = ? FOR UPDATE", [(int)$candidate['id']]);
-            if (!$u || $u['status'] !== 'active') { continue; }
-            // Respect the completed-week cutoff AND current net entitlement;
-            // the cutoff calculation also reserves later negative corrections.
-            $amount = min(payout_eligible_amount($u['id'], $cut, true), payout_eligible_amount($u['id'], null, true));
-            if ($amount < $min) { continue; } /* not payout-eligible this week */
-
-            /* the wallet may hold less if the member spent it on purchases */
-            if ($amount > (float)$u['wallet_balance']) {
-                $amount = round((float)$u['wallet_balance'], 2);
-            }
-            [$tds, $adm, $net] = payout_deductions($amount, $plan);
-
-            $kycOk = $u['kyc_status'] === 'verified';
-            $bankOk = trim((string)$u['bank_name']) !== '' && trim((string)$u['bank_account_no']) !== ''
-                   && trim((string)$u['bank_ifsc']) !== '';
-
-            if ($amount < $min) {
-                /* wallet below minimum after the cap — listed, but no payout */
-                $stats['skipped']++;
-                q("INSERT INTO payout_statement_rows
-                   (statement_id, user_id, username, full_name, mobile, bank_name, bank_account_no, bank_ifsc, bank_holder,
-                    kyc_status, bank_ok, gross, tds, admin_charge, net, payout_done, payout_id, reason)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, NULL, ?)",
-                  [$statementId, $u['id'], $u['username'], $u['full_name'], $u['mobile'],
-                   $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'],
-                   $u['kyc_status'], (int)$bankOk, $amount, 'Wallet balance below minimum — payout will not be done']);
-                continue;
-            }
-
-            $reason = null;
-            if (!$kycOk && !$bankOk) { $reason = 'KYC and bank details not completed — payout will not be done'; }
-            elseif (!$kycOk) { $reason = 'KYC not completed — payout will not be done'; }
-            elseif (!$bankOk) { $reason = 'Bank details not completed — payout will not be done'; }
-
-            if ($reason !== null) {
-                /* incomplete KYC / bank — on the statement, balance stays in the wallet */
-                $stats['blocked']++;
-                q("INSERT INTO payout_statement_rows
-                   (statement_id, user_id, username, full_name, mobile, bank_name, bank_account_no, bank_ifsc, bank_holder,
-                    kyc_status, bank_ok, gross, tds, admin_charge, net, payout_done, payout_id, reason)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)",
-                  [$statementId, $u['id'], $u['username'], $u['full_name'], $u['mobile'],
-                   $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'],
-                   $u['kyc_status'], (int)$bankOk, $amount, $tds, $adm, $net, $reason]);
-                continue;
-            }
-
-            /* KYC + bank completed — the payout will be done */
-            $no = 'RPT' . date('ymd', strtotime($cut)) . strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
-            q("INSERT INTO payouts (user_id, request_no, amount, tds_amount, admin_charge, net_amount,
-               status, bank_name, bank_account_no, bank_ifsc, bank_holder, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)",
-              [$u['id'], $no, $amount, $tds, $adm, $net,
-               $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'], $runTs]);
-            $pid = (int)db()->lastInsertId();
-            if (debit_wallet($u['id'], $amount, 'payout', $pid,
-                'Payout report ' . $no . ' (' . date('d M Y', strtotime($cut)) . ')') === null) {
-                throw new RuntimeException('Wallet debit failed; payout report was rolled back.');
-            }
-
-            q("INSERT INTO payout_statement_rows
-               (statement_id, user_id, username, full_name, mobile, bank_name, bank_account_no, bank_ifsc, bank_holder,
-                kyc_status, bank_ok, gross, tds, admin_charge, net, payout_done, payout_id, reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 1, ?, NULL)",
-              [$statementId, $u['id'], $u['username'], $u['full_name'], $u['mobile'],
-               $u['bank_name'], $u['bank_account_no'], $u['bank_ifsc'], $u['bank_holder'],
-               $u['kyc_status'], $amount, $tds, $adm, $net, $pid]);
-
-            $stats['created']++;
-            $stats['total'] = round($stats['total'] + $amount, 2);
-            $stats['net'] = round($stats['net'] + $net, 2);
-            $totGross = round($totGross + $amount, 2);
-            $totTds = round($totTds + $tds, 2);
-            $totAdm = round($totAdm + $adm, 2);
-            $totNet = round($totNet + $net, 2);
-        }
-
-        q("UPDATE payout_statements SET total_gross = ?, total_tds = ?, total_admin = ?, total_net = ?,
-           members_done = ?, members_blocked = ? WHERE id = ?",
-          [$totGross, $totTds, $totAdm, $totNet, $stats['created'], $stats['blocked'] + $stats['skipped'], $statementId]);
-    });
-
-    return [!empty($runTs), $runTs, $stats];
-}
+/* New weekly reports reserve wallet funds; legacy payout requests keep their
+ * original held/debited accounting. */
+require_once __DIR__ . '/weekly_payouts.php';
 
 /** One payout statement (header row) by id. */
 function payout_statement($id)
 {
-    return q_row("SELECT * FROM payout_statements WHERE id = ?", [(int)$id]);
+    return q_row("SELECT s.*, w.status AS report_status, w.paid_at AS report_paid_at
+                  FROM payout_statements s LEFT JOIN weekly_payout_runs w ON w.statement_id=s.id
+                  WHERE s.id = ?", [(int)$id]);
 }
 
 /** Week label of a statement: "from Sunday <d> - to Saturday <d>". */
@@ -835,12 +715,23 @@ function payout_statement_week_label(array $statement)
     return 'from Sunday ' . dmy($sun) . ' - to Saturday ' . dmy($sat);
 }
 
-/** Statement snapshots say whether a request was created, not whether it was
- * paid. Show the linked request's current status without changing the snapshot. */
-function payout_statement_status(array $row)
+/** A new weekly payout's state comes from both the report and its own
+ * reservation. Legacy pending requests were already debited, not reserved. */
+function payout_record_status(array $row)
 {
-    if (empty($row['payout_done'])) { return ['No payout created', 'danger']; }
-    switch ($row['payout_status'] ?? null) {
+    $status = $row['payout_status'] ?? $row['status'] ?? null;
+    $report = $row['report_status'] ?? null;
+    $reservation = $row['reservation_status'] ?? null;
+    if ($report !== null || $reservation !== null) {
+        if ($reservation === 'released' && $status === 'rejected') { return ['Unpaid · released', 'warning']; }
+        if ($reservation === 'paid' && $status === 'paid') { return ['Paid', 'success']; }
+        if ($reservation === 'reserved' && $status === 'pending') {
+            if ($report === 'unpaid') { return ['Unpaid', 'warning']; }
+            if ($report === 'in_process') { return ['In Process', 'info']; }
+        }
+        return ['Request status unavailable', 'warning'];
+    }
+    switch ($status) {
         case 'pending': return ['Pending processing', 'warning'];
         case 'paid': return ['Marked paid', 'success'];
         case 'rejected': return ['Rejected / refunded', 'danger'];
@@ -848,12 +739,25 @@ function payout_statement_status(array $row)
     }
 }
 
+/** Statement snapshots say whether a request was created, not whether it was
+ * paid. Show the linked request's current status without changing the snapshot. */
+function payout_statement_status(array $row)
+{
+    if (empty($row['payout_done'])) {
+        return !empty($row['report_status']) ? ['Unpaid', 'warning'] : ['No payout created', 'danger'];
+    }
+    return payout_record_status($row);
+}
+
 /** Statement snapshots with the linked request's current status. */
 function payout_statement_rows($statementId)
 {
-    return q_all("SELECT r.*, p.status AS payout_status, p.paid_at AS payout_paid_at
+    return q_all("SELECT r.*, p.status AS payout_status, p.paid_at AS payout_paid_at, p.reject_reason AS payout_reason,
+                         w.status AS report_status, wr.status AS reservation_status
                   FROM payout_statement_rows r
                   LEFT JOIN payouts p ON p.id = r.payout_id AND p.user_id = r.user_id
+                  LEFT JOIN weekly_payout_runs w ON w.statement_id=r.statement_id
+                  LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=r.payout_id AND wr.user_id=r.user_id AND wr.statement_id=r.statement_id
                   WHERE r.statement_id = ? ORDER BY r.payout_done DESC, r.username ASC", [(int)$statementId]);
 }
 
@@ -861,19 +765,24 @@ function payout_statement_rows($statementId)
 function member_payout_statements($userId)
 {
     return q_all("SELECT s.*, r.payout_done, r.payout_id, r.gross, r.tds, r.admin_charge, r.net,
-                         r.reason, r.kyc_status, r.bank_ok, p.status AS payout_status, p.paid_at AS payout_paid_at
+                         r.reason, r.kyc_status, r.bank_ok, p.status AS payout_status, p.paid_at AS payout_paid_at,
+                         p.reject_reason AS payout_reason, w.status AS report_status, wr.status AS reservation_status
                   FROM payout_statement_rows r
                   JOIN payout_statements s ON s.id = r.statement_id
                   LEFT JOIN payouts p ON p.id = r.payout_id AND p.user_id = r.user_id
+                  LEFT JOIN weekly_payout_runs w ON w.statement_id=s.id
+                  LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=r.payout_id AND wr.user_id=r.user_id AND wr.statement_id=r.statement_id
                   WHERE r.user_id = ?
-                  ORDER BY s.id DESC", [(int)$userId]);
+                  ORDER BY s.period_date DESC, s.id DESC", [(int)$userId]);
 }
 
 /** All payout rows of one report run (same creation timestamp). */
 function payout_report_rows($runTs)
 {
-    return q_all("SELECT p.*, u.username, u.full_name, u.mobile
+    return q_all("SELECT p.*, u.username, u.full_name, u.mobile, wr.status AS reservation_status, w.status AS report_status
                   FROM payouts p JOIN users u ON u.id = p.user_id
+                  LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=p.id
+                  LEFT JOIN weekly_payout_runs w ON w.statement_id=wr.statement_id
                   WHERE p.created_at = ? ORDER BY u.username ASC", [$runTs]);
 }
 
@@ -885,6 +794,10 @@ function process_payout($payoutId, $action, $adminId, $reason = '')
         $p = q_row("SELECT * FROM payouts WHERE id = ? FOR UPDATE", [$payoutId]);
         if (!$p) {
             return [false, 'Payout request not found.'];
+        }
+        weekly_payout_require_storage();
+        if (q_row("SELECT payout_id FROM weekly_payout_reservations WHERE payout_id = ? FOR UPDATE", [(int)$payoutId])) {
+            return [false, 'Weekly report payouts must be processed together from their statement.'];
         }
         if ($p['status'] !== 'pending') {
             return [false, 'Payout request is already processed.'];

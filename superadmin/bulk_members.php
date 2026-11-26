@@ -70,7 +70,7 @@ if (is_post()) {
                 if (!income_rules_ready(true)) { throw new RuntimeException(income_maintenance_message()); }
                 foreach (['orders', 'order_items', 'commissions', 'wallet_transactions', 'payouts', 'payout_statements',
                           'payout_statement_rows', 'bv_logs', 'points_logs', 'income_sponsor_events', 'income_rank_events',
-                          'income_recalc_runs', 'income_recalc_entries'] as $table) {
+                          'income_recalc_runs', 'income_recalc_entries', 'weekly_payout_runs', 'weekly_payout_reservations'] as $table) {
                     if ((int)q_val("SELECT COUNT(*) FROM $table") > 0) {
                         throw new RuntimeException('Wipe is blocked because business or reconciliation history exists. No data was deleted.');
                     }

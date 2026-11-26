@@ -36,7 +36,8 @@ super-admin MLM management console, in one self-contained PHP + MySQL codebase w
   manual activation, full profile + genealogy
 - Orders: approve / reject — **approval instantly runs the commission engine**
 - Commission ledger with filters + CSV export
-- Payouts: approve / reject (reject refunds the wallet), CSV export for the bank run
+- Weekly payout reports scheduled for Sunday, report-level Unpaid / In Process / Paid,
+  reservation-safe wallets and CSV export; manual/legacy requests are handled individually
 - E-wallets: full transaction ledger + manual credit/debit adjustments
 - MLM plan settings (joining BV, sponsor rate, pair unit and rate, placement first-match
   percentage, points, TDS, admin charge and payout minimum)
@@ -86,6 +87,50 @@ These instructions are for a **new, empty database only**. For an existing insta
 never run the fresh installer or seed on production: rehearse with a restored staging
 copy and follow the maintenance, backup, SQL and review steps in
 [DATABASE_CHANGES.sql](DATABASE_CHANGES.sql).
+
+## Weekly payout scheduler
+
+The application **does not install a scheduler by itself**. After deploying and
+migrating the database, configure the server's cron (or hosting control panel)
+to invoke the CLI script, for example every 15 minutes:
+
+```cron
+*/15 * * * * /usr/bin/php /absolute/path/to/yashasavi_MLM/cron/weekly_payouts.php >> /var/log/yashasavi-weekly-payouts.log 2>&1
+```
+
+Use the actual PHP executable and absolute application path, a restricted service
+account with database access, and a writable, private, rotated log. Monitor job
+failures and missing reports, and keep the server clock accurate and synchronized.
+Cron may use the server's timezone: the script uses `APP_TIMEZONE` (default
+`Asia/Kolkata`) to determine the latest completed Saturday.
+It creates the new report on the first invocation after Sunday 00:00 local time.
+Repeated or overlapping invocations are safe. On the first run it starts at the
+latest completed week; thereafter it catches up missing weeks in order (up to 52
+per invocation). An existing legacy report for the same week is left untouched
+and prevents a duplicate. The superadmin's **Run Due Reports** button is a manual
+fallback, not a replacement for cron. The script is CLI-only and returns nonzero
+on failure; no HTTP endpoint or secret URL is needed.
+
+Reports include eligible sponsor, matching, placement first-match and rank income
+through Saturday, including earlier unpaid income. The minimum, wallet availability,
+active status, verified KYC and bank details apply. Eligible gross amounts are
+reserved at generation: the displayed wallet balance is unchanged, but those funds
+cannot be spent or requested again. Ineligible income carries forward. The report
+starts **Unpaid**; a superadmin may mark it **In Process** or **Paid**. Paid rechecks
+eligibility and bank details, debits each still-eligible gross reservation exactly
+once in one transaction, and leaves ineligible rows unpaid. Members who become
+eligible after generation are included in a later report, not added to the existing
+reservation batch. Uploading new KYC documents sends verification back to Pending;
+a superadmin must review the current documents before verifying them. An empty
+report may be finalized as Paid with zero members paid; individual ineligible rows
+still show Unpaid. Deductions are recorded at generation and lifetime earned is not
+reduced by the payout. This action records payment only: **it does not initiate a
+bank transfer**. Arrange and verify the actual bank payment separately. A superadmin
+can explicitly release all remaining
+reservations on an unpaid report, for example before correcting income; this leaves
+members unpaid and makes funds available without a debit or refund. Old pending
+payouts and separate manual requests were already debited and retain their original
+individual processing/refund behavior.
 
 ## Default credentials (change after first login!)
 

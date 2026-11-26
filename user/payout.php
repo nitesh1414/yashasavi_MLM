@@ -6,6 +6,7 @@ $u = require_user();
 $plan = get_plan();
 
 $rows = payout_report_periods($u['id'], 'incentive');
+$recentStatements = array_slice(member_payout_statements($u['id']), 0, 5);
 $map = payout_column_map('incentive');
 
 /* column totals across all weeks */
@@ -30,6 +31,26 @@ require __DIR__ . '/../includes/dash_header.php';
 $tdsPct = rtrim(rtrim(number_format((float)$plan['tds_percent'], 2, '.', ''), '0'), '.');
 $admPct = rtrim(rtrim(number_format((float)$plan['admin_charge_percent'], 2, '.', ''), '0'), '.');
 ?>
+
+<div class="card">
+    <div class="card-title">📄 Your Weekly Payouts <a class="right" href="payout-balance.php#weekly-statements">View all →</a></div>
+    <p class="form-hint">Actual report amounts may include eligible income carried forward from earlier weeks. Status is current; the income-by-week table below is an estimate, not a payment record.</p>
+    <?php if (!$recentStatements): ?>
+        <div class="empty-state">No weekly payout statements yet.</div>
+    <?php else: ?>
+    <div class="table-wrap" style="box-shadow:none"><table class="table">
+        <thead><tr><th>Week</th><th>Gross at generation</th><th>Net at generation</th><th>Your payout status</th><th></th></tr></thead><tbody>
+        <?php foreach ($recentStatements as $st): ?>
+        <tr>
+            <td><?= payout_statement_week_label($st) ?></td><td><?= money($st['gross']) ?></td><td><?= money($st['net']) ?></td>
+            <td><?php [$label, $style] = payout_statement_status($st); ?><?= badge($label, $style) ?>
+                <?php if (!empty($st['payout_reason']) || (!(int)$st['payout_done'] && $st['reason'])): ?><br><small><?= e($st['payout_reason'] ?: $st['reason']) ?></small><?php endif; ?></td>
+            <td><a class="btn btn-outline btn-sm" href="receipt.php?statement=<?= (int)$st['id'] ?>">View</a></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody></table></div>
+    <?php endif; ?>
+</div>
 
 <div class="card">
     <div class="card-title">

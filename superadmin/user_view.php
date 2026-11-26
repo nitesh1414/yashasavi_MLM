@@ -2,6 +2,7 @@
 /** Distributor detail view (super admin) */
 require_once __DIR__ . '/../includes/init.php';
 require_once __DIR__ . '/../includes/tree_renderer.php';
+require_once __DIR__ . '/../includes/kyc.php';
 $a = require_superadmin();
 
 $id = get_int('id');
@@ -18,12 +19,14 @@ if (!$u) {
 if (is_post()) {
     verify_csrf();
     $action = post_str('action');
-    if ($action === 'kyc_verify') {
-        q("UPDATE users SET kyc_status='verified', kyc_remark=NULL WHERE id=?", [$id]);
-        flash('success', 'KYC marked verified.');
-    } elseif ($action === 'kyc_reject') {
-        q("UPDATE users SET kyc_status='rejected', kyc_remark=? WHERE id=?", [post_str('remark') ?: 'Rejected by admin', $id]);
-        flash('success', 'KYC marked rejected.');
+    if ($action === 'kyc_verify' || $action === 'kyc_reject') {
+        try {
+            kyc_review_decide($id, $action, post_str('kyc_snapshot'), post_str('remark'));
+            flash('success', $action === 'kyc_verify' ? 'KYC marked verified.' : 'KYC marked rejected.');
+        } catch (Throwable $ex) {
+            error_log('KYC review failed: ' . $ex->getMessage());
+            flash('error', $ex instanceof PDOException ? 'KYC review failed; no changes were saved.' : $ex->getMessage());
+        }
     } elseif ($action === 'activate') {
         try {
             [$ok, $message] = income_change_member_status($id, 'activate');
@@ -40,7 +43,10 @@ $teamCounts = team_counts($u);
 $earn = user_earnings_breakdown($u['id']);
 $directs = q_all("SELECT id, username, full_name, is_active, self_bv, created_at FROM users WHERE sponsor_id = ? ORDER BY id DESC LIMIT 10", [$id]);
 $orders = q_all("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 10", [$id]);
-$payouts = q_all("SELECT * FROM payouts WHERE user_id = ? ORDER BY id DESC LIMIT 10", [$id]);
+$payouts = q_all("SELECT p.*, wr.status AS reservation_status, w.status AS report_status FROM payouts p
+                  LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=p.id
+                  LEFT JOIN weekly_payout_runs w ON w.statement_id=wr.statement_id
+                  WHERE p.user_id = ? ORDER BY p.id DESC LIMIT 10", [$id]);
 $commissions = q_all("SELECT c.*, o.order_no FROM commissions c LEFT JOIN orders o ON o.id=c.order_id WHERE c.user_id = ? ORDER BY c.id DESC LIMIT 10", [$id]);
 
 $activeKey = 'users';
@@ -167,6 +173,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="kyc_verify">
+                <input type="hidden" name="kyc_snapshot" value="<?= e(kyc_review_snapshot($u)) ?>">
                 <button class="btn btn-primary btn-sm" type="submit">✔ Mark Verified</button>
             </form>
             <?php endif; ?>
@@ -174,6 +181,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <form method="post" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="kyc_reject">
+                <input type="hidden" name="kyc_snapshot" value="<?= e(kyc_review_snapshot($u)) ?>">
                 <input class="form-control" name="remark" placeholder="Reason (optional)" style="max-width:200px">
                 <button class="btn btn-danger btn-sm" type="submit">✖ Reject</button>
             </form>
@@ -223,7 +231,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr>
                     <td><?= e($p['request_no']) ?></td>
                     <td><?= money($p['amount']) ?></td>
-                    <td><?= status_badge($p['status']) ?></td>
+                    <td><?php [$label, $style] = payout_record_status($p); ?><?= badge($label, $style) ?></td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>

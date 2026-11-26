@@ -382,6 +382,32 @@ return [
     INDEX idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
+/* Weekly periods are unique without altering or reinterpreting legacy reports. */
+"CREATE TABLE IF NOT EXISTS weekly_payout_runs (
+    period_end DATE NOT NULL PRIMARY KEY,
+    statement_id INT UNSIGNED NULL,
+    status ENUM('unpaid','in_process','paid','legacy') NOT NULL DEFAULT 'unpaid',
+    created_at DATETIME NOT NULL,
+    in_process_at DATETIME NULL,
+    in_process_by INT UNSIGNED NULL,
+    paid_at DATETIME NULL,
+    paid_by INT UNSIGNED NULL,
+    UNIQUE KEY uq_weekly_statement (statement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS weekly_payout_reservations (
+    payout_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    statement_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    status ENUM('reserved','paid','released') NOT NULL DEFAULT 'reserved',
+    created_at DATETIME NOT NULL,
+    settled_at DATETIME NULL,
+    UNIQUE KEY uq_weekly_member (statement_id, user_id),
+    INDEX idx_weekly_user_status (user_id, status),
+    INDEX idx_weekly_statement (statement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
 "CREATE TABLE IF NOT EXISTS plan_settings (
     id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
     activation_bv DECIMAL(12,2) NOT NULL DEFAULT 100,

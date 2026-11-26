@@ -18,7 +18,8 @@ function seed_database($fresh = false)
     /*  Drop existing tables (fresh install)                            */
     /* ---------------------------------------------------------------- */
     if ($fresh) {
-        $tables = ['income_recalc_entries', 'income_recalc_runs', 'income_rank_events', 'income_sponsor_events', 'income_matching_state',
+        $tables = ['weekly_payout_reservations', 'weekly_payout_runs',
+                   'income_recalc_entries', 'income_recalc_runs', 'income_rank_events', 'income_sponsor_events', 'income_matching_state',
                    'payout_statement_rows', 'payout_statements', 'points_logs', 'bv_logs',
                    'wallet_transactions', 'commissions', 'payouts', 'order_items', 'orders',
                    'announcements', 'enquiries', 'documents', 'testimonials', 'sliders',

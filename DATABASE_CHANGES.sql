@@ -1,5 +1,5 @@
 -- ===========================================================================
--- DATABASE CHANGES & DEPLOYMENT NOTES: 1.8.50 MLM INCOME RULES
+-- DATABASE CHANGES & DEPLOYMENT NOTES: 1.8.51 WEEKLY PAYOUTS + 1.8.50 INCOME RULES
 -- Single developer handoff for all database changes in this release.
 -- ===========================================================================
 -- WARNING: this is financial software with live data. Do not run a fresh
@@ -17,21 +17,24 @@
 --    writers. The baseline apply locks entire input ranges and can take a long
 --    time on a large network; allow for database timeouts and capacity.
 -- 3. Select the intended database explicitly, check table engines, and execute
---    the five CREATE statements and the coordination-row INSERT below. They are
+--    the seven CREATE statements and the coordination-row INSERT below. They are
 --    additive and idempotent; MySQL DDL autocommits. Existing tables with these names must be checked against
 --    the definitions below: IF NOT EXISTS will not repair an incompatible one.
 --    All of these plus settings, admins, plan_settings, ranks, users, orders,
---    commissions, wallet_transactions, payouts, bv_logs and points_logs must
---    use InnoDB; the preview blocks application if any are not InnoDB. It also
+--    commissions, wallet_transactions, payouts, payout_statements,
+--    payout_statement_rows, bv_logs and points_logs must use InnoDB; relevant
+--    operations fail closed if required tables are missing or non-transactional. The income preview also
 --    checks the installed decimal widths and signed columns required for
 --    corrections, including narrower schemas from older deployments.
 -- 4. Deploy all application files together, clear PHP/opcode and worker caches,
 --    and keep writers paused. Do NOT run the generic installer/fresh seed.
 --    The generic /install/upgrade.php can create missing tables but also offers
 --    content/catalog changes; this SQL avoids those optional changes.
--- 5. On an existing installation the setting income_rules_1850 must be ABSENT
---    until the first reconciliation is reviewed and confirmed. Do not insert
---    or manually set it to ready. In that state new order approvals, manual
+-- 5. On a pre-1.8.50 installation the setting income_rules_1850 must be ABSENT
+--    until the first reconciliation is reviewed and confirmed. A site already
+--    reconciled on 1.8.50 retains its ready marker; upgrading to 1.8.51 does NOT
+--    require another reconciliation. Do not insert or manually set the marker
+--    to ready. While it is absent, new order approvals, manual
 --    Self BV grants, new payout requests and weekly payout generation are
 --    paused. Existing pending payouts, wallet adjustments, pending-order
 --    checkout/refunds and registrations can still run while coordinated by
@@ -41,8 +44,10 @@
 --    it must exist even before the first run. Fresh installs initialize both.
 --    Financial transactions enable STRICT_TRANS_TABLES for their connection
 --    so an out-of-range value fails and rolls back rather than being clipped.
--- 6. As superadmin, open Plan Settings -> Review recalculation preview. This
---    performs no writes. Review EVERY member, especially the Self BV vs
+-- 6. For a pre-1.8.50 site requiring its initial baseline, as superadmin open
+--    Plan Settings -> Review recalculation preview. This performs no writes.
+--    An already-ready 1.8.50 site should not repeat the baseline just for this
+--    upgrade. Review EVERY member, especially the Self BV vs
 --    approved-order BV differences, negative adjustments, wallet/ledger
 --    differences, already-paid excesses, rank changes and all blockers.
 --    Resolve blockers under accounting supervision and refresh the preview;
@@ -54,6 +59,46 @@
 --    Keep the run ID and audit export with the backup. Verify sample member
 --    balances, income, points, payout eligibility and both ledgers before
 --    resuming writers. A stale preview or a DB error applies nothing.
+--
+-- WEEKLY PAYOUT DEPLOYMENT (1.8.51)
+-- - Stop cron and ALL old application/integration writers before deployment.
+--   Old code does not know about reservations and must not run concurrently
+--   with this release. Create the two new InnoDB tables below (including on an
+--   already-reconciled 1.8.50 database); do not modify old payout or statement
+--   rows. Check table definitions and transactional engines on staging first.
+-- - Configure the CLI scheduler exactly as described in README.md and monitor
+--   its nonzero exit status, logs and report freshness. The app itself cannot
+--   install or guarantee a hosting provider's cron. It uses APP_TIMEZONE and
+--   creates the latest completed Sunday–Saturday report on Sunday or catch-up.
+--   The first run starts at the latest completed Saturday; earlier unpaid
+--   income is included without creating artificial historical reports. Later
+--   missed weeks are generated oldest first, at most 52 per invocation. Legacy
+--   statements for the same week suppress a duplicate without being changed.
+-- - A new weekly report starts Unpaid and creates a pending payout PLUS an
+--   explicit reservation, without changing the wallet. Purchases, manual
+--   debits/withdrawals and reconciliation cannot spend reserved funds. A Paid
+--   batch rechecks current eligibility, minimum, cutoff entitlement, verified
+--   KYC and unchanged bank details; each eligible gross is debited once, and
+--   members who no longer qualify are released without a debit/refund and stay
+--   unpaid. Members who become eligible after generation join a later report,
+--   not the existing batch. Re-uploaded KYC documents become Pending atomically;
+--   administrators must refresh stale KYC reviews. TDS/admin amounts are fixed
+--   at generation. Blocked/released income carries forward. Report totals are
+--   generation snapshots, not paid totals.
+--   Paid records the administrator's confirmation; it does NOT transfer funds.
+--   Review current eligibility/bank details when arranging payment separately;
+--   the app cannot verify an external bank transfer or reverse one.
+-- - Legacy report/manual pending requests were ALREADY debited and must only
+--   be processed individually; never create reservations for or refund them
+--   twice. A superadmin can explicitly release a new unpaid report's remaining
+--   reservations (for example before a negative reconciliation), with actor,
+--   reason and timestamp recorded. This makes the funds available without a
+--   refund or payout, and affected income remains unpaid for a later report.
+-- - NEVER roll back application code while new weekly reservations are active:
+--   older code would spend reserved funds or refund money never debited.
+--   Stop jobs and writers, explicitly settle/release every reservation under
+--   accounting supervision, and verify all records before any rollback. A
+--   rollback to pre-1.8.50 code has additional signed-ledger constraints below.
 --
 -- CALCULATION / ACCOUNTING MODEL
 -- - Saved users.self_bv is the authoritative input; it is NEVER overwritten
@@ -136,7 +181,13 @@
 --   YASH_TEST_DB=yash_test_income YASH_TEST_ALLOW_RESET=1 php tests/income_rules_test.php tree
 -- Repeat for historical, pending, shortfall, migration, integrity, custom_plan,
 -- rank, payouts, moves, offset, payout_timing, schema_guard and registration.
--- The test script DROPS/RESEEDS its selected database tables.
+--   YASH_TEST_DB=yash_test_weekly YASH_TEST_ALLOW_RESET=1 php tests/weekly_payouts_test.php lifecycle
+-- Repeat for scheduling, legacy, upgrade, reconciliation, rollback, multiweek,
+-- eligibility, kyc and storage. With Node.js and PHP CLI + PDO MySQL installed:
+--   YASH_TEST_DB=yash_test_weekly_race YASH_TEST_ALLOW_RESET=1 node tests/weekly_payouts_concurrency.mjs
+-- The test scripts DROP/RESEED application tables in the selected database.
+-- Use separate disposable DBs for simultaneous suites; NEVER point these tests
+-- at production or a database whose data must be kept.
 -- ===========================================================================
 
 CREATE TABLE IF NOT EXISTS income_matching_state (
@@ -194,6 +245,32 @@ CREATE TABLE IF NOT EXISTS income_recalc_entries (
     adjustment_json LONGTEXT NOT NULL,
     INDEX idx_run (run_id),
     INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- New 1.8.51 tables. Their separate identity preserves legacy held payouts.
+CREATE TABLE IF NOT EXISTS weekly_payout_runs (
+    period_end DATE NOT NULL PRIMARY KEY,
+    statement_id INT UNSIGNED NULL,
+    status ENUM('unpaid','in_process','paid','legacy') NOT NULL DEFAULT 'unpaid',
+    created_at DATETIME NOT NULL,
+    in_process_at DATETIME NULL,
+    in_process_by INT UNSIGNED NULL,
+    paid_at DATETIME NULL,
+    paid_by INT UNSIGNED NULL,
+    UNIQUE KEY uq_weekly_statement (statement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS weekly_payout_reservations (
+    payout_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    statement_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    status ENUM('reserved','paid','released') NOT NULL DEFAULT 'reserved',
+    created_at DATETIME NOT NULL,
+    settled_at DATETIME NULL,
+    UNIQUE KEY uq_weekly_member (statement_id, user_id),
+    INDEX idx_weekly_user_status (user_id, status),
+    INDEX idx_weekly_statement (statement_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Permanent mutex; this does NOT enable income rules or recalculate anything.

@@ -2,6 +2,11 @@
 /** Distributor dashboard */
 require_once __DIR__ . '/../includes/init.php';
 $u = require_user();
+$wallet = weekly_wallet_snapshot($u['id']);
+$u['wallet_balance'] = $wallet['wallet_balance'];
+$u['total_withdrawn'] = $wallet['total_withdrawn'];
+$reserved = $wallet['reserved'];
+$spendable = $wallet['available'];
 
 $earn = user_earnings_breakdown($u['id']);
 $teamCounts = team_counts($u);
@@ -16,11 +21,14 @@ $unmatchedLeft = $matchingState ? max(0, round((float)$u['left_bv'] - (float)$ma
 $unmatchedRight = $matchingState ? max(0, round((float)$u['right_bv'] - (float)$matchingState['processed_bv'], 2)) : null;
 $announcements = q_all("SELECT * FROM announcements WHERE status='active' ORDER BY created_at DESC LIMIT 3");
 $latestStatement = q_row("SELECT s.*, r.payout_done, r.gross, r.tds, r.admin_charge, r.net, r.reason,
-                                 p.status AS payout_status
+                                 p.status AS payout_status, p.reject_reason AS payout_reason,
+                                 w.status AS report_status, wr.status AS reservation_status
                           FROM payout_statement_rows r
                           JOIN payout_statements s ON s.id = r.statement_id
                           LEFT JOIN payouts p ON p.id = r.payout_id AND p.user_id = r.user_id
-                          WHERE r.user_id = ? ORDER BY s.id DESC LIMIT 1", [$u['id']]);
+                          LEFT JOIN weekly_payout_runs w ON w.statement_id=s.id
+                          LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=r.payout_id AND wr.user_id=r.user_id AND wr.statement_id=r.statement_id
+                          WHERE r.user_id = ? ORDER BY s.period_date DESC, s.id DESC LIMIT 1", [$u['id']]);
 $recentTx = q_all("SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY id DESC LIMIT 6", [$u['id']]);
 $recentOrders = q_all("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5", [$u['id']]);
 
@@ -41,7 +49,15 @@ require __DIR__ . '/../includes/dash_header.php';
 <div class="stat-grid">
     <div class="stat-card">
         <div class="st-ico">👛</div>
-        <div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(before deduction)</span></div>
+        <div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(includes reservations)</span></div>
+    </div>
+    <div class="stat-card gold">
+        <div class="st-ico">📅</div>
+        <div><b><?= money($reserved) ?></b><span>Reserved for weekly payouts</span></div>
+    </div>
+    <div class="stat-card teal">
+        <div class="st-ico">💳</div>
+        <div><b><?= money($spendable) ?></b><span>Available to spend</span></div>
     </div>
     <div class="stat-card gold">
         <div class="st-ico">💰</div>
@@ -122,11 +138,13 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Points — rank ladder</td><td><b><?= number_format((float)$u['reward_points']) ?> P</b></td></tr>
                 <?php
                 $bal = (float)$u['wallet_balance'];
-                $available = min(max(0, $bal), payout_eligible_amount($u['id']));
+                $available = min($spendable, payout_eligible_amount($u['id']));
                 [$tdsAmt, $admAmt] = payout_deductions($available, $plan);
                 ?>
-                <tr><td><b>Wallet Balance (before deduction)</b></td><td><b><?= money($bal) ?></b></td></tr>
-                <tr><td>Eligible gross, limited by wallet</td><td><b><?= money($available) ?></b></td></tr>
+                <tr><td><b>Wallet Balance (includes reserved)</b></td><td><b><?= money($bal) ?></b></td></tr>
+                <tr><td>Weekly payout reservations</td><td><b><?= money($reserved) ?></b></td></tr>
+                <tr><td>Available wallet balance</td><td><b><?= money($spendable) ?></b></td></tr>
+                <tr><td>Additional eligible gross, limited by available wallet</td><td><b><?= money($available) ?></b></td></tr>
                 <tr><td>Estimated TDS (<?= e($plan['tds_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($tdsAmt) ?></b></td></tr>
                 <tr><td>Estimated admin charge (<?= e($plan['admin_charge_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($admAmt) ?></b></td></tr>
                 <tr><td><b>Estimated net on that gross</b></td><td><b><?= money($available - $tdsAmt - $admAmt) ?></b></td></tr>
@@ -181,17 +199,20 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Payout status</td><td>
                     <?php [$statusLabel, $statusStyle] = payout_statement_status($latestStatement); ?>
                     <?= badge($statusLabel, $statusStyle) ?>
-                    <?php if (!(int)$latestStatement['payout_done'] && $latestStatement['reason']): ?><br><small><?= e($latestStatement['reason']) ?></small><?php endif; ?>
+                    <?php if (!empty($latestStatement['payout_reason']) || (!(int)$latestStatement['payout_done'] && $latestStatement['reason'])): ?><br><small><?= e($latestStatement['payout_reason'] ?: $latestStatement['reason']) ?></small><?php endif; ?>
                 </td></tr>
             </table>
             <?php if (!(int)$latestStatement['payout_done']): ?><p class="form-hint">No request was created; any displayed deductions were not applied.</p><?php endif; ?>
-            <a class="btn btn-outline btn-sm mt-2" href="payout.php">All statements →</a>
+            <a class="btn btn-outline btn-sm mt-2" href="payout-balance.php#weekly-statements">All statements →</a>
         </div>
         <?php endif; ?>
 
         <div class="card">
-            <div class="card-title">💳 Payout Status <a class="right" href="payout.php">View all →</a></div>
-            <?php $payouts = q_all("SELECT * FROM payouts WHERE user_id = ? ORDER BY id DESC LIMIT 4", [$u['id']]); ?>
+            <div class="card-title">💳 Payout Status <a class="right" href="payout-balance.php">View all →</a></div>
+            <?php $payouts = q_all("SELECT p.*, wr.status AS reservation_status, w.status AS report_status FROM payouts p
+                                   LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=p.id
+                                   LEFT JOIN weekly_payout_runs w ON w.statement_id=wr.statement_id
+                                   WHERE p.user_id = ? ORDER BY p.id DESC LIMIT 4", [$u['id']]); ?>
             <?php if (!$payouts): ?>
                 <div class="empty-state"><span class="es-ico">🏦</span>No payouts yet. Eligible payout income:
                     <b><?= money(payout_eligible_amount($u['id'])) ?></b></div>
@@ -206,13 +227,9 @@ require __DIR__ . '/../includes/dash_header.php';
                     </td>
                     <td style="text-align:right">
                         <b><?= money($p['net_amount']) ?></b><br>
-                        <?php if ($p['status'] === 'pending'): ?>
-                            <?= badge('⏳ Payout in process', 'warning') ?>
-                        <?php elseif ($p['status'] === 'paid'): ?>
-                            <?= badge('✅ Payment is done ' . ($p['paid_at'] ? dmy($p['paid_at']) : ''), 'success') ?>
-                        <?php else: ?>
-                            <?= status_badge($p['status']) ?>
-                        <?php endif; ?>
+                        <?php [$label, $style] = payout_record_status($p); ?>
+                        <?= badge($label, $style) ?>
+                        <?php if ($p['paid_at']): ?><br><small><?= e(dmy($p['paid_at'])) ?></small><?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

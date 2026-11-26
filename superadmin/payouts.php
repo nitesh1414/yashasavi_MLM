@@ -3,6 +3,19 @@
 require_once __DIR__ . '/../includes/init.php';
 $a = require_superadmin();
 
+/** Protect spreadsheet exports from member-supplied formula cells. */
+function payout_csv_rows(array $rows)
+{
+    foreach ($rows as &$row) {
+        foreach ($row as &$cell) {
+            if (is_string($cell) && preg_match('/^(?:[\t\r\n]|[\x00-\x20]*[=+\-@])/', $cell)) { $cell = "'" . $cell; }
+        }
+        unset($cell);
+    }
+    unset($row);
+    return $rows;
+}
+
 if (is_post()) {
     verify_csrf();
     $action = post_str('action');
@@ -12,26 +25,37 @@ if (is_post()) {
             [$ok, $msg] = process_payout($id, $action, $a['id'], post_str('reason'));
             $ok ? flash('success', $msg) : flash('error', $msg);
         }
+        if (in_array($action, ['report_in_process', 'report_paid', 'report_release'], true)) {
+            $reportAction = substr($action, 7);
+            [$ok, $msg] = process_weekly_payout_report($id, $reportAction, $a['id']);
+            $ok ? flash('success', $msg) : flash('warning', $msg);
+            redirect('payouts.php?statement=' . $id);
+        }
         if ($action === 'generate') {
-            /* weekly payout report + statement — income counted up to the last
-             * Saturday 11:59 PM; generated only here at the Superadmin end */
-            [$ok, $runTs, $st] = generate_payout_report();
-            if (!$ok || (!$st['created'] && !$st['blocked'] && !$st['skipped'])) {
-                flash('warning', $st['error'] ?? ('Weekly payout report: no eligible members found (sponsor, matching, placement first-match and rank income; minimum ' . money_txt(get_plan()['payout_min']) . ').'));
-                redirect('payouts.php');
+            // Manual catch-up uses the same idempotent scheduler as cron.
+            $results = weekly_payout_run_due();
+            $latest = weekly_latest_completed_saturday();
+            $run = q_row("SELECT * FROM weekly_payout_runs WHERE period_end=?", [$latest]);
+            if (!$results && $run) {
+                flash('info', $run['status'] === 'legacy'
+                    ? 'A legacy statement already exists for this week; it was left unchanged.'
+                    : 'This weekly report has already been generated; no duplicate was created.');
+            } elseif ($results) {
+                $created = array_sum(array_map(function ($r) { return $r['outcome'] === 'created' ? 1 : 0; }, $results));
+                flash('success', $created . ' weekly report(s) generated; existing legacy reports were left unchanged. No bank transfers were initiated.'
+                    . (count($results) === 52 && !$run ? ' More weeks remain; run catch-up again.' : ''));
+            } else {
+                flash('warning', 'No weekly report is due. Check the scheduler history if a completed week is missing.');
             }
-            flash('success',
-                'Weekly payout statement generated: ' . number_format($st['created']) . ' payout(s) '
-                . money_txt($st['total']) . ' gross → ' . money_txt($st['net']) . ' net'
-                . ($st['blocked'] ? ' · ' . number_format($st['blocked']) . ' member(s) listed as PAYOUT WILL NOT BE DONE (KYC / bank details incomplete)' : '')
-                . ($st['skipped'] ? ' · ' . number_format($st['skipped']) . ' skipped (wallet below minimum)' : '')
-                . '. Members now see the statement in their dashboard and can download the receipt.');
-            redirect('payouts.php?statement=' . (int)$st['statement_id']);
+            $viewId = (int)($run['statement_id'] ?? 0);
+            if (!$viewId && $results) { $viewId = (int)end($results)['statement_id']; }
+            redirect('payouts.php' . ($viewId ? '?statement=' . $viewId : ''));
         }
     } catch (Throwable $ex) {
         error_log('Payout operation failed: ' . $ex->getMessage());
         flash('error', $ex instanceof PDOException ? 'Payout operation failed; no changes were saved.' : $ex->getMessage());
     }
+    if (strpos($action, 'report_') === 0 && $id > 0) { redirect('payouts.php?statement=' . $id); }
     redirect('payouts.php' . (get_str('status') ? '?status=' . urlencode(get_str('status')) : ''));
 }
 
@@ -52,28 +76,30 @@ if ($statement && get_str('download') !== '') {
         $out[] = [$r['username'], $r['full_name'], $r['mobile'],
                   $r['bank_name'], $r['bank_account_no'], $r['bank_ifsc'],
                   $r['kyc_status'], $r['bank_ok'] ? 'Completed' : 'Not completed',
-                  $r['gross'], $r['tds'], $r['admin_charge'], $r['net'],
-                  $r['payout_done'] ? payout_statement_status($r)[0] : ($r['reason'] ?: 'No payout created')];
+                  $r['gross'], $r['tds'], $r['admin_charge'], $r['net'], payout_statement_status($r)[0],
+                  $r['payout_reason'] ?: $r['reason']];
     }
     output_csv('payout-statement-' . date('Ymd', strtotime($statement['run_ts'])) . '.csv',
         ['User ID', 'Name', 'Mobile', 'Bank Name', 'Account No', 'IFSC', 'KYC', 'Bank Details',
-         'Gross Amount', 'TDS', 'Admin Charge', 'Net Payable', 'Payout Status'], $out);
+         'Gross Amount', 'TDS', 'Admin Charge', 'Net at generation', 'Current payout status', 'Reason'], payout_csv_rows($out));
 }
-$recentStatements = q_all("SELECT * FROM payout_statements ORDER BY id DESC LIMIT 8");
+$recentStatements = q_all("SELECT s.*, w.status AS report_status FROM payout_statements s
+                           LEFT JOIN weekly_payout_runs w ON w.statement_id=s.id ORDER BY s.period_date DESC, s.id DESC");
 if (get_str('download') !== '' && $runTs !== '') {
     $out = [];
     foreach ($runRows as $r) {
         $out[] = [$r['request_no'], $r['username'], $r['full_name'], $r['mobile'],
                   $r['bank_name'], $r['bank_account_no'], $r['bank_ifsc'], $r['bank_holder'],
                   $r['amount'], $r['tds_amount'], $r['admin_charge'], $r['net_amount'],
-                  $r['status'], $r['created_at'], $r['paid_at']];
+                  payout_record_status($r)[0], $r['created_at'], $r['paid_at']];
     }
     output_csv('payout-report-' . date('Ymd', strtotime($runTs)) . '.csv',
         ['Request No', 'User ID', 'Name', 'Mobile', 'Bank Name', 'Account No', 'IFSC', 'Account Holder',
-         'Gross Amount', 'TDS', 'Admin Charge', 'Net Payable', 'Status', 'Generated On', 'Paid On'], $out);
+         'Gross Amount', 'TDS', 'Admin Charge', 'Net Payable', 'Status', 'Generated On', 'Paid On'], payout_csv_rows($out));
 }
 
 $status = get_str('status');
+if (!in_array($status, ['', 'pending', 'paid', 'rejected'], true)) { $status = ''; }
 $q = get_str('q');
 $where = "1=1";
 $params = [];
@@ -85,10 +111,40 @@ if ($q !== '') {
 $total = (int)q_val("SELECT COUNT(*) FROM payouts p JOIN users u ON u.id = p.user_id WHERE $where", $params);
 $sumPending = (float)q_val("SELECT COALESCE(SUM(amount),0) FROM payouts p JOIN users u ON u.id=p.user_id WHERE p.status='pending'" . ($status === 'pending' ? " AND $where" : ''), $status === 'pending' ? $params : []);
 $sumPaid = (float)q_val("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE status='paid'");
-$rows = q_all("SELECT p.*, u.username, u.full_name FROM payouts p
-               JOIN users u ON u.id = p.user_id
-               WHERE $where ORDER BY FIELD(p.status,'pending','paid','rejected'), p.id DESC
-              ", $params);
+$rows = q_all("SELECT p.*, u.username, u.full_name, wr.statement_id AS weekly_statement_id,
+                      wr.status AS reservation_status, w.status AS report_status
+               FROM payouts p JOIN users u ON u.id = p.user_id
+               LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=p.id
+               LEFT JOIN weekly_payout_runs w ON w.statement_id=wr.statement_id
+               WHERE $where ORDER BY FIELD(p.status,'pending','paid','rejected'), p.id DESC", $params);
+
+if (get_str('export') === '1') {
+    $expStatus = $status ?: 'pending';
+    $all = q_all("SELECT p.*, u.username, u.full_name, wr.status AS reservation_status, w.status AS report_status
+                  FROM payouts p JOIN users u ON u.id=p.user_id
+                  LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=p.id
+                  LEFT JOIN weekly_payout_runs w ON w.statement_id=wr.statement_id
+                  WHERE p.status=? ORDER BY p.id DESC", [$expStatus]);
+    $out = [];
+    foreach ($all as $r) {
+        $out[] = [$r['request_no'], $r['username'], $r['full_name'], $r['bank_name'], $r['bank_account_no'],
+                  $r['bank_ifsc'], $r['amount'], $r['tds_amount'], $r['admin_charge'], $r['net_amount'],
+                  payout_record_status($r)[0], $r['created_at'], $r['paid_at']];
+    }
+    output_csv('payouts-' . $expStatus . '.csv',
+        ['Request No', 'User ID', 'Name', 'Bank', 'Account No', 'IFSC', 'Amount', 'TDS', 'Charge', 'Net', 'Status', 'Requested', 'Paid'], payout_csv_rows($out));
+}
+
+$statementCounts = ['paid' => 0, 'reserved' => 0, 'unpaid' => 0, 'paid_gross' => 0.0, 'paid_net' => 0.0];
+foreach ($statementRows as $r) {
+    if ($r['payout_status'] === 'paid') {
+        $statementCounts['paid']++;
+        $statementCounts['paid_gross'] += (float)$r['gross'];
+        $statementCounts['paid_net'] += (float)$r['net'];
+    } elseif ($r['reservation_status'] === 'reserved' && $r['payout_status'] === 'pending') {
+        $statementCounts['reserved']++;
+    } else { $statementCounts['unpaid']++; }
+}
 
 $activeKey = 'payouts';
 $pageTitle = 'Payouts';
@@ -102,26 +158,70 @@ require __DIR__ . '/../includes/dash_header.php';
 </div>
 
 <div class="card" style="border:1.5px dashed var(--accent)">
-    <div class="card-title">📅 Generate Weekly Payout Report &amp; Statement</div>
+    <div class="card-title">📅 Automatic Weekly Payout Reports</div>
     <p style="font-size:13px;color:var(--ink-soft)">
-        Run this <b>every Monday</b>. Income is counted <b>up to the last Saturday 11:59 PM</b> — the completed
-        <b>Sunday → Saturday</b> week. It creates the <b>weekly payout statement</b> listing every eligible
-        member with amounts, KYC status and bank details. Members with <b>completed KYC + bank details</b>
-        get a pending payout request (wallet debited); payment is a separate processing step. Members with incomplete KYC or
-        bank details have no request created and keep their balance for the next week.
-        Eligible income = <b>sponsor income + every matching pair + placement-child first-match bonuses + rank rewards</b>, minimum
-        <?= money(get_plan()['payout_min']) ?>. <?= e(get_plan()['tds_percent']) ?>% TDS and
-        <?= e(get_plan()['admin_charge_percent']) ?>% admin charge are deducted from the payout amount.
+        The configured server scheduler generates each report on <b>Sunday</b> after the
+        <b>Sunday → Saturday</b> week ends (<?= e(APP_TIMEZONE) ?>). It includes older unpaid eligible income through
+        Saturday. Eligible members with verified KYC, bank details and at least <?= money(get_plan()['payout_min']) ?>
+        have funds <b>reserved, not deducted</b>. Unavailable amounts carry forward. Mark a report In process or
+        Paid from its statement. Paid deducts the gross once and records the payment; <b>it does not send a bank transfer</b>.
+        Sponsor, matching, placement first-match and rank income qualify. Recorded TDS and admin charges use the rates at generation.
+        The server cron must be configured as described in README.md; the button is a safe catch-up if it was missed.
     </p>
-    <form method="post" class="filter-form" data-confirm="Generate the weekly payout report? Pending payouts will be created for all eligible members with completed KYC + bank details.">
+    <form method="post" class="filter-form" data-confirm="Generate any due weekly reports? Eligible amounts will be reserved without debiting wallets.">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="generate">
-        <button class="btn btn-primary" type="submit">📅 Generate Report &amp; Statement</button>
+        <button class="btn btn-primary" type="submit">📅 Run Due Reports</button>
     </form>
 </div>
 
 <?php if ($statement): ?>
+<div class="card no-print" style="border:1px solid var(--line)">
+    <div class="card-title">Report #<?= (int)$statement['id'] ?> status
+        <?php [$reportLabel, $reportStyle] = weekly_report_status($statement['report_status']); ?>
+        <?= badge($reportLabel, $reportStyle) ?>
+    </div>
+    <?php if ($statement['report_status'] !== null): ?>
+    <p class="form-hint">Currently <?= (int)$statementCounts['paid'] ?> paid · <?= (int)$statementCounts['reserved'] ?> reserved ·
+        <?= (int)$statementCounts['unpaid'] ?> unpaid/released. Recorded paid gross <?= money($statementCounts['paid_gross']) ?>
+        and net <?= money($statementCounts['paid_net']) ?>. Members without a payout remain unpaid even when a batch is marked Paid.</p>
+    <?php if ($statement['report_status'] !== 'paid'): ?>
+    <?php if ($statementCounts['reserved'] === 0): ?><p class="form-hint">There are no reservations to pay. Marking this report Paid finalizes the batch with 0 paid members; unpaid income carries forward.</p><?php endif; ?>
+    <div class="table-actions">
+        <?php if ($statement['report_status'] === 'unpaid'): ?>
+        <form method="post" class="inline-form" data-confirm="Mark the report In process? Reserved funds remain in member wallets.">
+            <?= csrf_field() ?><input type="hidden" name="action" value="report_in_process"><input type="hidden" name="id" value="<?= (int)$statement['id'] ?>">
+            <button class="btn btn-outline btn-sm" type="submit">Mark In Process</button>
+        </form>
+        <?php endif; ?>
+        <form method="post" class="inline-form" data-confirm="<?= $statementCounts['reserved'] ? 'Confirm payment has been arranged separately? This records Paid and debits all still-eligible reservations once. No bank transfer is sent.' : 'Finalize this report as Paid with no reserved payouts? Ineligible members remain unpaid; no bank transfer is sent.' ?>">
+            <?= csrf_field() ?><input type="hidden" name="action" value="report_paid"><input type="hidden" name="id" value="<?= (int)$statement['id'] ?>">
+            <button class="btn btn-primary btn-sm" type="submit">Mark Report Paid</button>
+        </form>
+        <?php if ($statementCounts['reserved'] > 0): ?>
+        <form method="post" class="inline-form" data-confirm="Release ALL remaining reservations on this report without paying? Members remain unpaid, and their funds become available. Use this only when correcting the report or income.">
+            <?= csrf_field() ?><input type="hidden" name="action" value="report_release"><input type="hidden" name="id" value="<?= (int)$statement['id'] ?>">
+            <button class="btn btn-danger btn-sm" type="submit">Release Reservations (Unpaid)</button>
+        </form>
+        <?php endif; ?>
+    </div>
+    <?php else: ?>
+        <p class="form-hint">This batch is final and cannot debit the same reservation again. Marking paid did not initiate a bank transfer.</p>
+    <?php endif; ?>
+    <?php else: ?>
+        <p class="form-hint">Legacy report: requests were already debited when created and must be handled individually. Historical records are unchanged.</p>
+    <?php endif; ?>
+</div>
 <style>
+@media screen{
+    /* Keep member IDs, bank data and status badges readable; scroll the
+       statement rather than breaking a word into single letters. */
+    #payoutStatement table{min-width:1100px}
+    #payoutStatement td:nth-child(2){min-width:130px}
+    #payoutStatement td:nth-child(3){min-width:115px}
+    #payoutStatement td:last-child{min-width:170px}
+    #payoutStatement .badge{max-width:none;white-space:nowrap;overflow-wrap:normal}
+}
 @media print{
     /* print ONLY the statement table area */
     body *{visibility:hidden}
@@ -150,6 +250,7 @@ require __DIR__ . '/../includes/dash_header.php';
             &nbsp;·&nbsp; Statement #<?= (int)$statement['id'] ?>
         </div>
     </div>
+    <p class="form-hint no-print" style="margin-bottom:8px">Scroll horizontally to see all statement columns.</p>
     <div class="table-wrap" style="box-shadow:none">
         <table class="table">
             <tr>
@@ -170,8 +271,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td>
                     <?php [$statusLabel, $statusStyle] = payout_statement_status($r); ?>
                     <?= badge($statusLabel, $statusStyle) ?>
-                    <?php if (!(int)$r['payout_done'] && $r['reason']): ?>
-                        <br><small style="color:#000"><?= e($r['reason']) ?></small>
+                    <?php if (!empty($r['payout_reason']) || (!(int)$r['payout_done'] && $r['reason'])): ?>
+                        <br><small style="color:#000"><?= e($r['payout_reason'] ?: $r['reason']) ?></small>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -187,9 +288,9 @@ require __DIR__ . '/../includes/dash_header.php';
         </table>
     </div>
     <p class="form-hint" style="margin-top:10px">
-        These totals record requests created when the statement was generated, not payments completed.
-        Individual request statuses above are current; blocked amounts were not held. Any deductions shown
-        on a row without a request are illustrative and were not applied.
+        Totals are the original requests/reservations at generation, not current paid totals. Individual statuses above are current.
+        New reservations are not wallet debits until marked Paid; blocked or released amounts remain unpaid.
+        Deductions on unpaid or released rows are illustrative/planned and have not been applied as payments. No bank transfer is initiated by this page.
     </p>
 </div>
 <?php endif; ?>
@@ -200,7 +301,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <div class="table-wrap" style="box-shadow:none">
         <table class="table table-dt">
             <thead>
-                <tr><th>Statement</th><th>Week</th><th>Generated</th><th>Members</th><th>Gross requested</th><th>Net requested</th><th>Not created</th><th></th></tr>
+                <tr><th>Statement</th><th>Week</th><th>Generated</th><th>Report status</th><th>Members</th><th>Gross at generation</th><th>Net at generation</th><th>Not created</th><th></th></tr>
             </thead>
             <tbody>
 <?php foreach ($recentStatements as $st): ?>
@@ -208,6 +309,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><b>#<?= (int)$st['id'] ?></b></td>
                 <td><?= payout_statement_week_label($st) ?></td>
                 <td><?= dmy($st['run_ts'], true) ?></td>
+                <td><?php [$label, $style] = weekly_report_status($st['report_status']); ?><?= badge($label, $style) ?></td>
                 <td><?= (int)$st['members_done'] + (int)$st['members_blocked'] ?></td>
                 <td><?= money($st['total_gross']) ?></td>
                 <td><b><?= money($st['total_net']) ?></b></td>
@@ -242,7 +344,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><?= money($r['tds_amount']) ?></td>
                 <td><?= money($r['admin_charge']) ?></td>
                 <td><b><?= money($r['net_amount']) ?></b></td>
-                <td><?= status_badge($r['status']) ?></td>
+                <td><?php [$label, $style] = payout_record_status($r); ?><?= badge($label, $style) ?></td>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -263,6 +365,7 @@ require __DIR__ . '/../includes/dash_header.php';
         </span>
     </div>
 
+    <p class="form-hint">The Pending filter includes weekly Unpaid and In process reservations. Weekly payouts are processed only as a report; legacy and manual requests remain individually managed.</p>
     <form method="get" class="filter-form">
         <?php if ($status): ?><input type="hidden" name="status" value="<?= e($status) ?>"><?php endif; ?>
         <div class="form-group"><label>Search</label>
@@ -289,12 +392,14 @@ require __DIR__ . '/../includes/dash_header.php';
                 <td><small>TDS <?= money($r['tds_amount']) ?><br>Chg <?= money($r['admin_charge']) ?></small></td>
                 <td><b><?= money($r['net_amount']) ?></b></td>
                 <td>
-                    <?= status_badge($r['status']) ?>
+                    <?php [$label, $style] = payout_record_status($r); ?><?= badge($label, $style) ?>
                     <?php if ($r['paid_at']): ?><br><small style="color:#000"><?= dmy($r['paid_at']) ?></small><?php endif; ?>
                     <?php if ($r['reject_reason']): ?><br><small style="color:#000"><?= e($r['reject_reason']) ?></small><?php endif; ?>
                 </td>
                 <td>
-                    <?php if ($r['status'] === 'pending'): ?>
+                    <?php if ($r['reservation_status'] !== null): ?>
+                        <a class="btn btn-outline btn-sm" href="payouts.php?statement=<?= (int)$r['weekly_statement_id'] ?>">View report</a>
+                    <?php elseif ($r['status'] === 'pending'): ?>
                     <div class="table-actions">
                         <form method="post" class="inline-form" data-confirm="Mark this payout as PAID?">
                             <?= csrf_field() ?>
@@ -320,19 +425,4 @@ require __DIR__ . '/../includes/dash_header.php';
     <?php endif; ?>
 </div>
 
-<?php
-if (get_str('export') === '1') {
-    $expStatus = $status ?: 'pending';
-    $all = q_all("SELECT p.request_no, u.username, u.full_name, p.amount, p.tds_amount, p.admin_charge,
-                  p.net_amount, p.status, p.created_at, p.paid_at, p.bank_name, p.bank_account_no, p.bank_ifsc
-                  FROM payouts p JOIN users u ON u.id = p.user_id WHERE p.status = ? ORDER BY p.id DESC", [$expStatus]);
-    $out = [];
-    foreach ($all as $r) {
-        $out[] = [$r['request_no'], $r['username'], $r['full_name'], $r['bank_name'], $r['bank_account_no'],
-                  $r['bank_ifsc'], $r['amount'], $r['tds_amount'], $r['admin_charge'], $r['net_amount'],
-                  $r['status'], $r['created_at'], $r['paid_at']];
-    }
-    output_csv('payouts-' . $expStatus . '.csv',
-        ['Request No', 'User ID', 'Name', 'Bank', 'Account No', 'IFSC', 'Amount', 'TDS', 'Charge', 'Net', 'Status', 'Requested', 'Paid'], $out);
-}
-require __DIR__ . '/../includes/dash_footer.php';
+<?php require __DIR__ . '/../includes/dash_footer.php'; ?>

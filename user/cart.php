@@ -2,6 +2,10 @@
 /** Cart + checkout */
 require_once __DIR__ . '/../includes/init.php';
 $u = require_user();
+$wallet = weekly_wallet_snapshot($u['id']);
+$u['wallet_balance'] = $wallet['wallet_balance'];
+$reserved = $wallet['reserved'];
+$spendable = $wallet['available'];
 
 $cart = $_SESSION['cart'] ?? [];
 $removed = cart_cleanup();
@@ -80,8 +84,8 @@ if (is_post()) {
         }
         if (!$items) { $errors[] = 'Your cart is empty.'; }
 
-        if ($paymentMode === 'wallet' && (float)$u['wallet_balance'] < $totalDp) {
-            $errors[] = 'Insufficient wallet balance (' . money_txt($u['wallet_balance']) . '). Choose cash or bank transfer.';
+        if ($paymentMode === 'wallet' && $spendable < $totalDp) {
+            $errors[] = 'Insufficient available wallet balance (' . money_txt($spendable) . '); weekly payout reservations cannot be spent. Choose cash or bank transfer.';
         }
 
         if ($errors) {
@@ -109,7 +113,7 @@ if (is_post()) {
             }
             if ($paymentMode === 'wallet') {
                 if (debit_wallet($u['id'], $totalDp, 'purchase', $oid, 'Purchase payment for order ' . $orderNo) === null) {
-                    throw new RuntimeException('Wallet balance changed. Please review your cart and try again.');
+                    throw new RuntimeException('Available wallet balance changed or is reserved for a weekly payout. Please review your cart and try again.');
                 }
             }
             return $oid;
@@ -232,7 +236,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <label class="form-check"><input type="radio" name="payment_mode" value="bank_transfer">
                 <span><b>🏦 Bank Transfer / UPI</b> — transfer <?= money($totalDp) ?> to the company account, then enter your transaction reference. Order is verified by the company.</span></label>
             <label class="form-check"><input type="radio" name="payment_mode" value="wallet">
-                <span><b>E-Wallet</b> — pay instantly from your wallet balance (<?= money($u['wallet_balance']) ?>)</span></label>
+                <span><b>E-Wallet</b> — available to spend <?= money($spendable) ?> (<?= money($reserved) ?> reserved for weekly payouts)</span></label>
             <div class="form-group" style="margin-top:10px">
                 <label>Payment / UPI Transaction Reference <small style="color:var(--ink-soft)">(for bank transfer)</small></label>
                 <input class="form-control" name="txn_ref" placeholder="e.g. UPI ref 4032XXXXXX12">

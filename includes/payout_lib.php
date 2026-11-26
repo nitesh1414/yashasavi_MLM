@@ -69,7 +69,7 @@ function payout_period_bounds($kind, $dateStr)
 /** Live gross payout-entitlement activity, not the wallet transaction ledger.
  * Credited eligible income (including signed adjustments) is grouped by day;
  * pending and paid payout requests reduce entitlement by their GROSS amount
- * from the day the wallet was held. Rejected requests are excluded. This uses
+ * from the day they were reserved or held. Rejected requests are excluded. This uses
  * exactly the same income types and current payout statuses as payout eligibility,
  * includes the current period, and never applies estimated tax a second time. */
 function payout_entitlement_ledger($userId)
@@ -84,10 +84,15 @@ function payout_entitlement_ledger($userId)
         $ledger[] = ['date' => $income['day'], 'ord' => 1, 'id' => 0,
             'desc' => 'ELIGIBLE INCOME / ADJUSTMENTS', 'cr' => max(0, $amount), 'dr' => max(0, -$amount)];
     }
-    foreach (q_all("SELECT id, request_no, amount, status, created_at FROM payouts
-                    WHERE user_id = ? AND status IN ('paid','pending')", [(int)$userId]) as $payout) {
+    foreach (q_all("SELECT p.id, p.request_no, p.amount, p.status, p.created_at,
+                           wr.status AS reservation_status, w.status AS report_status
+                    FROM payouts p LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=p.id
+                    LEFT JOIN weekly_payout_runs w ON w.statement_id=wr.statement_id
+                    WHERE p.user_id = ? AND p.status IN ('paid','pending')", [(int)$userId]) as $payout) {
+        $label = payout_record_status($payout)[0];
+        $kind = $payout['reservation_status'] !== null ? 'WEEKLY PAYOUT' : 'PAYOUT REQUEST';
         $ledger[] = ['date' => substr($payout['created_at'], 0, 10), 'ord' => 2, 'id' => (int)$payout['id'],
-            'desc' => 'PAYOUT REQUEST ' . $payout['request_no'] . ($payout['status'] === 'paid' ? ' (PAID)' : ' (HELD)'),
+            'desc' => $kind . ' ' . $payout['request_no'] . ' (' . $label . ')',
             'cr' => 0.0, 'dr' => (float)$payout['amount']];
     }
     usort($ledger, function ($a, $b) { return [$a['date'], $a['ord'], $a['id']] <=> [$b['date'], $b['ord'], $b['id']]; });

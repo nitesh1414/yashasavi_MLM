@@ -11,9 +11,12 @@ if (!$st) {
 }
 /* own statement row only */
 $mine = q_row(
-    "SELECT r.*, p.status AS payout_status, p.paid_at AS payout_paid_at
+    "SELECT r.*, p.status AS payout_status, p.paid_at AS payout_paid_at, p.reject_reason AS payout_reason,
+            w.status AS report_status, wr.status AS reservation_status
      FROM payout_statement_rows r
      LEFT JOIN payouts p ON p.id = r.payout_id AND p.user_id = r.user_id
+     LEFT JOIN weekly_payout_runs w ON w.statement_id=r.statement_id
+     LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=r.payout_id AND wr.user_id=r.user_id AND wr.statement_id=r.statement_id
      WHERE r.statement_id = ? AND r.user_id = ?",
     [$st['id'], $u['id']]
 );
@@ -77,11 +80,15 @@ require __DIR__ . '/../includes/dash_header.php';
         <?= badge($statusLabel, $statusStyle) ?>
         <?php if ($mine['payout_status'] === 'paid' && $mine['payout_paid_at']): ?>
             <div style="margin-top:6px;font-size:13px">Marked paid on <?= e(dmy($mine['payout_paid_at'], true)) ?>.</div>
+        <?php elseif (!empty($mine['payout_reason'])): ?>
+            <div style="margin-top:6px;font-size:13px"><?= e($mine['payout_reason']) ?><?php if ($mine['reservation_status'] === 'released'): ?> The reservation was not a wallet debit, so no refund was needed.<?php endif; ?></div>
         <?php elseif (!(int)$mine['payout_done']): ?>
-            <div style="margin-top:6px;font-size:13px"><?= e($mine['reason']) ?>.
+            <div style="margin-top:6px;font-size:13px"><?= e($mine['reason']) ?>
                 No payout was created and the displayed deductions were not applied.</div>
+        <?php elseif ($mine['reservation_status'] === 'reserved'): ?>
+            <div style="margin-top:6px;font-size:13px">The gross amount is reserved in your wallet, not yet debited.</div>
         <?php endif; ?>
-        <div style="margin-top:6px;font-size:13px">Amounts above are the statement snapshot. The status reflects the linked request now.</div>
+        <div style="margin-top:6px;font-size:13px">Amounts above are the statement snapshot. The status is current. Marking paid records payment; it does not itself send a bank transfer.</div>
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:46px">

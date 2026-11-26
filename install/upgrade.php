@@ -136,7 +136,8 @@ function ug_needs_upgrade($pdo)
     if (!ug_table_exists('award_rewards')) {
         return true;
     }
-    foreach (['income_matching_state', 'income_sponsor_events', 'income_rank_events', 'income_recalc_runs', 'income_recalc_entries'] as $table) {
+    foreach (['income_matching_state', 'income_sponsor_events', 'income_rank_events', 'income_recalc_runs', 'income_recalc_entries',
+              'weekly_payout_runs', 'weekly_payout_reservations'] as $table) {
         if (!ug_table_exists($table)) { return true; }
     }
     if (!ug_table_exists('settings') || q_val("SELECT svalue FROM settings WHERE skey = 'income_lock_1850'") !== '1') {

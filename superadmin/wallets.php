@@ -23,7 +23,7 @@ if (is_post() && post_str('action') === 'adjust') {
                 if ($direction === 'debit') {
                     $newBal = debit_wallet($userId, $amount, 'admin', null, $note);
                     if ($newBal === null) {
-                        throw new RuntimeException('User has insufficient wallet balance.');
+                        throw new RuntimeException('Insufficient available wallet balance; weekly payout reservations cannot be debited.');
                     }
                 } else {
                     credit_wallet($userId, $amount, 'admin', null, $note);
@@ -72,8 +72,10 @@ if ($minBal !== '') {
     $wParams[] = (float)$minBal;
 }
 $wTotal = (int)q_val("SELECT COUNT(*) FROM users WHERE $wWhere", $wParams);
-$wallets = q_all("SELECT * FROM users WHERE $wWhere
-                  ORDER BY wallet_balance DESC, id ASC", $wParams);
+$wallets = q_all("SELECT u.*, COALESCE(r.reserved,0) AS reserved_amount FROM users u
+                  LEFT JOIN (SELECT user_id, SUM(amount) AS reserved FROM weekly_payout_reservations
+                             WHERE status='reserved' GROUP BY user_id) r ON r.user_id=u.id
+                  WHERE $wWhere ORDER BY u.wallet_balance DESC, u.id ASC", $wParams);
 
 $activeKey = 'wallets';
 $pageTitle = 'E-Wallets';
@@ -181,7 +183,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="table-wrap" style="box-shadow:none">
                 <table class="table table-dt">
                     <thead>
-                        <tr><th>Distributor</th><th>Rank</th><th>L / R BV</th><th>Balance</th><th></th></tr>
+                        <tr><th>Distributor</th><th>Rank</th><th>L / R BV</th><th>Balance</th><th>Weekly reserved</th><th>Available</th><th></th></tr>
                     </thead>
                     <tbody>
 <?php foreach ($wallets as $w): ?>
@@ -191,6 +193,8 @@ require __DIR__ . '/../includes/dash_header.php';
                         <td><?= $w['rank_id'] ? e(q_val("SELECT name FROM ranks WHERE id = ?", [$w['rank_id']]) ?: '—') : '—' ?></td>
                         <td><b><?= bv($w['left_bv']) ?></b> / <b><?= bv($w['right_bv']) ?></b></td>
                         <td><b class="text-ok"><?= money($w['wallet_balance']) ?></b></td>
+                        <td><?= money($w['reserved_amount']) ?></td>
+                        <td><?= money(max(0, (float)$w['wallet_balance'] - (float)$w['reserved_amount'])) ?></td>
                         <td><a class="btn btn-light btn-sm" href="commissions.php?q=<?= urlencode($w['username']) ?>">📜</a></td>
                     </tr>
                     <?php endforeach; ?>

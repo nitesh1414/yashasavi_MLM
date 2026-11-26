@@ -51,14 +51,14 @@ if ($preview && get_str('export') === '1') {
             $b['earnings']['binary'], $n['earnings']['binary'], $row['adjustments']['binary'],
             $b['earnings']['sponsor_matching'], $n['earnings']['sponsor_matching'], $row['adjustments']['sponsor_matching'],
             $b['earnings']['rank'], $n['earnings']['rank'], $row['adjustments']['rank'], $b['wallet'], $n['wallet'],
-            $row['net_adjustment'], $row['ledger_difference'], $b['payout_taken'], $row['overpaid']];
+            $row['net_adjustment'], $row['ledger_difference'], $b['payout_taken'], $b['payout_reserved'], $row['overpaid']];
     }
     output_csv('income-preview.csv', ['Member ID', 'Username', 'Status', 'Earning active', 'Sponsor ID', 'Placement parent ID',
         'Saved Self BV', 'Approved order BV', 'Self BV difference', 'Old left BV', 'New left BV', 'Old right BV', 'New right BV',
         'Old pairs', 'New pairs', 'Old points', 'New points', 'Old sponsor', 'New sponsor', 'Sponsor adjustment',
         'Old binary', 'New binary', 'Binary adjustment', 'Old child bonus', 'New child bonus', 'Child bonus adjustment',
         'Old rank', 'New rank', 'Rank adjustment', 'Old wallet', 'New wallet', 'Net adjustment', 'Wallet minus ledger',
-        'Payouts taken', 'Payouts above new income'], $csv);
+        'Payouts taken', 'Weekly reservations', 'Payouts above new income'], $csv);
 }
 $activeKey = 'plan'; $pageTitle = 'Review Historical Income & BV';
 require __DIR__ . '/_nav.php';
@@ -94,7 +94,8 @@ require __DIR__ . '/../includes/dash_header.php';
        <b>Wallet/ledger differences:</b> <?= number_format($s['ledger_discrepancies']) ?> ·
        <b>Already-paid amounts above new earnings:</b> <?= number_format($s['overpaid_members']) ?> member(s).</p>
     <p class="form-hint">A wallet/ledger difference is shown for review; the existing wallet balance is the starting balance and is not rebuilt from the ledger.
-       Existing payouts are never altered. If paid/pending payouts exceed projected earnings, future eligible income first offsets that excess.</p>
+       Existing payouts are never altered. If paid/pending payouts exceed projected earnings, future eligible income first offsets that excess.
+       A correction cannot spend a weekly reservation. If necessary, explicitly release the unpaid report reservations before reviewing a new preview; no wallet refund is issued because they were not debited.</p>
     <?php if ($preview['errors']): ?>
     <div class="alert alert-danger"><b>Cannot apply: <?= count($preview['errors']) ?> blocking issue(s).</b>
         <ul style="margin:8px 0 0 18px"><?php foreach ($preview['errors'] as $problem): ?><li><?= e($problem) ?></li><?php endforeach; ?></ul>
@@ -119,7 +120,7 @@ require __DIR__ . '/../includes/dash_header.php';
             <?php endforeach; ?>
             <td><?= money($b['wallet']) ?> → <?= money($n['wallet']) ?><br><b>Δ <?= money($r['net_adjustment']) ?></b>
                 <?php if ($r['ledger_difference'] != 0.0): ?><br><small style="color:#b45309">Wallet / ledger Δ <?= money($r['ledger_difference']) ?></small><?php endif; ?></td>
-            <td><?= money($b['payout_taken']) ?><?php if ($r['overpaid'] > 0): ?><br><small style="color:#b45309">Above new income: <?= money($r['overpaid']) ?></small><?php endif; ?></td>
+            <td><?= money($b['payout_taken']) ?><?php if ($b['payout_reserved'] > 0): ?><br><small>Weekly reserved: <?= money($b['payout_reserved']) ?></small><?php endif; ?><?php if ($r['overpaid'] > 0): ?><br><small style="color:#b45309">Above new income: <?= money($r['overpaid']) ?></small><?php endif; ?></td>
         </tr>
         <?php endforeach; ?>
         </tbody>

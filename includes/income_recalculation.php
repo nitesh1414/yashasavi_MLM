@@ -7,7 +7,8 @@
 
 function income_recalc_schema_ready()
 {
-    $tables = ['income_matching_state', 'income_sponsor_events', 'income_rank_events', 'income_recalc_runs', 'income_recalc_entries'];
+    $tables = ['income_matching_state', 'income_sponsor_events', 'income_rank_events', 'income_recalc_runs', 'income_recalc_entries',
+        'weekly_payout_runs', 'weekly_payout_reservations'];
     $marks = implode(',', array_fill(0, count($tables), '?'));
     return (int)q_val("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ($marks)", $tables) === count($tables);
 }
@@ -75,9 +76,11 @@ function income_recalc_lock_inputs()
     // protect against legacy/non-engine writers.
     income_rules_ready(true);
     foreach (['plan_settings', 'ranks', 'users', 'orders', 'commissions', 'wallet_transactions', 'payouts',
-              'income_matching_state', 'income_sponsor_events', 'income_rank_events'] as $table) {
+              'income_matching_state', 'income_sponsor_events', 'income_rank_events',
+              'weekly_payout_runs', 'weekly_payout_reservations'] as $table) {
         $key = $table === 'plan_settings' ? 'id' : ($table === 'income_matching_state' ? 'user_id'
-             : ($table === 'income_sponsor_events' ? 'member_id' : ($table === 'income_rank_events' ? 'user_id, rank_id' : 'id')));
+             : ($table === 'income_sponsor_events' ? 'member_id' : ($table === 'income_rank_events' ? 'user_id, rank_id'
+             : ($table === 'weekly_payout_runs' ? 'period_end' : ($table === 'weekly_payout_reservations' ? 'payout_id' : 'id')))));
         $stmt = q("SELECT $key FROM $table ORDER BY $key FOR UPDATE");
         while ($stmt->fetch()) { /* drain the locking read without retaining all ids */ }
     }
@@ -103,6 +106,8 @@ function income_calculate_reconciliation()
                           GROUP BY user_id, type ORDER BY user_id, type");
     $payouts = q_all("SELECT user_id, COUNT(*) AS n, COALESCE(SUM(amount), 0) AS taken FROM payouts
                       WHERE status IN ('pending','paid') GROUP BY user_id ORDER BY user_id");
+    $reservations = q_all("SELECT payout_id, statement_id, user_id, amount FROM weekly_payout_reservations
+                           WHERE status='reserved' ORDER BY payout_id");
     $ledger = q_all("SELECT user_id, COUNT(*) AS n, COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END), 0) AS balance
                      FROM wallet_transactions GROUP BY user_id ORDER BY user_id");
     $matchingStates = q_all("SELECT * FROM income_matching_state ORDER BY user_id");
@@ -112,7 +117,8 @@ function income_calculate_reconciliation()
     $mutex = q_val("SELECT svalue FROM settings WHERE skey = 'income_lock_1850'", [], '');
     $snapshot = ['algorithm' => 'income-rules-1.8.50-1', 'marker' => $marker, 'mutex' => $mutex, 'plan' => $plan, 'ranks' => $ranks,
         'users' => $usersList, 'orders' => $orders, 'commissions' => $commissions, 'payouts' => $payouts,
-        'ledger' => $ledger, 'matching' => $matchingStates, 'sponsors' => $sponsorEvents, 'rank_events' => $rankEvents];
+        'reservations' => $reservations, 'ledger' => $ledger, 'matching' => $matchingStates,
+        'sponsors' => $sponsorEvents, 'rank_events' => $rankEvents];
     $hash = hash('sha256', income_recalc_json($snapshot));
     $errors = [];
     if ($mutex !== '1') {
@@ -122,7 +128,7 @@ function income_calculate_reconciliation()
     // other non-transactional legacy tables. Refuse to apply in that case.
     $requiredTables = ['settings', 'admins', 'plan_settings', 'ranks', 'users', 'orders', 'commissions', 'wallet_transactions',
         'payouts', 'bv_logs', 'points_logs', 'income_matching_state', 'income_sponsor_events', 'income_rank_events',
-        'income_recalc_runs', 'income_recalc_entries'];
+        'income_recalc_runs', 'income_recalc_entries', 'weekly_payout_runs', 'weekly_payout_reservations'];
     $marks = implode(',', array_fill(0, count($requiredTables), '?'));
     $engines = [];
     foreach (q_all("SELECT TABLE_NAME, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ($marks)", $requiredTables) as $table) {
@@ -214,16 +220,20 @@ function income_calculate_reconciliation()
     }
     if ($processed !== count($users)) { $errors[] = 'The placement tree contains a cycle or an invalid parent link.'; }
 
-    $orderByUser = []; $earned = []; $taken = []; $ledgerByUser = [];
+    $orderByUser = []; $earned = []; $taken = []; $reserved = []; $ledgerByUser = [];
     $oldMatching = []; $oldSponsor = []; $oldRanks = [];
     foreach ($orders as $o) { $orderByUser[(int)$o['user_id']] = $o; }
     foreach ($commissions as $c) { $earned[(int)$c['user_id']][$c['type']] = (float)$c['amount']; }
     foreach ($payouts as $p) { $taken[(int)$p['user_id']] = (float)$p['taken']; }
+    foreach ($reservations as $r) {
+        $id = (int)$r['user_id'];
+        $reserved[$id] = round(($reserved[$id] ?? 0) + (float)$r['amount'], 2);
+    }
     foreach ($ledger as $l) { $ledgerByUser[(int)$l['user_id']] = (float)$l['balance']; }
     foreach ($matchingStates as $m) { $oldMatching[(int)$m['user_id']] = $m; }
     foreach ($sponsorEvents as $e) { $oldSponsor[(int)$e['member_id']] = $e; }
     foreach ($rankEvents as $e) { $oldRanks[(int)$e['user_id']][] = $e; }
-    foreach ([$orderByUser, $earned, $taken, $ledgerByUser, $oldMatching, $oldSponsor, $oldRanks] as $byUser) {
+    foreach ([$orderByUser, $earned, $taken, $reserved, $ledgerByUser, $oldMatching, $oldSponsor, $oldRanks] as $byUser) {
         foreach ($byUser as $id => $_) {
             if (!isset($users[$id])) { $errors[] = 'Business data references missing member ID ' . $id . '.'; }
         }
@@ -282,6 +292,7 @@ function income_calculate_reconciliation()
                 'earnings' => $oldEarnings, 'matching_state' => $oldMatching[$id] ?? null,
                 'sponsor_event' => $oldSponsor[$id] ?? null, 'rank_events' => $oldRanks[$id] ?? [],
                 'ledger_balance' => $ledgerByUser[$id] ?? 0, 'payout_taken' => $taken[$id] ?? 0,
+                'payout_reserved' => $reserved[$id] ?? 0,
             ],
             'after' => [
                 'left_bv' => $teams[$id]['L'], 'right_bv' => $teams[$id]['R'], 'pairs' => $pairCount,
@@ -351,6 +362,9 @@ function income_calculate_reconciliation()
         if ($row['after']['wallet'] < -0.001 || $row['after']['total_earned'] < -0.001) {
             $errors[] = $row['username'] . ' would have a negative wallet balance or total earned; resolve the shortfall before applying.';
         }
+        if ($row['before']['payout_reserved'] > 0 && $row['after']['wallet'] + 0.001 < $row['before']['payout_reserved']) {
+            $errors[] = $row['username'] . ' would spend funds reserved for a weekly payout. Process or explicitly release the unpaid report reservations, or resolve the shortfall before applying.';
+        }
         if ($net != 0.0 || $row['before']['left_bv'] != $row['after']['left_bv'] || $row['before']['right_bv'] != $row['after']['right_bv']
             || $row['before']['pairs'] !== $row['after']['pairs'] || $row['before']['points'] !== $row['after']['points']
             || $row['before']['rank_id'] !== $row['after']['rank_id']) { $summary['changed_members']++; }
@@ -370,6 +384,7 @@ function income_preview_reconciliation()
 /** Append a signed commission AND its corresponding wallet transaction. */
 function income_recalc_adjustment($userId, $type, $amount, $runId, $createdAt = null)
 {
+    if (!db()->inTransaction()) { throw new RuntimeException('Income adjustments require a transaction.'); }
     $amount = round((float)$amount, 2);
     if ($amount == 0.0) { return null; }
     $createdAt = $createdAt ?: now();
@@ -381,6 +396,9 @@ function income_recalc_adjustment($userId, $type, $amount, $runId, $createdAt = 
     $newBalance = round((float)$u['wallet_balance'] + $amount, 2);
     $newEarned = round((float)$u['total_earned'] + $amount, 2);
     if ($newBalance < -0.001 || $newEarned < -0.001) { throw new RuntimeException('A wallet changed or has insufficient funds; reconciliation was rolled back.'); }
+    if ($newBalance + 0.001 < weekly_reserved_amount($userId, true)) {
+        throw new RuntimeException('A reconciliation adjustment would spend reserved weekly payout funds; the run was rolled back.');
+    }
     q("UPDATE users SET wallet_balance = ?, total_earned = ? WHERE id = ?", [$newBalance, $newEarned, $userId]);
     q("INSERT INTO wallet_transactions (user_id, type, amount, balance_after, ref_type, ref_id, note, created_at)
        VALUES (?, ?, ?, ?, 'commission', ?, ?, ?)", [$userId, $amount > 0 ? 'credit' : 'debit', abs($amount), $newBalance,

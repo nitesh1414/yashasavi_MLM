@@ -23,11 +23,20 @@ if (is_post() && post_str('action') === 'request') {
     redirect('payout-balance.php');
 }
 
-$eligible = payout_eligible_amount($u['id']);   /* three plan incomes + rank rewards */
+$eligible = payout_eligible_amount($u['id']);   /* additional, unallocated eligible income */
+$wallet = weekly_wallet_snapshot($u['id']);
+$u['wallet_balance'] = $wallet['wallet_balance'];
+$u['total_withdrawn'] = $wallet['total_withdrawn'];
+$reserved = $wallet['reserved'];
+$spendable = $wallet['available'];
+$requestable = min($eligible, $spendable);
 $bankComplete = trim((string)$u['bank_name']) !== '' && trim((string)$u['bank_account_no']) !== '' && trim((string)$u['bank_ifsc']) !== '';
 $kycComplete = $u['kyc_status'] === 'verified';
 $myStatements = member_payout_statements($u['id']);
-$rows = q_all("SELECT * FROM payouts WHERE user_id = ? ORDER BY id DESC", [$u['id']]);
+$rows = q_all("SELECT p.*, wr.status AS reservation_status, w.status AS report_status FROM payouts p
+               LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=p.id
+               LEFT JOIN weekly_payout_runs w ON w.statement_id=wr.statement_id
+               WHERE p.user_id = ? ORDER BY p.id DESC", [$u['id']]);
 
 /* A gross entitlement view, distinct from the actual wallet ledger. */
 $entitlementLedger = payout_entitlement_ledger($u['id']);
@@ -44,8 +53,10 @@ $adminFee = (float)$plan['admin_charge_percent'];
 ?>
 
 <div class="stat-grid">
-    <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(gross income credited)</span></div></div>
-    <div class="stat-card gold"><div class="st-ico">✅</div><div><b><?= money($eligible) ?></b><span>Eligible for Payout<br>(before TDS + charges)</span></div></div>
+    <div class="stat-card"><div class="st-ico">👛</div><div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(includes reserved)</span></div></div>
+    <div class="stat-card gold"><div class="st-ico">📅</div><div><b><?= money($reserved) ?></b><span>Reserved for weekly payouts</span></div></div>
+    <div class="stat-card teal"><div class="st-ico">💳</div><div><b><?= money($spendable) ?></b><span>Available wallet balance</span></div></div>
+    <div class="stat-card gold"><div class="st-ico">✅</div><div><b><?= money($eligible) ?></b><span>Additional eligible income<br>(before TDS + charges)</span></div></div>
     <div class="stat-card teal"><div class="st-ico">⚖️</div><div><b><?= money($bal) ?></b><span>Gross entitlement balance<br>(before deductions)</span></div></div>
     <div class="stat-card red"><div class="st-ico">🏦</div><div><b><?= money($u['total_withdrawn']) ?></b><span>Total Withdrawn</span></div></div>
 </div>
@@ -56,7 +67,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
     <?= !$kycComplete ? '<b>KYC not completed</b> (status: ' . e(ucfirst($u['kyc_status'])) . ')' : '' ?>
     <?= !$kycComplete && !$bankComplete ? ' · ' : '' ?>
     <?= !$bankComplete ? '<b>Bank details not completed</b>' : '' ?>
-    — update them in your <a href="profile.php">profile</a>. Your income stays safe in your wallet and is paid once completed.
+    — update them in your <a href="profile.php">profile</a>. Unpaid eligible income can be included in a later report when the requirements are met.
 </div>
 <?php endif; ?>
 
@@ -64,10 +75,10 @@ $adminFee = (float)$plan['admin_charge_percent'];
     <div class="card-title">🧾 Gross Payout Entitlement</div>
     <p class="form-hint" style="margin:4px 0 10px">
         Eligible gross commissions and corrections, including the current period, less the gross amount of
-        pending or paid requests. Rejected requests are excluded. This is a live eligibility view, not the
-        wallet ledger; purchases and non-payout income can make the wallet different. A negative balance
-        indicates prior payouts exceed current eligible income; the requestable amount is never below zero
-        and is also limited by your wallet. Actual deductions are shown in payout history and receipts.
+        pending or paid requests, including weekly reservations. Released or rejected requests are excluded.
+        This is a live eligibility view, not the wallet ledger; purchases and non-payout income can make the wallet different.
+        Weekly reservations remain in the wallet balance but cannot be spent until released; they are debited when marked Paid.
+        A negative entitlement means prior payouts exceed current eligible income. Actual deductions are shown in payout history and receipts.
     </p>
     <?php if (!$ledger): ?>
         <div class="empty-state"><span class="es-ico">🧾</span>No eligible income or payout requests yet.</div>
@@ -100,19 +111,19 @@ $adminFee = (float)$plan['admin_charge_percent'];
             Payable income = <b>Direct Sponsor Income + Matching Pair Income + Placement Child First-Match Bonus + Rank Rewards</b>;
             rank achievements are credited to your wallet and are payable.
         </p>
-        <?php if ($eligible < (float)$plan['payout_min']): ?>
+        <?php if ($requestable < (float)$plan['payout_min']): ?>
             <div class="alert alert-warning">
-                You need at least <b><?= money($plan['payout_min']) ?></b> of eligible payout income to request a payout.
-                Current eligible income: <b><?= money($eligible) ?></b> (wallet balance: <?= money($u['wallet_balance']) ?>).
+                You need at least <b><?= money($plan['payout_min']) ?></b> of unallocated eligible income and available wallet funds to request a payout.
+                Additional eligible income: <b><?= money($eligible) ?></b>; available wallet: <b><?= money($spendable) ?></b>.
             </div>
         <?php else: ?>
         <form method="post">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="request">
             <div class="form-group">
-                <label>Amount (eligible: <?= money($eligible) ?>)</label>
+                <label>Amount (maximum requestable: <?= money($requestable) ?>)</label>
                 <input class="form-control" type="number" step="0.01" min="<?= e($plan['payout_min']) ?>"
-                       max="<?= e(min($eligible, (float)$u['wallet_balance'])) ?>" name="amount" required
+                       max="<?= e($requestable) ?>" name="amount" required
                        placeholder="Min <?= e($plan['payout_min']) ?>">
             </div>
             <table class="kv-table" style="width:100%;margin:12px 0">
@@ -121,7 +132,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
                 <tr><td><b>Net payable to bank</b></td><td id="net-row"><b>—</b></td></tr>
             </table>
             <p class="form-hint" style="margin-bottom:12px">
-                Payout will be transferred to your registered bank account:
+                The company uses your registered bank details to arrange a payout separately:
                 <b><?= e($u['bank_name'] ?: '— not set —') ?></b>
                 (<?= e(mask_acct($u['bank_account_no'])) ?>). Update it in your
                 <a href="profile.php">profile</a> if needed.
@@ -137,22 +148,20 @@ $adminFee = (float)$plan['admin_charge_percent'];
             <tr><td>Minimum request</td><td><?= money($plan['payout_min']) ?></td></tr>
             <tr><td>TDS deduction</td><td><?= e($tds) ?>%</td></tr>
             <tr><td>Admin / processing charge</td><td><?= e($adminFee) ?>%</td></tr>
-            <tr><td>Processing time</td><td>Within 3–5 working days</td></tr>
-            <tr><td>Weekly payout statement</td><td>Generated by the company every <b>Monday</b> (income counted up to the last <b>Saturday 11:59 PM</b>)</td></tr>
+            <tr><td>Weekly payout statement</td><td>Generated on <b>Sunday</b> after the completed Sunday–Saturday week, in <?= e(APP_TIMEZONE) ?>, when the server scheduler runs.</td></tr>
         </table>
         <p class="form-hint" style="margin-top:10px">
-            Requested amount is immediately deducted (held) from your wallet. If a request is
-            rejected, the amount is refunded to your wallet automatically.
+            Weekly amounts are reserved without reducing your balance and cannot be spent. They are deducted once when marked Paid.
+            A separate manual payout request is immediately deducted (held) and is refunded if rejected. The company arranges bank transfers separately.
         </p>
     </div>
 </div>
 
-<div class="card">
+<div class="card" id="weekly-statements">
     <div class="card-title">📊 My Weekly Payout Statements</div>
-    <p class="form-hint" style="margin:6px 0 10px">The company generates the payout statement <b>every Monday</b>.
-        It lists eligible members and the amounts calculated at generation. A created request remains pending
-        until processed; its current status is shown below. For rows without a request, any shown deductions are
-        illustrative and were not applied.</p>
+    <p class="form-hint" style="margin:6px 0 10px">Statements are scheduled for <b>Sunday</b> after the week closes.
+        Amounts are snapshots at generation and may include older unpaid eligible income. Your current status is shown below;
+        an unpaid/released row carries forward. Deductions on unpaid or released rows have not been applied as payments.</p>
     <?php if (!$myStatements): ?>
         <div class="empty-state"><span class="es-ico">📊</span>No payout statements yet. Your weekly statement appears here
             once the company generates the weekly payout report and you are payout-eligible.</div>
@@ -177,7 +186,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
                 <td>
                     <?php [$statusLabel, $statusStyle] = payout_statement_status($st); ?>
                     <?= badge($statusLabel, $statusStyle) ?>
-                    <?php if (!(int)$st['payout_done'] && $st['reason']): ?><br><small style="color:#000"><?= e($st['reason']) ?></small><?php endif; ?>
+                    <?php if (!empty($st['payout_reason']) || (!(int)$st['payout_done'] && $st['reason'])): ?><br><small style="color:#000"><?= e($st['payout_reason'] ?: $st['reason']) ?></small><?php endif; ?>
                 </td>
                 <td><a class="btn btn-outline btn-sm" href="receipt.php?statement=<?= (int)$st['id'] ?>">⬇ Receipt</a></td>
             </tr>
@@ -207,7 +216,7 @@ $adminFee = (float)$plan['admin_charge_percent'];
                 <td><?= money($r['tds_amount']) ?></td>
                 <td><?= money($r['admin_charge']) ?></td>
                 <td><b><?= money($r['net_amount']) ?></b></td>
-                <td><?= status_badge($r['status'] === 'paid' ? 'approved' : ($r['status'] === 'pending' ? 'pending' : 'rejected')) ?></td>
+                <td><?php [$label, $style] = payout_record_status($r); ?><?= badge($label, $style) ?><?php if ($r['reject_reason']): ?><br><small><?= e($r['reject_reason']) ?></small><?php endif; ?></td>
                 <td><?= $r['paid_at'] ? dmy($r['paid_at'], true) : '—' ?></td>
             </tr>
             <?php endforeach; ?>
