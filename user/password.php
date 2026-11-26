@@ -34,10 +34,7 @@ require __DIR__ . '/../includes/dash_header.php';
     <form method="post">
         <?= csrf_field() ?>
         <div class="form-group"><label>Current Password</label>
-            <input class="form-control" type="password" name="current" required>
-            <?php if (!empty($u['must_change_password'])): ?>
-                <div class="form-hint">First login: your current password is your User ID (<b><?= e($u['username']) ?></b>).</div>
-            <?php endif; ?></div>
+            <input class="form-control" type="password" name="current" required></div>
         <div class="form-group"><label>New Password</label>
             <input class="form-control" type="password" name="new" required>
             <div class="form-hint">Minimum 8 characters with letters and numbers.</div></div>

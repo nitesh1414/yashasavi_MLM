@@ -256,7 +256,7 @@ function register_distributor($data)
         if (!empty($data['use_username_password'])) {
             // Public/panel registration promises this initial password. Keep it
             // atomic with the account so an error cannot leave an unusable ID.
-            q("UPDATE users SET username = ?, path = ?, depth = ?, password = ?, must_change_password = 1 WHERE id = ?",
+            q("UPDATE users SET username = ?, path = ?, depth = ?, password = ?, must_change_password = 0 WHERE id = ?",
               [$username, $path, (int)$parent['depth'] + 1, password_hash($username, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $id]);
         } else {
             q("UPDATE users SET username = ?, path = ?, depth = ? WHERE id = ?",

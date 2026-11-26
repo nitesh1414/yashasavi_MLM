@@ -613,7 +613,7 @@ function registration_success_popup(array $member, $targetUrl, $selfRegister = t
             <div class="regpop-row"><span>Sponsor</span><b><?= e($sponsorTxt) ?></b></div>
             <div class="regpop-row"><span>Joined</span><b><?= e($joined) ?></b></div>
         </div>
-        <p class="regpop-note">🔐 Change this password after first login &nbsp;•&nbsp; 📄 PAN/Aadhaar optional — upload anytime (Upload KYC)</p>
+        <p class="regpop-note">📄 PAN/Aadhaar optional — upload anytime (Upload KYC)</p>
         <div class="regpop-btns">
             <button type="button" class="regpop-share" id="regpop-share">📤 Share</button>
             <a class="regpop-btn" id="regpop-go" href="<?= e($target) ?>"><?= $selfRegister ? '🔐 Continue to Login' : '✅ Continue' ?></a>
@@ -721,7 +721,7 @@ function registration_success_popup(array $member, $targetUrl, $selfRegister = t
 
         /* note */
         x.textAlign = 'center'; x.fillStyle = '#4a5a4d'; x.font = '18px ' + F;
-        x.fillText('Password = User ID. Change it after the first login.', W / 2, y + 24);
+        x.fillText('Your initial password is your User ID.', W / 2, y + 24);
         x.fillText('PAN / Aadhaar can be uploaded later (Upload KYC).', W / 2, y + 50);
 
         /* footer */
@@ -736,8 +736,7 @@ function registration_success_popup(array $member, $targetUrl, $selfRegister = t
             '\nPassword: ' + REG.uid +
             '\nSponsor: ' + REG.sponsor +
             '\nJoined: ' + REG.joined +
-            '\n\nLogin: ' + REG.login +
-            '\n(Please change the password after the first login.)';
+            '\n\nLogin: ' + REG.login;
     }
     var shareBtn = document.getElementById('regpop-share');
     shareBtn.addEventListener('click', function () {

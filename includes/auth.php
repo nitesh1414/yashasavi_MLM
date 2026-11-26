@@ -57,14 +57,8 @@ function require_user()
         flash('warning', $u ? 'Your account is not active. Please contact support.' : 'Please login to continue.');
         redirect('/login.php');
     }
-    // New member IDs are initially also their passwords. Do not expose the
-    // member panel until that publicly guessable password has been changed.
-    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
-    $passwordPage = basename($script) === 'password.php' && basename(dirname($script)) === 'user';
-    if (!empty($u['must_change_password']) && !$passwordPage) {
-        flash('warning', 'Please change your first-time password before continuing.');
-        redirect('/user/password.php');
-    }
+    // Older accounts may still have must_change_password set. First-login
+    // password changes are optional, so that legacy flag does not block access.
     return $u;
 }
 

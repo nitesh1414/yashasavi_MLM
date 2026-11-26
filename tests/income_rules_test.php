@@ -231,8 +231,27 @@ if ($scenario === 'registration') {
     [$ok, $id, $username] = register_distributor($data);
     $user = q_row('SELECT username, password, path, must_change_password FROM users WHERE id=?', [$id]);
     test_check($ok && $user['username'] === $username && password_verify($username, $user['password']), 'registration atomically assigns the promised member-ID password');
-    test_eq($user['must_change_password'], 1, 'new member must change their first-time password');
+    test_eq($user['must_change_password'], 0, 'new member is not required to change their password at login');
     test_eq(q_val('SELECT COUNT(*) FROM income_matching_state WHERE user_id=?', [$id]), 1, 'new account and empty income state commit together');
+    // Existing accounts can still carry the old flag; they must also be able
+    // to reach the dashboard without altering their password or their record.
+    q('UPDATE users SET must_change_password=1 WHERE id=?', [$id]);
+    $_SESSION['user_id'] = $id;
+    $_SERVER['SCRIPT_NAME'] = '/user/index.php';
+    // A redirect calls exit(0), so make an unexpected redirect fail the test
+    // instead of silently terminating the scenario with a successful status.
+    $guardReturned = false;
+    register_shutdown_function(static function () use (&$guardReturned) {
+        if (!$guardReturned) {
+            fwrite(STDERR, "FAIL: member guard exited instead of allowing the flagged account.\n");
+            exit(1);
+        }
+    });
+    $guarded = require_user();
+    $guardReturned = true;
+    test_check((int)$guarded['id'] === (int)$id, 'previously flagged members can access the dashboard without changing their password');
+    test_eq(q_val('SELECT must_change_password FROM users WHERE id=?', [$id]), 1, 'access does not require a migration or rewrite of old flags');
+    unset($_SESSION['user_id']);
     db()->exec('ALTER TABLE users MODIFY path VARCHAR(5) NOT NULL');
     $data['placement'] = $id;
     $count = (int)q_val('SELECT COUNT(*) FROM users');

@@ -132,7 +132,19 @@ members unpaid and makes funds available without a debit or refund. Old pending
 payouts and separate manual requests were already debited and retain their original
 individual processing/refund behavior.
 
-## Default credentials (change after first login!)
+## Member first login
+
+New members can access their dashboard immediately after login; changing the
+password is optional. Existing accounts with the old `must_change_password` flag
+can also log in without a forced change, and no password or database migration is
+performed. The Change Password page remains available in the member panel.
+
+**Security warning:** Public, panel and bulk registration currently use the member
+ID as the initial password. Member IDs may be visible or predictable, so accounts
+that keep this password are vulnerable to unauthorized access. Before production
+use, arrange unique, private credentials for members through a secure process.
+
+## Default installer credentials (replace before production)
 
 | Role | URL | Username | Password |
 |---|---|---|---|

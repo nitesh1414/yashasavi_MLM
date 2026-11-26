@@ -35,7 +35,7 @@ function create_bulk_member_atomic(array $data, $activate, $selfbv)
         if ($ready) { get_plan(true); }
         [$ok, $uid, $code] = register_distributor($data);
         if (!$ok) { throw new RuntimeException($code); }
-        q("UPDATE users SET password = ?, must_change_password = 1 WHERE id = ?",
+        q("UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?",
           [password_hash($code, PASSWORD_BCRYPT, ['cost' => BCRYPT_COST]), $uid]);
         if ($activate) {
             q("UPDATE users SET is_active = 1, kyc_status = 'verified', activated_at = COALESCE(activated_at, NOW()) WHERE id = ?", [$uid]);
@@ -380,8 +380,8 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
             <div class="form-group">
                 <label>Password</label>
                 <div class="form-hint" style="margin-top:8px">
-                    🔐 Each member's first-time password is their own <b>User ID</b> (e.g. <b>YSH100002</b>)
-                    — exactly like a normal registration. They must change it after first login.
+                    🔐 Each member's initial password is their own <b>User ID</b> (e.g. <b>YSH100002</b>),
+                    exactly like a normal registration.
                 </div>
             </div>
             <div class="form-group">
@@ -460,8 +460,8 @@ $total = (int)q_val("SELECT COUNT(*) FROM users");
             <div class="form-group">
                 <label>Password</label>
                 <div class="form-hint" style="margin-top:8px">
-                    🔐 Each member's first-time password is their own <b>User ID</b> (e.g. <b>YSH100002</b>)
-                    — exactly like a normal registration. They must change it after first login.
+                    🔐 Each member's initial password is their own <b>User ID</b> (e.g. <b>YSH100002</b>),
+                    exactly like a normal registration.
                 </div>
             </div>
             <div class="form-group">
