@@ -2,14 +2,15 @@
 /** Distributor registration (binary placement under a sponsor) */
 require_once __DIR__ . '/includes/init.php';
 
-// Logged-in users are normally sent to their dashboard, but they may open the
-// form from a tree "empty position" link (which carries ?ref=) to sign up a
-// new downline member.
-if (current_user() && get_str('ref') === '') {
+// Logged-in users may open a referral/empty-position link to register a
+// downline member. Also allow the success popup after the form's PRG redirect,
+// which no longer carries the original referral query string.
+$pendingSelfPopup = !empty($_SESSION['reg_popup']) && ($_SESSION['reg_popup']['self'] ?? false);
+if (current_user() && get_str('ref') === '' && !$pendingSelfPopup) {
     redirect('user/index.php');
 }
 
-$prefill = ['sponsor' => strtoupper(get_str('ref')), 'leg' => get_str('leg', 'L')];
+$prefill = ['sponsor' => strtoupper(get_str('ref')), 'leg' => strtoupper(get_str('leg', 'L'))];
 $errors = [];
 
 $STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Delhi','Goa','Gujarat','Haryana',
@@ -18,7 +19,7 @@ $STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','
     'Uttar Pradesh','Uttaranchal','West Bengal'];
 
 $f = [
-    'sponsor' => '', 'leg' => 'L', 'full_name' => '', 'email' => '', 'mobile' => '', 'dob' => '',
+    'sponsor' => '', 'leg' => $prefill['leg'] === 'R' ? 'R' : 'L', 'full_name' => '', 'email' => '', 'mobile' => '', 'dob' => '',
     'marital_status' => '', 'nationality' => 'Indian', 'state' => 'Maharashtra', 'city' => '', 'pincode' => '',
     'address' => '', 'nominee_name' => '', 'nominee_relation' => '', 'bank_holder' => '', 'bank_account_no' => '',
     'bank_ifsc' => '', 'bank_name' => '', 'bank_branch' => '', 'aadhaar_no' => '', 'pan_no' => '',

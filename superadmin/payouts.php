@@ -32,7 +32,7 @@ if (is_post()) {
             redirect('payouts.php?statement=' . $id);
         }
         if ($action === 'generate') {
-            // Manual catch-up uses the same idempotent scheduler as cron.
+            // Manual catch-up can include the newly completed week on Sunday.
             $results = weekly_payout_run_due();
             $latest = weekly_latest_completed_saturday();
             $run = q_row("SELECT * FROM weekly_payout_runs WHERE period_end=?", [$latest]);
@@ -160,13 +160,14 @@ require __DIR__ . '/../includes/dash_header.php';
 <div class="card" style="border:1.5px dashed var(--accent)">
     <div class="card-title">📅 Automatic Weekly Payout Reports</div>
     <p style="font-size:13px;color:var(--ink-soft)">
-        The configured server scheduler generates each report on <b>Sunday</b> after the
-        <b>Sunday → Saturday</b> week ends (<?= e(APP_TIMEZONE) ?>). It includes older unpaid eligible income through
-        Saturday. Eligible members with verified KYC, bank details and at least <?= money(get_plan()['payout_min']) ?>
-        have funds <b>reserved, not deducted</b>. Unavailable amounts carry forward. Mark a report In process or
-        Paid from its statement. Paid deducts the gross once and records the payment; <b>it does not send a bank transfer</b>.
-        Sponsor, matching, placement first-match and rank income qualify. Recorded TDS and admin charges use the rates at generation.
-        The server cron must be configured as described in README.md; the button is a safe catch-up if it was missed.
+        The <b>Sunday → Saturday</b> week is generated automatically from Monday when an active superadmin logs in
+        or refreshes a page (<?= e(APP_TIMEZONE) ?>). If no one visits on Monday, missed reports catch up on the next visit;
+        no server cron is required. The button can also run a completed week manually from Sunday.
+        Reports include older unpaid eligible income through Saturday. Eligible members with verified KYC,
+        bank details and at least <?= money(get_plan()['payout_min']) ?> have funds <b>reserved, not deducted</b>.
+        Unavailable amounts carry forward. Mark a report In process or Paid from its statement. Paid deducts the gross once
+        and records the payment; <b>it does not send a bank transfer</b>. Sponsor, matching, placement first-match
+        and rank income qualify. Recorded TDS and admin charges use the rates at generation.
     </p>
     <form method="post" class="filter-form" data-confirm="Generate any due weekly reports? Eligible amounts will be reserved without debiting wallets.">
         <?= csrf_field() ?>

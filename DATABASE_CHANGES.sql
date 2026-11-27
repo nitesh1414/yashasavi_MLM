@@ -66,11 +66,16 @@
 --   with this release. Create the two new InnoDB tables below (including on an
 --   already-reconciled 1.8.50 database); do not modify old payout or statement
 --   rows. Check table definitions and transactional engines on staging first.
--- - Configure the CLI scheduler exactly as described in README.md and monitor
---   its nonzero exit status, logs and report freshness. The app itself cannot
---   install or guarantee a hosting provider's cron. It uses APP_TIMEZONE and
---   creates the latest completed Sunday–Saturday report on Sunday or catch-up.
---   The first run starts at the latest completed Saturday; earlier unpaid
+-- - From v1.8.53, an authenticated active superadmin panel visit from Monday
+--   generates due Sunday–Saturday reports and catches up missed weeks. On an
+--   already-ready site this can happen immediately on the first panel GET,
+--   including a reconciliation page or login redirect, and reserves eligible
+--   funds. Do not open those pages during a write freeze unless this action has
+--   been approved. The separate install/upgrade.php page does not trigger it;
+--   the missing income-ready marker pauses generation on pre-baseline sites.
+--   No cron is required, but no visit means no automatic report; monitor freshness
+--   and server logs. The optional CLI fallback follows the same Monday schedule.
+--   The first automatic run starts at the latest due Saturday; earlier unpaid
 --   income is included without creating artificial historical reports. Later
 --   missed weeks are generated oldest first, at most 52 per invocation. Legacy
 --   statements for the same week suppress a duplicate without being changed.

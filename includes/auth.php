@@ -120,6 +120,31 @@ function require_superadmin()
         unset($_SESSION['superadmin_id']);
         redirect('/superadmin/login.php');
     }
+    // A logged-in superadmin panel visit replaces a required server cron.
+    // Retry on the next visit after failures or missed Mondays. Never settle or
+    // mark reports Paid here. Exclude POST/CLI and non-panel uses of this guard
+    // (notably install/upgrade.php) from these automatic financial writes.
+    static $autoPayoutAttempted = false;
+    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    $isPanelPage = basename(dirname($script)) === 'superadmin';
+    if (!$autoPayoutAttempted && $isPanelPage && !defined('YASH_CLI')
+        && ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET'
+        && function_exists('weekly_payout_auto_run_due')) {
+        $autoPayoutAttempted = true;
+        try {
+            $runs = weekly_payout_auto_run_due();
+            $created = count(array_filter($runs, function ($run) { return $run['outcome'] === 'created'; }));
+            if ($created || count($runs) === 52) {
+                $message = $created
+                    ? $created . ' weekly payout report(s) generated automatically as Unpaid. No bank transfers were made.'
+                    : 'Earlier weekly periods were already covered by existing reports.';
+                flash('info', $message . (count($runs) === 52 ? ' Further missed weeks may need another visit.' : ''));
+            }
+        } catch (Throwable $ex) {
+            error_log('Automatic weekly payout report failed: ' . $ex->getMessage());
+            flash('warning', 'Automatic weekly reports could not finish. Check Payouts and the server log; the next visit will retry.');
+        }
+    }
     return $a;
 }
 

@@ -6,14 +6,21 @@ document.addEventListener('DOMContentLoaded', function () {
     var sb = document.querySelector('.sidebar');
     var so = document.querySelector('.side-overlay');
     function closeSidebar() {
+        var restoreFocus = sb && sb.classList.contains('open') && sb.contains(document.activeElement)
+            && window.matchMedia('(max-width: 820px)').matches;
         if (sb) { sb.classList.remove('open'); }
         if (so) { so.classList.remove('open'); }
+        if (mt) { mt.setAttribute('aria-expanded', 'false'); }
         document.body.classList.remove('side-open');
+        if (restoreFocus && mt) { mt.focus(); }
     }
     function openSidebar() {
         if (sb) { sb.classList.add('open'); }
         if (so) { so.classList.add('open'); }
+        if (mt) { mt.setAttribute('aria-expanded', 'true'); }
         document.body.classList.add('side-open');
+        var close = sb && sb.querySelector('.side-close');
+        if (close) { close.focus(); }
     }
     if (mt && sb) {
         mt.addEventListener('click', function (e) {
@@ -31,7 +38,20 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
         document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeSidebar(); } });
+        window.addEventListener('resize', function () {
+            if (!window.matchMedia('(max-width: 820px)').matches && sb.classList.contains('open')) { closeSidebar(); }
+        });
     }
+
+    /* Native details remain usable without JavaScript. With JS, keep only
+       one main section open in the member and superadmin sidebars. */
+    var sections = document.querySelectorAll('.side-section');
+    sections.forEach(function (section) {
+        section.addEventListener('toggle', function () {
+            if (!section.open) { return; }
+            sections.forEach(function (other) { if (other !== section) { other.open = false; } });
+        });
+    });
 
     /* sidebar submenu groups (e.g. Payout): the caret expands/collapses
        the kids; clicking the row itself navigates */
@@ -42,6 +62,8 @@ document.addEventListener('DOMContentLoaded', function () {
             var g = b.closest('.side-group');
             if (!g) { return; }
             var open = g.classList.toggle('open');
+            var kids = g.querySelector('.side-kids');
+            if (kids) { kids.hidden = !open; }
             b.setAttribute('aria-expanded', open ? 'true' : 'false');
         });
     });

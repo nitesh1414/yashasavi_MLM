@@ -171,12 +171,28 @@ function generate_payout_report($periodEnd = null, $asOf = null)
     return [$stats['outcome'] !== '', $runTs, $stats];
 }
 
-/** Run from cron. The first invocation starts with the latest completed week;
- * subsequent invocations catch up missing weeks in order, at most 52 at once. */
-function weekly_payout_run_due($asOf = null)
+/** A Saturday's automatic report becomes due on Monday, not Sunday. On
+ * Sunday an older missed report may still be caught up by an admin visit. */
+function weekly_latest_auto_saturday($asOf = null)
 {
-    weekly_payout_require_storage();
+    $zone = new DateTimeZone(APP_TIMEZONE);
+    $local = $asOf instanceof DateTimeInterface
+        ? (new DateTimeImmutable('@' . $asOf->getTimestamp()))->setTimezone($zone)
+        : new DateTimeImmutable('now', $zone);
     $latest = weekly_latest_completed_saturday($asOf);
+    return $local->format('N') === '7'
+        ? (new DateTimeImmutable($latest, $zone))->modify('-7 days')->format('Y-m-d')
+        : $latest;
+}
+
+/** Generate through an explicit completed Saturday. The first invocation
+ * starts with that week; later invocations catch up in order, at most 52. */
+function weekly_payout_run_through($latest, $asOf = null)
+{
+    if (!weekly_valid_period($latest, $asOf)) {
+        throw new InvalidArgumentException('Weekly payout catch-up requires a completed Saturday.');
+    }
+    weekly_payout_require_storage();
     $last = q_val("SELECT MAX(period_end) FROM weekly_payout_runs");
     $next = $last ? (new DateTimeImmutable($last, new DateTimeZone(APP_TIMEZONE)))->modify('+7 days')->format('Y-m-d') : $latest;
     $results = [];
@@ -187,6 +203,18 @@ function weekly_payout_run_due($asOf = null)
         $next = (new DateTimeImmutable($next, new DateTimeZone(APP_TIMEZONE)))->modify('+7 days')->format('Y-m-d');
     }
     return $results;
+}
+
+/** Explicit manual catch-up can include the most recently completed Saturday. */
+function weekly_payout_run_due($asOf = null)
+{
+    return weekly_payout_run_through(weekly_latest_completed_saturday($asOf), $asOf);
+}
+
+/** Automatic superadmin visits and the optional CLI fallback start on Monday. */
+function weekly_payout_auto_run_due($asOf = null)
+{
+    return weekly_payout_run_through(weekly_latest_auto_saturday($asOf), $asOf);
 }
 
 /** Status label for a new weekly report header. */

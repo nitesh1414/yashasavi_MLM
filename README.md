@@ -15,7 +15,8 @@ super-admin MLM management console, in one self-contained PHP + MySQL codebase w
 - Legals (certificates) and Promotion (brochure/business-plan downloads) pages
 
 **Distributor panel** (`user/`)
-- Dashboard with team stats, e-wallet balance, announcements, recent activity
+- Dashboard with member details, shareable referral link and local QR, income cards,
+  team stats, e-wallet balance, announcements and recent activity
 - Binary genealogy tree viewer (re-root into your own downline)
 - Team lists (direct / full downline with search)
 - Shop with cart, wallet or bank-transfer checkout, order history & invoice view
@@ -36,8 +37,9 @@ super-admin MLM management console, in one self-contained PHP + MySQL codebase w
   manual activation, full profile + genealogy
 - Orders: approve / reject — **approval instantly runs the commission engine**
 - Commission ledger with filters + CSV export
-- Weekly payout reports scheduled for Sunday, report-level Unpaid / In Process / Paid,
-  reservation-safe wallets and CSV export; manual/legacy requests are handled individually
+- Weekly payout reports automatically generated on superadmin visits from Monday,
+  report-level Unpaid / In Process / Paid, reservation-safe wallets and CSV export;
+  manual/legacy requests are handled individually
 - E-wallets: full transaction ledger + manual credit/debit adjustments
 - MLM plan settings (joining BV, sponsor rate, pair unit and rate, placement first-match
   percentage, points, TDS, admin charge and payout minimum)
@@ -90,26 +92,26 @@ copy and follow the maintenance, backup, SQL and review steps in
 
 ## Weekly payout scheduler
 
-The application **does not install a scheduler by itself**. After deploying and
-migrating the database, configure the server's cron (or hosting control panel)
-to invoke the CLI script, for example every 15 minutes:
+No server cron is required. From Monday 00:00 in `APP_TIMEZONE` (default
+`Asia/Kolkata`), the first authenticated active superadmin panel page visit after
+login or refresh generates the report for the preceding Sunday–Saturday week. If nobody
+visits on Monday, the next superadmin visit catches up due reports, even on a later
+day. **Without a superadmin visit there is no unattended run**, so reports can be
+late. Monitor report freshness and the server log, and keep the clock synchronized.
+An automatic failure is reported to the superadmin and retried on a later visit.
+On an already-ready installation, the first authenticated superadmin panel GET
+after deployment can immediately create a report and reserve funds, including
+when visiting its reconciliation pages. Plan and approve that behavior before
+opening them. The separate `install/upgrade.php` page does not trigger the run.
 
-```cron
-*/15 * * * * /usr/bin/php /absolute/path/to/yashasavi_MLM/cron/weekly_payouts.php >> /var/log/yashasavi-weekly-payouts.log 2>&1
-```
-
-Use the actual PHP executable and absolute application path, a restricted service
-account with database access, and a writable, private, rotated log. Monitor job
-failures and missing reports, and keep the server clock accurate and synchronized.
-Cron may use the server's timezone: the script uses `APP_TIMEZONE` (default
-`Asia/Kolkata`) to determine the latest completed Saturday.
-It creates the new report on the first invocation after Sunday 00:00 local time.
-Repeated or overlapping invocations are safe. On the first run it starts at the
-latest completed week; thereafter it catches up missing weeks in order (up to 52
-per invocation). An existing legacy report for the same week is left untouched
-and prevents a duplicate. The superadmin's **Run Due Reports** button is a manual
-fallback, not a replacement for cron. The script is CLI-only and returns nonzero
-on failure; no HTTP endpoint or secret URL is needed.
+The first run starts with the latest automatically due week; thereafter missing
+weeks are generated in order (up to 52 per visit). Repeated and overlapping visits
+are safe. A legacy report for the same week is left unchanged and prevents a
+duplicate. The superadmin's **Run Due Reports** button is an optional manual
+fallback and can generate a completed week on Sunday. The existing CLI-only
+`cron/weekly_payouts.php` remains an optional fallback; it uses the same Monday
+eligibility and returns nonzero on failure. A previously configured server cron
+is no longer necessary and may be removed by the server operator.
 
 Reports include eligible sponsor, matching, placement first-match and rank income
 through Saturday, including earlier unpaid income. The minimum, wallet availability,
@@ -131,6 +133,29 @@ reservations on an unpaid report, for example before correcting income; this lea
 members unpaid and makes funds available without a debit or refund. Old pending
 payouts and separate manual requests were already debited and retain their original
 individual processing/refund behavior.
+
+## Member dashboard milestones
+
+The referral link opens public registration with the current member's sponsor ID;
+registrants select their placement leg. Its QR code is generated locally. Set the
+public `APP_URL` correctly so shared links use the intended site and HTTPS origin.
+The link exposes the member ID; since the initial password is also the member ID,
+sharing it before voluntarily changing the password makes the account easy to access.
+The package card sums approved paid purchases through the recorded joining-BV target using
+continuous Self BV logs. If the historical target is missing, or manual grants or
+missing/inconsistent logs prevent a reliable calculation, it shows the amount as
+unavailable rather than inventing it. Before qualification it shows paid approved
+purchases so far.
+
+Car Fund and Tour/Vacation use the member's existing matched-pair points and can be
+configured in Superadmin → MLM Plan Settings. The existing Car Fund plan settings
+are used; Tour/Vacation is unconfigured until both its target and amount are set.
+These are **display-only milestones**, not automatic wallet credits, payments or
+payout eligibility. The Royalty card shows existing credited `level` commissions;
+this release does not create a new royalty income stream. Award milestones show
+recognition reached, not proof of delivery. Total Income is the credited commission
+ledger, including applicable adjustments; the payout balance is eligible gross
+limited by the available wallet, before deductions and other payout checks.
 
 ## Member first login
 

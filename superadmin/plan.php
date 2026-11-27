@@ -17,6 +17,7 @@ if (is_post()) {
             'pair_unit_bv' => ['positive', 9999999999.99],
             'binary_value' => ['nonnegative', 99999999.99],
             'sponsor_matching_percent' => ['nonnegative', 9999.99],
+            'car_fund_amount' => ['nonnegative', 9999999999.99],
             'tds_percent' => ['nonnegative', 100],
             'admin_charge_percent' => ['nonnegative', 100],
             'payout_min' => ['positive', 9999999999.99],
@@ -45,9 +46,32 @@ if (is_post()) {
             if (!ctype_digit($raw) || (int)$raw > 1000) { $errors[] = 'Points per pair must be between 0 and 1000.'; }
             else { $updates['points_per_unit'] = (int)$raw; }
         }
+        if (array_key_exists('car_fund_points', $_POST)) {
+            $raw = is_scalar($_POST['car_fund_points']) ? trim((string)$_POST['car_fund_points']) : '';
+            if (!ctype_digit($raw) || strlen($raw) > 10 || (float)$raw > 4294967295) {
+                $errors[] = 'Car Fund points must be a whole number from 0 to 4294967295.';
+            } else { $updates['car_fund_points'] = (int)$raw; }
+        }
+        $milestoneUpdates = [];
+        if (array_key_exists('dashboard_tour_points', $_POST) || array_key_exists('dashboard_tour_amount', $_POST)) {
+            $points = isset($_POST['dashboard_tour_points']) && is_scalar($_POST['dashboard_tour_points'])
+                ? trim((string)$_POST['dashboard_tour_points']) : '';
+            $amount = isset($_POST['dashboard_tour_amount']) && is_scalar($_POST['dashboard_tour_amount'])
+                ? trim((string)$_POST['dashboard_tour_amount']) : '';
+            if ($points === '' && $amount === '') {
+                $milestoneUpdates = ['dashboard_tour_points' => '', 'dashboard_tour_amount' => ''];
+            } elseif (!ctype_digit($points) || strlen($points) > 10 || (float)$points < 1 || (float)$points > 4294967295
+                || $amount === '' || !is_numeric($amount) || !is_finite((float)$amount)
+                || (float)$amount < 0 || (float)$amount > 9999999999.99) {
+                $errors[] = 'Enter valid Tour/Vacation points and amount, or leave both blank.';
+            } else {
+                $milestoneUpdates = ['dashboard_tour_points' => (string)(int)$points,
+                    'dashboard_tour_amount' => number_format((float)$amount, 2, '.', '')];
+            }
+        }
         if (!$errors) {
             try {
-                db_tx(function () use ($updates) {
+                db_tx(function () use ($updates, $milestoneUpdates) {
                     income_rules_ready(true); // same lock order as orders and reconciliation
                     $current = q_row("SELECT * FROM plan_settings WHERE id = 1 FOR UPDATE");
                     if (!$current) { throw new RuntimeException('MLM plan settings are missing.'); }
@@ -59,6 +83,7 @@ if (is_post()) {
                     foreach ($updates as $k => $v) { $sets[] = "$k = ?"; $params[] = $v; }
                     $sets[] = 'updated_at = ?'; $params[] = now(); $params[] = 1;
                     q("UPDATE plan_settings SET " . implode(', ', $sets) . " WHERE id = ?", $params);
+                    foreach ($milestoneUpdates as $key => $value) { save_setting($key, $value); }
                 });
                 flash('success', 'MLM plan settings saved.');
             } catch (Throwable $ex) {
@@ -161,7 +186,28 @@ require __DIR__ . '/../includes/dash_header.php';
             <div class="form-group">
                 <label>Points per matched pair unit</label>
                 <input class="form-control" type="number" min="0" name="points_per_unit" value="<?= e($plan['points_per_unit']) ?>">
-                <div class="form-hint" style="margin-top:6px">Points are awarded per matched pair using the configured unit and point rate. Points require joining eligibility or manual earning activation. Every <a href="ranks.php">rank</a> achievement credits that rank's reward amount to the member's <b>wallet balance</b> (wallet income — included in payouts). <a href="rewards.php">Award milestones</a> are recognition only; no car fund exists.</div>
+                <div class="form-hint" style="margin-top:6px">Points are awarded per matched pair using the configured unit and point rate. Points require joining eligibility or manual earning activation. Every <a href="ranks.php">rank</a> achievement credits that rank's reward amount to the member's <b>wallet balance</b> (wallet income — included in payouts). <a href="rewards.php">Award milestones</a> are recognition only.</div>
+            </div>
+        </div>
+
+        <h4 style="font-size:14px;margin:16px 0 12px">Dashboard milestones</h4>
+        <p class="form-hint" style="margin-bottom:12px">These milestones are informational only. Reaching a target does not credit a wallet, create a payout, or confirm a reward has been paid. Set Car Fund points to 0 to disable it; leave both Tour/Vacation fields blank to leave it unconfigured.</p>
+        <div class="form-grid2">
+            <div class="form-group">
+                <label>Car Fund target points</label>
+                <input class="form-control" type="number" min="0" max="4294967295" step="1" name="car_fund_points" value="<?= e($plan['car_fund_points']) ?>">
+            </div>
+            <div class="form-group">
+                <label>Car Fund milestone amount (₹)</label>
+                <input class="form-control" type="number" min="0" max="9999999999.99" step="0.01" name="car_fund_amount" value="<?= e($plan['car_fund_amount']) ?>">
+            </div>
+            <div class="form-group">
+                <label>Tour / Vacation target points</label>
+                <input class="form-control" type="number" min="1" max="4294967295" step="1" name="dashboard_tour_points" value="<?= e(setting('dashboard_tour_points', '')) ?>" placeholder="Not configured">
+            </div>
+            <div class="form-group">
+                <label>Tour / Vacation milestone amount (₹)</label>
+                <input class="form-control" type="number" min="0" max="9999999999.99" step="0.01" name="dashboard_tour_amount" value="<?= e(setting('dashboard_tour_amount', '')) ?>" placeholder="Not configured">
             </div>
         </div>
 

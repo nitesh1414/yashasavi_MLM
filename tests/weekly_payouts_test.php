@@ -3,8 +3,8 @@
  * Destructive integration tests. ONLY run against a disposable yash_test_* DB.
  *
  * YASH_TEST_DB=yash_test_weekly YASH_TEST_ALLOW_RESET=1 php tests/weekly_payouts_test.php lifecycle
- * Repeat for scheduling, legacy, upgrade, reconciliation, rollback, multiweek,
- * eligibility, kyc and storage.
+ * Repeat for scheduling, auto_visit, legacy, upgrade, reconciliation, rollback,
+ * multiweek, eligibility, kyc and storage.
  * Each scenario drops and reseeds all application tables in its test database.
  */
 define('YASH_CLI', true);
@@ -20,8 +20,8 @@ require __DIR__ . '/../includes/income_recalculation.php';
 require __DIR__ . '/../includes/kyc.php';
 require __DIR__ . '/../install/seed.php';
 $scenario = defined('WEEKLY_TEST_SCENARIO') ? WEEKLY_TEST_SCENARIO : ($argv[1] ?? '');
-if (!in_array($scenario, ['lifecycle', 'scheduling', 'legacy', 'upgrade', 'reconciliation', 'rollback', 'multiweek', 'eligibility', 'kyc', 'storage'], true)) {
-    fwrite(STDERR, "Choose lifecycle, scheduling, legacy, upgrade, reconciliation, rollback, multiweek, eligibility, kyc or storage.\n"); exit(1);
+if (!in_array($scenario, ['lifecycle', 'scheduling', 'auto_visit', 'legacy', 'upgrade', 'reconciliation', 'rollback', 'multiweek', 'eligibility', 'kyc', 'storage'], true)) {
+    fwrite(STDERR, "Choose lifecycle, scheduling, auto_visit, legacy, upgrade, reconciliation, rollback, multiweek, eligibility, kyc or storage.\n"); exit(1);
 }
 seed_database(true);
 $checks = 0;
@@ -192,6 +192,33 @@ if ($scenario === 'scheduling') {
     w_eq(count($part), 52, 'one invocation limits catch-up to 52 weeks');
     w_eq(count(weekly_payout_run_due()), 8, 'a later invocation resumes the remaining weeks');
     w_eq(count(weekly_payout_run_due()), 0, 'catch-up completes without duplicates');
+}
+
+if ($scenario === 'auto_visit') {
+    $zone = new DateTimeZone(APP_TIMEZONE);
+    $sunday = new DateTimeImmutable('2026-08-09 23:59:59', $zone);
+    $monday = new DateTimeImmutable('2026-08-10 00:00:00', $zone);
+    w_eq(weekly_latest_auto_saturday($sunday), '2026-08-01', 'Sunday auto-run excludes the just-closed Saturday');
+    w_eq(weekly_latest_auto_saturday($monday), '2026-08-08', 'automatic eligibility changes at Monday midnight');
+    w_eq(weekly_latest_auto_saturday(new DateTimeImmutable('2026-08-09 18:29:59', new DateTimeZone('UTC'))), '2026-08-01', 'automatic cutoff uses the application timezone before Monday');
+    w_eq(weekly_latest_auto_saturday(new DateTimeImmutable('2026-08-09 18:30:00', new DateTimeZone('UTC'))), '2026-08-08', 'UTC instant at local Monday midnight is eligible');
+    w_bank(1); w_earning(1, 'binary', 1000, '2026-07-29 12:00:00');
+    $old = weekly_payout_auto_run_due($sunday);
+    w_check(count($old) === 1 && $old[0]['period_end'] === '2026-08-01', 'a Sunday visit catches up an older overdue week');
+    w_eq(q_val('SELECT COUNT(*) FROM weekly_payout_runs WHERE period_end=?', ['2026-08-08']), 0, 'Sunday visit does not automatically run the newly closed week');
+    w_eq(q_val('SELECT wallet_balance FROM users WHERE id=1'), 1000, 'automatic generation does not debit the wallet');
+    w_eq(q_val("SELECT status FROM weekly_payout_runs WHERE period_end='2026-08-01'"), 'unpaid', 'automatic report remains Unpaid');
+    w_eq(q_val("SELECT COALESCE(SUM(amount),0) FROM weekly_payout_reservations WHERE status='reserved'"), 1000, 'eligible funds are reserved once');
+    w_eq(count(weekly_payout_auto_run_due($sunday)), 0, 'repeated Sunday visits do not duplicate reports');
+    $new = weekly_payout_auto_run_due($monday);
+    w_check(count($new) === 1 && $new[0]['period_end'] === '2026-08-08', 'first Monday visit generates the due week');
+    w_eq(count(weekly_payout_auto_run_due($monday)), 0, 'refreshing on Monday is idempotent');
+    $caughtUp = weekly_payout_auto_run_due(new DateTimeImmutable('2026-09-01 11:00:00', $zone));
+    w_check(count($caughtUp) === 3 && $caughtUp[0]['period_end'] === '2026-08-15'
+        && $caughtUp[2]['period_end'] === '2026-08-29', 'a later Tuesday visit catches up missed Mondays in order');
+    w_eq(q_val('SELECT COUNT(*) FROM weekly_payout_runs'), 5, 'one report exists per due week');
+    w_eq(q_val("SELECT COUNT(*) FROM weekly_payout_runs WHERE status='paid'"), 0, 'automatic visits never mark reports Paid');
+    w_eq(q_val('SELECT wallet_balance FROM users WHERE id=1'), 1000, 'catch-up does not make a payment or debit');
 }
 
 if ($scenario === 'legacy') {

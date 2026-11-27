@@ -1,6 +1,7 @@
 <?php
 /** Distributor dashboard */
 require_once __DIR__ . '/../includes/init.php';
+require_once __DIR__ . '/../includes/member_dashboard.php';
 $u = require_user();
 $wallet = weekly_wallet_snapshot($u['id']);
 $u['wallet_balance'] = $wallet['wallet_balance'];
@@ -31,52 +32,148 @@ $latestStatement = q_row("SELECT s.*, r.payout_done, r.gross, r.tds, r.admin_cha
                           WHERE r.user_id = ? ORDER BY s.period_date DESC, s.id DESC LIMIT 1", [$u['id']]);
 $recentTx = q_all("SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY id DESC LIMIT 6", [$u['id']]);
 $recentOrders = q_all("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5", [$u['id']]);
+$package = member_joining_package($u, $plan);
+$carMilestone = member_display_milestone($u['reward_points'], $plan['car_fund_points'], $plan['car_fund_amount']);
+$tourMilestone = member_display_milestone($u['reward_points'], setting('dashboard_tour_points', ''), setting('dashboard_tour_amount', ''));
+$awardsReached = (int)q_val("SELECT COUNT(*) FROM award_rewards WHERE status='active' AND points > 0 AND points <= ?", [(int)$u['reward_points']]);
+$eligibleGross = min($spendable, payout_eligible_amount($u['id']));
+$referralUrl = url('register.php?ref=' . rawurlencode($u['username']));
+$whatsappUrl = 'https://wa.me/?text=' . rawurlencode('Join my team: ' . $referralUrl);
+$firstName = preg_split('/\\s+/', trim((string)$u['full_name']))[0] ?: $u['full_name'];
+$matchingPercent = rtrim(rtrim(number_format((float)$plan['sponsor_matching_percent'], 2, '.', ''), '0'), '.');
+[$carValue, $carStatus] = member_milestone_text($carMilestone);
+[$tourValue, $tourStatus] = member_milestone_text($tourMilestone);
+$packageValue = $package['amount'] === null ? '—' : money_txt($package['amount']);
+$packageStatus = $package['status'] === 'qualified' ? 'Qualified'
+    : ($package['status'] === 'in_progress' ? bv($u['self_bv']) . ' / ' . bv($package['target_bv']) : 'Not available');
+$metrics = [
+    ['package', 'My Package', 'fa-box-open', 'green', $packageValue, $packageStatus],
+    ['sponsor', 'Direct Sponsor Income', 'fa-user-plus', 'blue', money_txt($earn['sponsor']), ''],
+    ['matching', 'Direct Matching Income', 'fa-code-branch', 'violet', money_txt($earn['binary']), ''],
+    ['first-match', $matchingPercent . '% Matching Income', 'fa-project-diagram', 'teal', money_txt($earn['sponsor_matching']), ''],
+    ['cash-reward', 'Cash Reward', 'fa-medal', 'amber', money_txt($earn['rank']), ''],
+    ['royalty', 'Royalty Income', 'fa-crown', 'rose', money_txt($earn['level']), ''],
+    ['payout', 'Incentive Payout Balance', 'fa-wallet', 'green', money_txt($eligibleGross), 'Eligible gross'],
+    ['car', 'Car Fund', 'fa-car', 'blue', $carValue, $carStatus],
+    ['tour', 'Tour Vacation', 'fa-plane', 'violet', $tourValue, $tourStatus],
+    ['awards', 'Awards & Rewards', 'fa-gift', 'amber', number_format($awardsReached), 'Milestones reached'],
+    ['total', 'Total Income', 'fa-chart-line', 'teal', money_txt($earn['total']), ''],
+];
 
 $activeKey = 'dashboard';
 $pageTitle = 'Dashboard';
+$wideContent = true;
+$bodyClass = 'member-dashboard-page';
+$pageStylesFiles = [url('assets/css/member-dashboard.css') . '?v=' . APP_VERSION];
+$pageScriptsFiles = [url('assets/vendor/qrcode-generator/qrcode.js') . '?v=' . APP_VERSION,
+    url('assets/js/member-dashboard.js') . '?v=' . APP_VERSION];
 require __DIR__ . '/_nav.php';
 require __DIR__ . '/../includes/dash_header.php';
 ?>
 
-<?php if (!income_can_earn($u, $plan)): ?>
-<div class="alert alert-warning">
-    ⚠️ Your account is <b>not activated</b> yet. Purchase products worth at least
-    <b><?= e($plan['activation_bv']) ?> BV</b> (lifetime) from the <a href="shop.php"><b>Shop</b></a> to activate your
-    account and start earning commissions. Current self BV: <b><?= bv($u['self_bv']) ?></b>.
-</div>
-<?php endif; ?>
+<div class="member-dashboard">
+    <section class="md-welcome" aria-label="Dashboard overview">
+        <div>
+            <div class="md-eyebrow">MEMBER OVERVIEW</div>
+            <h1>Welcome back, <?= e($firstName) ?></h1>
+            <p>Your business, at a glance.</p>
+        </div>
+        <div class="md-id-pill"><i class="fas fa-id-card" aria-hidden="true"></i><span>Member ID <b><?= e($u['username']) ?></b></span></div>
+    </section>
 
-<div class="stat-grid">
-    <div class="stat-card">
-        <div class="st-ico">👛</div>
-        <div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(includes reservations)</span></div>
+    <section class="md-overview-grid" aria-label="Member information and referral link">
+        <article class="md-panel md-profile">
+            <div class="md-panel-header">
+                <div><span class="md-eyebrow">YOUR ACCOUNT</span><h2>Member information</h2></div>
+                <a class="md-text-link" href="profile.php">Edit profile <span aria-hidden="true">↗</span></a>
+            </div>
+            <dl class="md-profile-grid">
+                <div><dt>Name</dt><dd><?= e($u['full_name']) ?></dd></div>
+                <div><dt>Email</dt><dd><?= e($u['email'] ?: '—') ?></dd></div>
+                <div><dt>Mobile number</dt><dd><?= e($u['mobile'] ?: '—') ?></dd></div>
+                <div><dt>Joining date</dt><dd><?= e(dmy($u['created_at'])) ?></dd></div>
+                <div><dt>Last login</dt><dd><?= e(dmy($u['last_login'], true)) ?></dd></div>
+                <div><dt>Rank</dt><dd><span class="md-rank"><i class="fas fa-award" aria-hidden="true"></i> <?= e($rank ? $rank['name'] : 'Not ranked') ?></span></dd></div>
+            </dl>
+        </article>
+
+        <article class="md-panel md-referral">
+            <div class="md-panel-header">
+                <div><span class="md-eyebrow">GROW YOUR NETWORK</span><h2>Share your referral link</h2></div>
+                <span class="md-share-icon"><i class="fas fa-share-alt" aria-hidden="true"></i></span>
+            </div>
+            <div class="md-referral-body">
+                <div class="md-referral-actions">
+                    <label for="referral-link">Your referral link</label>
+                    <div class="md-copy-row">
+                        <input id="referral-link" value="<?= e($referralUrl) ?>" readonly spellcheck="false">
+                        <button type="button" id="referral-copy"><i class="far fa-copy" aria-hidden="true"></i> Copy</button>
+                    </div>
+                    <a class="md-whatsapp" href="<?= e($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer"><i class="fab fa-whatsapp" aria-hidden="true"></i> Share on WhatsApp</a>
+                    <span class="md-copy-status" id="referral-copy-status" role="status" aria-live="polite"></span>
+                </div>
+                <div class="md-qr-wrap">
+                    <button type="button" class="md-qr-open" id="referral-qr-open" aria-haspopup="dialog" aria-controls="referral-qr-dialog" aria-label="Enlarge referral QR code">
+                        <span id="referral-qr" class="md-qr" aria-hidden="true">QR unavailable</span>
+                    </button>
+                    <span>Tap to enlarge</span>
+                </div>
+            </div>
+            <dialog id="referral-qr-dialog" class="md-qr-dialog" role="dialog" aria-labelledby="referral-qr-title">
+                <div class="md-qr-dialog-head"><h2 id="referral-qr-title">Scan to join</h2><button type="button" id="referral-qr-close" aria-label="Close QR code">×</button></div>
+                <div id="referral-qr-large" class="md-qr-large" role="img" aria-label="Referral registration QR code">QR unavailable</div>
+                <p>Scan this code to open your registration link.</p>
+            </dialog>
+        </article>
+    </section>
+
+    <section class="md-section" aria-labelledby="income-overview-title">
+        <div class="md-section-header"><div><span class="md-eyebrow">YOUR EARNINGS</span><h2 id="income-overview-title">Income overview</h2></div><a class="md-text-link" href="earnings.php">View statement <span aria-hidden="true">→</span></a></div>
+        <div class="md-metric-grid">
+            <?php foreach ($metrics as [$key, $label, $icon, $tint, $value, $status]): ?>
+            <article class="md-metric" data-metric="<?= e($key) ?>">
+                <span class="md-metric-icon <?= e($tint) ?>"><i class="fas <?= e($icon) ?>" aria-hidden="true"></i></span>
+                <span class="md-metric-label"><?= e($label) ?></span>
+                <strong class="md-metric-value"><?= e($value) ?></strong>
+                <?php if ($status !== ''): ?><span class="md-metric-status"><?= e($status) ?></span><?php endif; ?>
+            </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+
+    <section class="md-section" aria-labelledby="team-overview-title">
+        <div class="md-section-header"><div><span class="md-eyebrow">YOUR NETWORK</span><h2 id="team-overview-title">Team overview</h2></div><a class="md-text-link" href="tree.php">View genealogy <span aria-hidden="true">→</span></a></div>
+        <div class="md-team-grid">
+            <div class="md-team-card"><span class="md-team-icon left"><i class="fas fa-users" aria-hidden="true"></i></span><div><span>Left team members</span><strong><?= number_format($teamCounts['L']) ?></strong></div></div>
+            <div class="md-team-card"><span class="md-team-icon right"><i class="fas fa-users" aria-hidden="true"></i></span><div><span>Right team members</span><strong><?= number_format($teamCounts['R']) ?></strong></div></div>
+            <div class="md-team-card"><span class="md-team-icon left"><i class="fas fa-chart-bar" aria-hidden="true"></i></span><div><span>Left BV</span><strong><?= e(bv($u['left_bv'])) ?></strong></div></div>
+            <div class="md-team-card"><span class="md-team-icon right"><i class="fas fa-chart-bar" aria-hidden="true"></i></span><div><span>Right BV</span><strong><?= e(bv($u['right_bv'])) ?></strong></div></div>
+        </div>
+    </section>
+
+    <?php if (!income_can_earn($u, $plan)): ?>
+    <div class="alert alert-warning">
+        ⚠️ Your account is <b>not activated</b> yet. Purchase products worth at least
+        <b><?= e($plan['activation_bv']) ?> BV</b> (lifetime) from the <a href="shop.php"><b>Shop</b></a> to activate your
+        account and start earning commissions. Current self BV: <b><?= bv($u['self_bv']) ?></b>.
     </div>
-    <div class="stat-card gold">
-        <div class="st-ico">📅</div>
-        <div><b><?= money($reserved) ?></b><span>Reserved for weekly payouts</span></div>
-    </div>
-    <div class="stat-card teal">
-        <div class="st-ico">💳</div>
-        <div><b><?= money($spendable) ?></b><span>Available to spend</span></div>
-    </div>
-    <div class="stat-card gold">
-        <div class="st-ico">💰</div>
-        <div><b><?= money($earn['total']) ?></b><span>Total Income</span></div>
-    </div>
-    <div class="stat-card teal">
-        <div class="st-ico">⭐</div>
-        <div><b><?= number_format((int)$u['reward_points']) ?> P</b><span>Points (<?= (int)$u['matched_pairs'] ?> pairs matched)</span></div>
-    </div>
-    <div class="stat-card blue">
-        <div class="st-ico">🏅</div>
-        <div><b><?= e($rank ? $rank['name'] : '—') ?></b><span>Current Rank</span></div>
-    </div>
-</div>
+    <?php endif; ?>
+
+    <section class="md-section" aria-labelledby="wallet-overview-title">
+        <div class="md-section-header"><div><span class="md-eyebrow">BALANCES</span><h2 id="wallet-overview-title">Wallet overview</h2></div><a class="md-text-link" href="wallet.php">View wallet <span aria-hidden="true">→</span></a></div>
+        <div class="stat-grid md-wallet-grid">
+            <div class="stat-card"><div class="st-ico"><i class="fas fa-wallet" aria-hidden="true"></i></div><div><b><?= money($u['wallet_balance']) ?></b><span>Wallet Balance<br>(includes reservations)</span></div></div>
+            <div class="stat-card gold"><div class="st-ico"><i class="fas fa-calendar-alt" aria-hidden="true"></i></div><div><b><?= money($reserved) ?></b><span>Reserved for weekly payouts</span></div></div>
+            <div class="stat-card teal"><div class="st-ico"><i class="fas fa-credit-card" aria-hidden="true"></i></div><div><b><?= money($spendable) ?></b><span>Available to spend</span></div></div>
+            <div class="stat-card teal"><div class="st-ico"><i class="fas fa-star" aria-hidden="true"></i></div><div><b><?= number_format((int)$u['reward_points']) ?> P</b><span>Points (<?= (int)$u['matched_pairs'] ?> pairs matched)</span></div></div>
+            <div class="stat-card blue"><div class="st-ico"><i class="fas fa-award" aria-hidden="true"></i></div><div><b><?= e($rank ? $rank['name'] : '—') ?></b><span>Current Rank</span></div></div>
+        </div>
+    </section>
 
 <div class="two-col">
     <div>
         <div class="card">
-            <div class="card-title">📊 Business Summary</div>
+            <div class="card-title"><i class="fas fa-chart-line" aria-hidden="true"></i> Business Summary</div>
             <table class="kv-table" style="width:100%">
                 <tr><td>Left Team BV</td><td><b><?= bv($u['left_bv']) ?></b> &nbsp;<?= badge($teamCounts['L'] . ' members', 'info') ?></td></tr>
                 <tr><td>Right Team BV</td><td><b><?= bv($u['right_bv']) ?></b> &nbsp;<?= badge($teamCounts['R'] . ' members', 'info') ?></td></tr>
@@ -92,9 +189,9 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
 
         <div class="card">
-            <div class="card-title">🧾 Recent Orders <a class="right" href="orders.php">View all →</a></div>
+            <div class="card-title"><i class="fas fa-box" aria-hidden="true"></i> Recent Orders <a class="right" href="orders.php">View all →</a></div>
             <?php if (!$recentOrders): ?>
-                <div class="empty-state"><span class="es-ico">📦</span>No orders yet. <a href="shop.php"><b>Visit the shop</b></a></div>
+                <div class="empty-state"><span class="es-ico"><i class="fas fa-box" aria-hidden="true"></i></span>No orders yet. <a href="shop.php"><b>Visit the shop</b></a></div>
             <?php else: ?>
             <div class="table-wrap" style="box-shadow:none">
                 <table class="table">
@@ -116,7 +213,7 @@ require __DIR__ . '/../includes/dash_header.php';
 
     <div>
         <div class="card">
-            <div class="card-title">📣 Announcements</div>
+            <div class="card-title"><i class="fas fa-bullhorn" aria-hidden="true"></i> Announcements</div>
             <?php if (!$announcements): ?>
                 <p style="color:var(--ink-soft)">No announcements.</p>
             <?php else: foreach ($announcements as $a): ?>
@@ -129,7 +226,7 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
 
         <div class="card">
-            <div class="card-title">💹 Income Breakdown</div>
+            <div class="card-title"><i class="fas fa-chart-pie" aria-hidden="true"></i> Income Breakdown</div>
             <table class="kv-table" style="width:100%">
                 <tr><td>Direct Sponsor Income</td><td><b><?= money($earn['sponsor']) ?></b></td></tr>
                 <tr><td>Matching Pair Income</td><td><b><?= money($earn['binary']) ?></b></td></tr>
@@ -154,7 +251,7 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
 
         <div class="card">
-            <div class="card-title">📊 BV &amp; Points Log</div>
+            <div class="card-title"><i class="fas fa-chart-bar" aria-hidden="true"></i> BV &amp; Points Log</div>
             <?php
             $bvLogs = q_all("SELECT * FROM bv_logs WHERE user_id = ? ORDER BY id DESC LIMIT 6", [$u['id']]);
             $ptLogs = q_all("SELECT * FROM points_logs WHERE user_id = ? ORDER BY id DESC LIMIT 3", [$u['id']]);
@@ -164,7 +261,7 @@ require __DIR__ . '/../includes/dash_header.php';
             usort($logs, function ($x, $y) { return strcmp($y['d'], $x['d']); });
             ?>
             <?php if (!$logs): ?>
-                <div class="empty-state"><span class="es-ico">📊</span>No BV or points yet. Your self purchases
+                <div class="empty-state"><span class="es-ico"><i class="fas fa-chart-bar" aria-hidden="true"></i></span>No BV or points yet. Your self purchases
                     and your team's purchases will appear here.</div>
             <?php else: ?>
             <table class="kv-table" style="width:100%">
@@ -187,7 +284,7 @@ require __DIR__ . '/../includes/dash_header.php';
 
         <?php if ($latestStatement): ?>
         <div class="card">
-            <div class="card-title">📄 Latest Weekly Payout Statement
+            <div class="card-title"><i class="fas fa-file-alt" aria-hidden="true"></i> Latest Weekly Payout Statement
                 <span class="right"><a class="btn btn-primary btn-sm" href="receipt.php?statement=<?= (int)$latestStatement['id'] ?>">⬇ Download Receipt</a></span>
             </div>
             <table class="kv-table" style="width:100%">
@@ -208,13 +305,13 @@ require __DIR__ . '/../includes/dash_header.php';
         <?php endif; ?>
 
         <div class="card">
-            <div class="card-title">💳 Payout Status <a class="right" href="payout-balance.php">View all →</a></div>
+            <div class="card-title"><i class="fas fa-university" aria-hidden="true"></i> Payout Status <a class="right" href="payout-balance.php">View all →</a></div>
             <?php $payouts = q_all("SELECT p.*, wr.status AS reservation_status, w.status AS report_status FROM payouts p
                                    LEFT JOIN weekly_payout_reservations wr ON wr.payout_id=p.id
                                    LEFT JOIN weekly_payout_runs w ON w.statement_id=wr.statement_id
                                    WHERE p.user_id = ? ORDER BY p.id DESC LIMIT 4", [$u['id']]); ?>
             <?php if (!$payouts): ?>
-                <div class="empty-state"><span class="es-ico">🏦</span>No payouts yet. Eligible payout income:
+                <div class="empty-state"><span class="es-ico"><i class="fas fa-university" aria-hidden="true"></i></span>No payouts yet. Eligible payout income:
                     <b><?= money(payout_eligible_amount($u['id'])) ?></b></div>
             <?php else: ?>
             <table class="kv-table" style="width:100%">
@@ -238,7 +335,7 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
 
         <div class="card">
-            <div class="card-title">👛 Recent Wallet Activity <a class="right" href="wallet.php">View all →</a></div>
+            <div class="card-title"><i class="fas fa-wallet" aria-hidden="true"></i> Recent Wallet Activity <a class="right" href="wallet.php">View all →</a></div>
             <?php if (!$recentTx): ?>
                 <p style="color:var(--ink-soft)">No transactions yet.</p>
             <?php else: ?>
@@ -256,5 +353,6 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
     </div>
 </div>
+</div><!-- /member-dashboard -->
 
 <?php require __DIR__ . '/../includes/dash_footer.php'; ?>

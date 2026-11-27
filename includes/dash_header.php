@@ -42,6 +42,9 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= url('assets/font-awesome/css/all.min.css') ?>?v=<?= APP_VERSION ?>">
 <link rel="stylesheet" href="<?= url('assets/css/dash.css') ?>?v=<?= APP_VERSION ?>">
+<?php foreach ((array)($pageStylesFiles ?? []) as $styleFile): ?>
+<link rel="stylesheet" href="<?= e($styleFile) ?>">
+<?php endforeach; ?>
 <link rel="manifest" href="<?= e(url('manifest.php')) ?>">
 <meta name="theme-color" content="#103a14">
 <meta name="mobile-web-app-capable" content="yes">
@@ -49,7 +52,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Yashasavi">
 </head>
-<body class="dash-body area-<?= e($area) ?>">
+<body class="dash-body area-<?= e($area) ?><?= !empty($bodyClass) ? ' ' . e($bodyClass) : '' ?>">
 
 <div class="dash">
     <aside class="sidebar" id="sidebar">
@@ -61,15 +64,15 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
             </div>
             <button class="side-close" aria-label="Close menu">✕</button>
         </div>
-        <nav class="side-nav">
+        <nav class="side-nav" aria-label="Panel navigation">
             <?php
-            foreach ($nav as $item):
-                if (isset($item['label2'])) { echo '<div class="side-label">' . e($item['label2']) . '</div>'; continue; }
+            // Existing section labels become native, keyboard-accessible
+            // accordions in the member and superadmin panels. CMS is unchanged.
+            $renderNavItem = function ($item) {
                 $active = !empty($item['active']);
                 $children = isset($item['children']) && is_array($item['children']) ? $item['children'] : [];
-                $childActive = false;
-                foreach ($children as $ch) { if (!empty($ch['active'])) { $childActive = true; $active = true; } }
-            ?>
+                foreach ($children as $ch) { if (!empty($ch['active'])) { $active = true; } }
+                ?>
                 <?php if ($children): ?>
                 <div class="side-group<?= $active ? ' open' : '' ?>">
                     <div class="side-row-wrap">
@@ -78,9 +81,9 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
                             <span class="s-label"><?= e($item['label']) ?></span>
                             <?php if (!empty($item['count'])): ?><span class="side-count"><?= (int)$item['count'] ?></span><?php endif; ?>
                         </a>
-                        <button type="button" class="side-caret" aria-label="Expand submenu" aria-expanded="<?= $active ? 'true' : 'false' ?>">▾</button>
+                        <button type="button" class="side-caret" aria-label="Toggle <?= e($item['label']) ?> submenu" aria-expanded="<?= $active ? 'true' : 'false' ?>">▾</button>
                     </div>
-                    <div class="side-kids">
+                    <div class="side-kids"<?= $active ? '' : ' hidden' ?>>
                         <?php foreach ($children as $ch): ?>
                             <a href="<?= e($ch['href']) ?>" class="side-sub<?= !empty($ch['active']) ? ' active' : '' ?>">
                                 <span class="ss-dot"></span><span><?= e($ch['label']) ?></span>
@@ -94,8 +97,45 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
                         <span class="s-label"><?= e($item['label']) ?></span>
                         <?php if (!empty($item['count'])): ?><span class="side-count"><?= (int)$item['count'] ?></span><?php endif; ?>
                     </a>
-                <?php endif; ?>
-            <?php endforeach; ?>
+                <?php endif;
+            };
+            if (in_array($area, ['user', 'superadmin'], true)) {
+                $sections = []; $currentSection = null;
+                foreach ($nav as $item) {
+                    if (isset($item['label2'])) {
+                        $sections[] = ['label' => $item['label2'], 'items' => []];
+                        $currentSection = count($sections) - 1;
+                    } elseif ($currentSection === null) {
+                        $sections[] = ['item' => $item];
+                    } else {
+                        $sections[$currentSection]['items'][] = $item;
+                    }
+                }
+                foreach ($sections as $section) {
+                    if (isset($section['item'])) { $renderNavItem($section['item']); continue; }
+                    $open = false;
+                    foreach ($section['items'] as $sectionItem) {
+                        if (!empty($sectionItem['active'])) { $open = true; }
+                        foreach (($sectionItem['children'] ?? []) as $child) {
+                            if (!empty($child['active'])) { $open = true; }
+                        }
+                    }
+                    ?>
+                    <details name="sidebar-sections" class="side-section"<?= $open ? ' open' : '' ?>>
+                        <summary><span><?= e($section['label']) ?></span><span class="side-section-arrow" aria-hidden="true">▾</span></summary>
+                        <div class="side-section-items">
+                            <?php foreach ($section['items'] as $sectionItem) { $renderNavItem($sectionItem); } ?>
+                        </div>
+                    </details>
+                    <?php
+                }
+            } else {
+                foreach ($nav as $item) {
+                    if (isset($item['label2'])) { echo '<div class="side-label">' . e($item['label2']) . '</div>'; }
+                    else { $renderNavItem($item); }
+                }
+            }
+            ?>
         </nav>
         <div class="side-foot">
             <span class="sf-txt"><?= e($siteName) ?> · v<?= APP_VERSION ?></span>
@@ -106,7 +146,7 @@ $areaTitles = ['user' => 'Distributor Panel', 'admin' => 'Website Admin', 'super
 
     <div class="main">
         <div class="topbar">
-            <button class="menu-toggle" aria-label="Menu">☰</button>
+            <button type="button" class="menu-toggle" aria-label="Menu" aria-controls="sidebar" aria-expanded="false">☰</button>
             <div class="page-title"><?= e($pageTitle ?? '') ?></div>
             <div class="tb-right">
                 <div class="tb-user">

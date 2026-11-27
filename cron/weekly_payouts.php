@@ -1,7 +1,7 @@
 <?php
 /**
- * CLI-only scheduler entry point. Configure server cron as documented in
- * README.md. It can be run repeatedly: one report is created per closed week.
+ * Optional CLI fallback. Superadmin visits automatically catch up reports;
+ * this can also be run repeatedly without creating duplicate reports.
  */
 if (PHP_SAPI !== 'cli' || !empty($_SERVER['REQUEST_METHOD'])) {
     http_response_code(404);
@@ -11,7 +11,7 @@ define('YASH_CLI', true);
 require __DIR__ . '/../includes/init.php';
 
 try {
-    $results = weekly_payout_run_due();
+    $results = weekly_payout_auto_run_due();
     if (!$results) {
         echo '[' . now() . '] No weekly payout reports due.' . PHP_EOL;
     }
