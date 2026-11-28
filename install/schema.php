@@ -1,0 +1,502 @@
+<?php
+/**
+ * Database schema — array of CREATE TABLE statements (MySQL / MariaDB).
+ * Kept compatible with MySQL 5.7+ and MariaDB 10.2+.
+ */
+
+return [
+"CREATE TABLE IF NOT EXISTS settings (
+    skey   VARCHAR(64) NOT NULL PRIMARY KEY,
+    svalue TEXT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS admins (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    username VARCHAR(60) NOT NULL UNIQUE,
+    email VARCHAR(150) NULL,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('admin','superadmin') NOT NULL DEFAULT 'admin',
+    status ENUM('active','blocked') NOT NULL DEFAULT 'active',
+    last_login DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_role (role)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS users (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(20) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    full_name VARCHAR(120) NOT NULL,
+    email VARCHAR(150) NULL,
+    mobile VARCHAR(15) NOT NULL,
+    dob DATE NULL,
+    marital_status VARCHAR(20) NULL,
+    nationality VARCHAR(60) NULL DEFAULT 'Indian',
+    address VARCHAR(255) NULL,
+    city VARCHAR(80) NULL,
+    state VARCHAR(80) NULL,
+    pincode VARCHAR(10) NULL,
+    nominee_name VARCHAR(120) NULL,
+    nominee_relation VARCHAR(60) NULL,
+    bank_holder VARCHAR(120) NULL,
+    bank_account_no VARCHAR(40) NULL,
+    bank_ifsc VARCHAR(20) NULL,
+    bank_name VARCHAR(120) NULL,
+    bank_branch VARCHAR(120) NULL,
+    aadhaar_no VARCHAR(20) NULL,
+    pan_no VARCHAR(20) NULL,
+    pan_image VARCHAR(255) NULL,
+    aadhaar_image VARCHAR(255) NULL,
+    sponsor_id INT UNSIGNED NULL,
+    placement_id INT UNSIGNED NULL,
+    leg ENUM('L','R') NOT NULL DEFAULT 'L',
+    /* TEXT, not VARCHAR(255): deep straight-line seeds create paths far
+     * longer than 255 chars — one slash-id segment per level */
+    path TEXT NOT NULL,
+    depth INT UNSIGNED NOT NULL DEFAULT 0,
+    left_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    right_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    self_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    matched_pairs INT UNSIGNED NOT NULL DEFAULT 0,
+    reward_points INT UNSIGNED NOT NULL DEFAULT 0,
+    rank_id INT UNSIGNED NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 0,
+    activated_at DATETIME NULL,
+    wallet_balance DECIMAL(14,2) NOT NULL DEFAULT 0,
+    total_earned DECIMAL(14,2) NOT NULL DEFAULT 0,
+    total_withdrawn DECIMAL(14,2) NOT NULL DEFAULT 0,
+    status ENUM('active','blocked') NOT NULL DEFAULT 'active',
+    kyc_status ENUM('pending','verified','rejected') NOT NULL DEFAULT 'pending',
+    must_change_password TINYINT(1) NOT NULL DEFAULT 0,
+    kyc_remark VARCHAR(255) NULL,
+    last_login DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_sponsor (sponsor_id),
+    INDEX idx_email (email),
+    INDEX idx_mobile (mobile),
+    INDEX idx_placement (placement_id),
+    INDEX idx_path (path(191)),
+    INDEX idx_active (is_active),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+/* Version 1.8.50 income tracking: additive only. Existing installations
+ * must apply the SQL in DATABASE_CHANGES.sql before enabling the rules. */
+"CREATE TABLE IF NOT EXISTS income_matching_state (
+    user_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    processed_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    points_processed_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_pairs INT UNSIGNED NOT NULL DEFAULT 0,
+    pending_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    pending_points INT UNSIGNED NOT NULL DEFAULT 0,
+    first_match_seen TINYINT(1) NOT NULL DEFAULT 0,
+    first_parent_id INT UNSIGNED NULL,
+    first_bonus_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    first_bonus_order_id INT UNSIGNED NULL,
+    first_bonus_commission_id INT UNSIGNED NULL,
+    first_bonus_status ENUM('none','pending_match','pending_parent','paid') NOT NULL DEFAULT 'none',
+    INDEX idx_parent_bonus (first_parent_id, first_bonus_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS income_sponsor_events (
+    member_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    sponsor_id INT UNSIGNED NULL,
+    order_id INT UNSIGNED NULL,
+    amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    joining_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    status ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
+    commission_id INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL,
+    paid_at DATETIME NULL,
+    INDEX idx_sponsor_pending (sponsor_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS income_rank_events (
+    user_id INT UNSIGNED NOT NULL,
+    rank_id INT UNSIGNED NOT NULL,
+    amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, rank_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS income_recalc_runs (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT UNSIGNED NOT NULL,
+    snapshot_hash CHAR(64) NOT NULL,
+    plan_json LONGTEXT NOT NULL,
+    summary_json LONGTEXT NOT NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS income_recalc_entries (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    run_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    before_json LONGTEXT NOT NULL,
+    after_json LONGTEXT NOT NULL,
+    adjustment_json LONGTEXT NOT NULL,
+    INDEX idx_run (run_id),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS categories (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    description TEXT NULL,
+    image VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS products (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    category_id INT UNSIGNED NULL,
+    name VARCHAR(180) NOT NULL,
+    slug VARCHAR(200) NOT NULL UNIQUE,
+    size VARCHAR(60) NULL,
+    mrp DECIMAL(10,2) NOT NULL DEFAULT 0,
+    dp DECIMAL(10,2) NOT NULL DEFAULT 0,
+    bv DECIMAL(10,2) NOT NULL DEFAULT 0,
+    short_desc VARCHAR(500) NULL,
+    description LONGTEXT NULL,
+    benefits TEXT NULL,
+    ingredients TEXT NULL,
+    how_to_use TEXT NULL,
+    image VARCHAR(255) NULL,
+    stock INT NOT NULL DEFAULT 0,
+    is_featured TINYINT(1) NOT NULL DEFAULT 0,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    INDEX idx_cat (category_id),
+    INDEX idx_status (status),
+    INDEX idx_featured (is_featured)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC",
+
+"CREATE TABLE IF NOT EXISTS pages (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(180) NOT NULL,
+    slug VARCHAR(200) NOT NULL UNIQUE,
+    content LONGTEXT NULL,
+    meta_title VARCHAR(200) NULL,
+    meta_description VARCHAR(300) NULL,
+    parent_id INT UNSIGNED NULL,
+    show_in_menu TINYINT(1) NOT NULL DEFAULT 1,
+    menu_order INT NOT NULL DEFAULT 0,
+    status ENUM('published','draft') NOT NULL DEFAULT 'published',
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_menu (show_in_menu, menu_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC",
+
+"CREATE TABLE IF NOT EXISTS sliders (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200) NULL,
+    subtitle VARCHAR(255) NULL,
+    description VARCHAR(500) NULL,
+    image VARCHAR(255) NOT NULL,
+    btn_text VARCHAR(60) NULL,
+    btn_link VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS testimonials (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    designation VARCHAR(120) NULL,
+    photo VARCHAR(255) NULL,
+    content TEXT NOT NULL,
+    rating TINYINT NOT NULL DEFAULT 5,
+    sort_order INT NOT NULL DEFAULT 0,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS documents (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(180) NOT NULL,
+    type ENUM('legal','download') NOT NULL DEFAULT 'legal',
+    image VARCHAR(255) NULL,
+    file VARCHAR(255) NULL,
+    external_url VARCHAR(255) NULL,
+    description VARCHAR(500) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS enquiries (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(150) NULL,
+    mobile VARCHAR(15) NULL,
+    subject VARCHAR(200) NULL,
+    message TEXT NOT NULL,
+    status ENUM('new','read','replied') NOT NULL DEFAULT 'new',
+    ip VARCHAR(45) NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS announcements (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    content TEXT NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS orders (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    order_no VARCHAR(30) NOT NULL UNIQUE,
+    user_id INT UNSIGNED NOT NULL,
+    total_mrp DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_dp DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_bv DECIMAL(12,2) NOT NULL DEFAULT 0,
+    payment_mode ENUM('wallet','bank_transfer','online','cash') NOT NULL DEFAULT 'bank_transfer',
+    payment_status ENUM('pending','paid','refunded') NOT NULL DEFAULT 'pending',
+    txn_ref VARCHAR(120) NULL,
+    status ENUM('pending','approved','rejected','cancelled') NOT NULL DEFAULT 'pending',
+    remark VARCHAR(255) NULL,
+    ship_name VARCHAR(120) NULL,
+    ship_mobile VARCHAR(15) NULL,
+    ship_address VARCHAR(255) NULL,
+    ship_city VARCHAR(80) NULL,
+    ship_state VARCHAR(80) NULL,
+    ship_pincode VARCHAR(10) NULL,
+    approved_by INT UNSIGNED NULL,
+    approved_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_user (user_id),
+    INDEX idx_status (status),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS order_items (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    order_id INT UNSIGNED NOT NULL,
+    product_id INT UNSIGNED NULL,
+    product_name VARCHAR(180) NOT NULL,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0,
+    mrp DECIMAL(10,2) NOT NULL DEFAULT 0,
+    bv DECIMAL(10,2) NOT NULL DEFAULT 0,
+    qty INT NOT NULL DEFAULT 1,
+    total DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_bv DECIMAL(12,2) NOT NULL DEFAULT 0,
+    INDEX idx_order (order_id),
+    INDEX idx_product (product_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS commissions (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    order_id INT UNSIGNED NULL,
+    type ENUM('sponsor','binary','level','rank','sponsor_matching','car_fund','award','retail','other') NOT NULL,
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    bv DECIMAL(12,2) NOT NULL DEFAULT 0,
+    level TINYINT UNSIGNED NULL,
+    note VARCHAR(255) NULL,
+    status ENUM('credited','reversed') NOT NULL DEFAULT 'credited',
+    created_at DATETIME NOT NULL,
+    INDEX idx_user (user_id),
+    INDEX idx_order (order_id),
+    INDEX idx_type (type),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    type ENUM('credit','debit') NOT NULL,
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    balance_after DECIMAL(14,2) NOT NULL DEFAULT 0,
+    ref_type ENUM('commission','payout','purchase','admin','refund') NOT NULL,
+    ref_id INT UNSIGNED NULL,
+    note VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_user (user_id),
+    INDEX idx_ref (ref_type, ref_id),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS payouts (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    request_no VARCHAR(30) NOT NULL UNIQUE,
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    tds_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    admin_charge DECIMAL(12,2) NOT NULL DEFAULT 0,
+    net_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    status ENUM('pending','paid','rejected') NOT NULL DEFAULT 'pending',
+    bank_name VARCHAR(120) NULL,
+    bank_account_no VARCHAR(40) NULL,
+    bank_ifsc VARCHAR(20) NULL,
+    bank_holder VARCHAR(120) NULL,
+    reject_reason VARCHAR(255) NULL,
+    paid_at DATETIME NULL,
+    processed_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_user (user_id),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS payout_statements (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    run_ts DATETIME NOT NULL,
+    period_date DATE NOT NULL,
+    total_gross DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_tds DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_admin DECIMAL(12,2) NOT NULL DEFAULT 0,
+    total_net DECIMAL(12,2) NOT NULL DEFAULT 0,
+    members_done INT UNSIGNED NOT NULL DEFAULT 0,
+    members_blocked INT UNSIGNED NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    INDEX idx_run (run_ts),
+    INDEX idx_period (period_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS payout_statement_rows (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    statement_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    username VARCHAR(20) NOT NULL,
+    full_name VARCHAR(120) NOT NULL,
+    mobile VARCHAR(15) NOT NULL,
+    bank_name VARCHAR(120) NULL,
+    bank_account_no VARCHAR(40) NULL,
+    bank_ifsc VARCHAR(20) NULL,
+    bank_holder VARCHAR(120) NULL,
+    kyc_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    bank_ok TINYINT(1) NOT NULL DEFAULT 0,
+    gross DECIMAL(12,2) NOT NULL DEFAULT 0,
+    tds DECIMAL(12,2) NOT NULL DEFAULT 0,
+    admin_charge DECIMAL(12,2) NOT NULL DEFAULT 0,
+    net DECIMAL(12,2) NOT NULL DEFAULT 0,
+    payout_done TINYINT(1) NOT NULL DEFAULT 0,
+    payout_id INT UNSIGNED NULL,
+    reason VARCHAR(255) NULL,
+    INDEX idx_statement (statement_id),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+/* Weekly periods are unique without altering or reinterpreting legacy reports. */
+"CREATE TABLE IF NOT EXISTS weekly_payout_runs (
+    period_end DATE NOT NULL PRIMARY KEY,
+    statement_id INT UNSIGNED NULL,
+    status ENUM('unpaid','in_process','paid','legacy') NOT NULL DEFAULT 'unpaid',
+    created_at DATETIME NOT NULL,
+    in_process_at DATETIME NULL,
+    in_process_by INT UNSIGNED NULL,
+    paid_at DATETIME NULL,
+    paid_by INT UNSIGNED NULL,
+    UNIQUE KEY uq_weekly_statement (statement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS weekly_payout_reservations (
+    payout_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    statement_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    status ENUM('reserved','paid','released') NOT NULL DEFAULT 'reserved',
+    created_at DATETIME NOT NULL,
+    settled_at DATETIME NULL,
+    UNIQUE KEY uq_weekly_member (statement_id, user_id),
+    INDEX idx_weekly_user_status (user_id, status),
+    INDEX idx_weekly_statement (statement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS plan_settings (
+    id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    activation_bv DECIMAL(12,2) NOT NULL DEFAULT 100,
+    sponsor_percent DECIMAL(6,2) NOT NULL DEFAULT 5,
+    pair_unit_bv DECIMAL(12,2) NOT NULL DEFAULT 100,
+    binary_type ENUM('percent','fixed') NOT NULL DEFAULT 'percent',
+    binary_value DECIMAL(10,2) NOT NULL DEFAULT 10,
+    level_depth TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    daily_cap DECIMAL(12,2) NOT NULL DEFAULT 5000,
+    monthly_cap DECIMAL(12,2) NOT NULL DEFAULT 0,
+    carry_forward TINYINT(1) NOT NULL DEFAULT 1,
+    matching_requires_active TINYINT(1) NOT NULL DEFAULT 1,
+    level_requires_active TINYINT(1) NOT NULL DEFAULT 1,
+    sponsor_matching_percent DECIMAL(6,2) NOT NULL DEFAULT 0,
+    points_per_unit INT UNSIGNED NOT NULL DEFAULT 1,
+    point_bv DECIMAL(10,2) NOT NULL DEFAULT 400,
+    car_fund_points INT UNSIGNED NOT NULL DEFAULT 500,
+    car_fund_amount DECIMAL(12,2) NOT NULL DEFAULT 150000,
+    tds_percent DECIMAL(6,2) NOT NULL DEFAULT 5,
+    admin_charge_percent DECIMAL(6,2) NOT NULL DEFAULT 5,
+    payout_min DECIMAL(12,2) NOT NULL DEFAULT 500,
+    updated_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS dashboard_milestones (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    target_points INT UNSIGNED NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uq_dashboard_milestone_name (name),
+    INDEX idx_dashboard_milestone_display (status, sort_order, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS award_rewards (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    points INT UNSIGNED NOT NULL DEFAULT 0,
+    reward_title VARCHAR(180) NOT NULL,
+    reward_type ENUM('item','cash') NOT NULL DEFAULT 'item',
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    description VARCHAR(500) NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS bv_logs (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    order_id INT UNSIGNED NULL,
+    kind ENUM('self','left','right') NOT NULL,
+    bv DECIMAL(12,2) NOT NULL DEFAULT 0,
+    balance_after DECIMAL(14,2) NOT NULL DEFAULT 0,
+    note VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_bl_user (user_id),
+    INDEX idx_bl_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS points_logs (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    order_id INT UNSIGNED NULL,
+    points INT NOT NULL DEFAULT 0,
+    total_points INT NOT NULL DEFAULT 0,
+    left_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    right_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    INDEX idx_pl_user (user_id),
+    INDEX idx_pl_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS plan_levels (
+    level_no TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    percent DECIMAL(6,2) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+"CREATE TABLE IF NOT EXISTS ranks (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    min_points INT UNSIGNED NOT NULL DEFAULT 0,
+    min_team_bv DECIMAL(14,2) NOT NULL DEFAULT 0,
+    min_directs TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    badge VARCHAR(60) NULL,
+    icon_image VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+];
