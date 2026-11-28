@@ -2,6 +2,8 @@
 /** Distributor dashboard */
 require_once __DIR__ . '/../includes/init.php';
 require_once __DIR__ . '/../includes/member_dashboard.php';
+require_once __DIR__ . '/../includes/dashboard_milestones.php';
+require_once __DIR__ . '/../includes/rank_icons.php';
 $u = require_user();
 $wallet = weekly_wallet_snapshot($u['id']);
 $u['wallet_balance'] = $wallet['wallet_balance'];
@@ -12,6 +14,7 @@ $spendable = $wallet['available'];
 $earn = user_earnings_breakdown($u['id']);
 $teamCounts = team_counts($u);
 $rank = $u['rank_id'] ? q_row("SELECT * FROM ranks WHERE id = ?", [$u['rank_id']]) : null;
+$rankIcon = rank_icon_url($rank['icon_image'] ?? null);
 $directs = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ?", [$u['id']]);
 $plan = get_plan();
 $directActive = (int)q_val("SELECT COUNT(*) FROM users WHERE sponsor_id = ? AND status = 'active'
@@ -51,14 +54,19 @@ $metrics = [
     ['sponsor', 'Direct Sponsor Income', 'fa-user-plus', 'blue', money_txt($earn['sponsor']), ''],
     ['matching', 'Direct Matching Income', 'fa-code-branch', 'violet', money_txt($earn['binary']), ''],
     ['first-match', $matchingPercent . '% Matching Income', 'fa-project-diagram', 'teal', money_txt($earn['sponsor_matching']), ''],
+    ['rank', 'Rank', 'fa-award', 'amber', $rank ? $rank['name'] : 'Not ranked', 'Current rank', $rankIcon],
     ['cash-reward', 'Cash Reward', 'fa-medal', 'amber', money_txt($earn['rank']), ''],
     ['royalty', 'Royalty Income', 'fa-crown', 'rose', money_txt($earn['level']), ''],
-    ['payout', 'Incentive Payout Balance', 'fa-wallet', 'green', money_txt($eligibleGross), 'Eligible gross'],
+    ['payout', 'Incentive Payout Balance', 'fa-wallet', 'green', money_txt($eligibleGross), 'Eligible gross · wallet-limited'],
     ['car', 'Car Fund', 'fa-car', 'blue', $carValue, $carStatus],
     ['tour', 'Tour Vacation', 'fa-plane', 'violet', $tourValue, $tourStatus],
-    ['awards', 'Awards & Rewards', 'fa-gift', 'amber', number_format($awardsReached), 'Milestones reached'],
-    ['total', 'Total Income', 'fa-chart-line', 'teal', money_txt($earn['total']), ''],
 ];
+foreach (dashboard_milestones_list(true) as $fund) {
+    [$value, $status] = member_milestone_text(member_display_milestone($u['reward_points'], $fund['target_points'], $fund['amount']));
+    $metrics[] = ['fund-' . (int)$fund['id'], $fund['name'], 'fa-flag-checkered', 'green', $value, $status];
+}
+$metrics[] = ['awards', 'Awards & Rewards', 'fa-gift', 'amber', number_format($awardsReached), 'Milestones reached'];
+$metrics[] = ['total', 'Total Income', 'fa-chart-line', 'teal', money_txt($earn['total']), ''];
 
 $activeKey = 'dashboard';
 $pageTitle = 'Dashboard';
@@ -130,9 +138,9 @@ require __DIR__ . '/../includes/dash_header.php';
     <section class="md-section" aria-labelledby="income-overview-title">
         <div class="md-section-header"><div><span class="md-eyebrow">YOUR EARNINGS</span><h2 id="income-overview-title">Income overview</h2></div><a class="md-text-link" href="earnings.php">View statement <span aria-hidden="true">→</span></a></div>
         <div class="md-metric-grid">
-            <?php foreach ($metrics as [$key, $label, $icon, $tint, $value, $status]): ?>
+            <?php foreach ($metrics as $metric): [$key, $label, $icon, $tint, $value, $status] = $metric; $iconImage = $metric[6] ?? null; ?>
             <article class="md-metric" data-metric="<?= e($key) ?>">
-                <span class="md-metric-icon <?= e($tint) ?>"><i class="fas <?= e($icon) ?>" aria-hidden="true"></i></span>
+                <span class="md-metric-icon <?= e($tint) ?><?= $iconImage ? ' has-image' : '' ?>"><?php if ($iconImage): ?><img src="<?= e($iconImage) ?>" alt=""><?php else: ?><i class="fas <?= e($icon) ?>" aria-hidden="true"></i><?php endif; ?></span>
                 <span class="md-metric-label"><?= e($label) ?></span>
                 <strong class="md-metric-value"><?= e($value) ?></strong>
                 <?php if ($status !== ''): ?><span class="md-metric-status"><?= e($status) ?></span><?php endif; ?>
@@ -235,8 +243,8 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Points — rank ladder</td><td><b><?= number_format((float)$u['reward_points']) ?> P</b></td></tr>
                 <?php
                 $bal = (float)$u['wallet_balance'];
-                $available = min($spendable, payout_eligible_amount($u['id']));
-                [$tdsAmt, $admAmt] = payout_deductions($available, $plan);
+                $available = $eligibleGross;
+                [$tdsAmt, $admAmt, $netAmt] = payout_deductions($available, $plan);
                 ?>
                 <tr><td><b>Wallet Balance (includes reserved)</b></td><td><b><?= money($bal) ?></b></td></tr>
                 <tr><td>Weekly payout reservations</td><td><b><?= money($reserved) ?></b></td></tr>
@@ -244,7 +252,7 @@ require __DIR__ . '/../includes/dash_header.php';
                 <tr><td>Additional eligible gross, limited by available wallet</td><td><b><?= money($available) ?></b></td></tr>
                 <tr><td>Estimated TDS (<?= e($plan['tds_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($tdsAmt) ?></b></td></tr>
                 <tr><td>Estimated admin charge (<?= e($plan['admin_charge_percent']) ?>%)</td><td style="color:var(--danger,crimson)"><b>− <?= money($admAmt) ?></b></td></tr>
-                <tr><td><b>Estimated net on that gross</b></td><td><b><?= money($available - $tdsAmt - $admAmt) ?></b></td></tr>
+                <tr><td><b>Estimated net on that gross</b></td><td><b><?= money($netAmt) ?></b></td></tr>
             </table>
             <p class="form-hint" style="margin-top:8px">This is an illustration using current rates, not a payout or a guarantee. Requests also require the minimum amount, active status, KYC and bank details. Actual deductions are recorded when a payout is created.</p>
             <a class="btn btn-outline btn-sm mt-2" href="earnings.php">Full Statement →</a>

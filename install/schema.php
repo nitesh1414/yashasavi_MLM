@@ -432,6 +432,19 @@ return [
     updated_at DATETIME NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
+"CREATE TABLE IF NOT EXISTS dashboard_milestones (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    target_points INT UNSIGNED NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uq_dashboard_milestone_name (name),
+    INDEX idx_dashboard_milestone_display (status, sort_order, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
 "CREATE TABLE IF NOT EXISTS award_rewards (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     points INT UNSIGNED NOT NULL DEFAULT 0,
@@ -483,6 +496,7 @@ return [
     min_directs TINYINT UNSIGNED NOT NULL DEFAULT 0,
     reward_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
     badge VARCHAR(60) NULL,
+    icon_image VARCHAR(255) NULL,
     sort_order INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 ];

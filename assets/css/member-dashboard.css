@@ -136,3 +136,88 @@ body.member-dashboard-page { background: #f4f7f5; color: #173427; }
     .md-qr { width: 80px; height: 80px; }
     .md-metric-value { font-size: 14px; }
 }
+
+/* Readable, softly coloured dashboard cards (scoped to the member overview). */
+.member-dashboard :where(.md-panel, .md-metric, .md-team-card, .stat-card, .two-col .card),
+.member-dashboard :where(.md-panel, .md-metric, .md-team-card, .stat-card, .two-col .card) :where(div, h2, h3, h4, p, dt, dd, label, span, strong, b, small, td, th, a, input, button) {
+    color: #000 !important;
+}
+.md-profile { background: #eff7fb; border-color: #d9e9f1; }
+.md-referral { background: #f0faf3; border-color: #d9ecdf; }
+.md-panel { border-radius: 18px; box-shadow: 0 8px 26px rgba(32, 52, 60, .06); }
+.md-panel-header h2, .md-section-header h2 { font-size: 19px; }
+.md-panel .md-eyebrow { font-size: 11px; }
+.md-profile-grid dt, .md-referral-actions label { font-size: 13px; line-height: 1.35; }
+.md-profile-grid dd { font-size: 15px; }
+.md-copy-row input, .md-copy-row button, .md-whatsapp { font-size: 13px; }
+.md-whatsapp, .md-whatsapp:hover { color: #000 !important; background: #d4efdc; }
+.md-qr-wrap, .md-copy-status { font-size: 12px; }
+
+.md-metric {
+    position: relative; min-height: 175px; padding: 17px; border-radius: 17px;
+    box-shadow: 0 8px 24px rgba(31, 50, 64, .065); overflow: hidden;
+}
+.md-metric::before { content: ''; position: absolute; left: 17px; top: 0; width: 44px; height: 3px; border-radius: 0 0 3px 3px; background: var(--metric-accent); }
+.md-metric:nth-child(8n+1) { --metric-accent: #68a87a; background: #eef8f0; border-color: #d7eadb; }
+.md-metric:nth-child(8n+2) { --metric-accent: #75a8d4; background: #eef6fd; border-color: #d8e8f6; }
+.md-metric:nth-child(8n+3) { --metric-accent: #a58ac9; background: #f5f0fb; border-color: #e7dcf4; }
+.md-metric:nth-child(8n+4) { --metric-accent: #68b4ad; background: #ebf8f6; border-color: #d3ece9; }
+.md-metric:nth-child(8n+5) { --metric-accent: #d3ab60; background: #fff8e9; border-color: #f2e7ca; }
+.md-metric:nth-child(8n+6) { --metric-accent: #d8949a; background: #fff1f1; border-color: #f3dddd; }
+.md-metric:nth-child(8n+7) { --metric-accent: #9bb179; background: #f5f9eb; border-color: #e4edcf; }
+.md-metric:nth-child(8n+8) { --metric-accent: #b394bb; background: #faf1f8; border-color: #efdfec; }
+.md-metric-icon { width: 38px; height: 38px; border-radius: 11px; font-size: 16px; }
+.md-metric-icon.has-image { background: rgba(255,255,255,.72); padding: 3px; }
+.md-metric-icon img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.md-metric-label { margin-top: 11px; font-size: 14px; line-height: 1.35; }
+.md-metric-value { padding-top: 9px; font-size: clamp(18px, 1.4vw, 22px); line-height: 1.2; }
+.md-metric-status { margin-top: 5px; font-size: 12.5px; line-height: 1.4; }
+
+.md-team-card { border-radius: 16px; box-shadow: 0 8px 24px rgba(31, 50, 64, .055); }
+.md-team-card:nth-child(4n+1) { background: #eef8f0; border-color: #d7eadb; }
+.md-team-card:nth-child(4n+2) { background: #eef6fd; border-color: #d8e8f6; }
+.md-team-card:nth-child(4n+3) { background: #f5f0fb; border-color: #e7dcf4; }
+.md-team-card:nth-child(4n+4) { background: #fff8e9; border-color: #f2e7ca; }
+.md-team-card span:not(.md-team-icon) { font-size: 13.5px; }
+.md-team-card strong { font-size: 19px; }
+.member-dashboard .md-wallet-grid .stat-card { border-radius: 16px; box-shadow: 0 8px 24px rgba(31, 50, 64, .055); }
+.member-dashboard .md-wallet-grid .stat-card:nth-child(5n+1) { background: #eef8f0; }
+.member-dashboard .md-wallet-grid .stat-card:nth-child(5n+2) { background: #fff8e9; }
+.member-dashboard .md-wallet-grid .stat-card:nth-child(5n+3) { background: #ebf8f6; }
+.member-dashboard .md-wallet-grid .stat-card:nth-child(5n+4) { background: #f5f0fb; }
+.member-dashboard .md-wallet-grid .stat-card:nth-child(5n+5) { background: #eef6fd; }
+.member-dashboard .md-wallet-grid b { font-size: 18px; }
+.member-dashboard .md-wallet-grid span { font-size: 13px; }
+.member-dashboard .two-col .card { border-radius: 16px; font-size: 15px; box-shadow: 0 8px 24px rgba(31, 50, 64, .055); }
+.member-dashboard .two-col > div:nth-child(1) > .card:nth-child(4n+1) { background: #f1f8f3; }
+.member-dashboard .two-col > div:nth-child(1) > .card:nth-child(4n+2) { background: #f0f6fc; }
+.member-dashboard .two-col > div:nth-child(1) > .card:nth-child(4n+3) { background: #fff8ee; }
+.member-dashboard .two-col > div:nth-child(1) > .card:nth-child(4n+4) { background: #f7f1fb; }
+.member-dashboard .two-col > div:nth-child(2) > .card:nth-child(4n+1) { background: #fff8ee; }
+.member-dashboard .two-col > div:nth-child(2) > .card:nth-child(4n+2) { background: #f4f1fb; }
+.member-dashboard .two-col > div:nth-child(2) > .card:nth-child(4n+3) { background: #eef8f6; }
+.member-dashboard .two-col > div:nth-child(2) > .card:nth-child(4n+4) { background: #fdf1f2; }
+.member-dashboard .two-col .card-title { font-size: 17px; }
+.member-dashboard .two-col .kv-table td, .member-dashboard .two-col .table { font-size: 14.5px; }
+.member-dashboard .two-col .form-hint, .member-dashboard .two-col small, .member-dashboard .two-col .badge { font-size: 13px; }
+.member-dashboard .two-col .ann-item b, .member-dashboard .two-col .ann-item p { font-size: 14.5px; }
+.member-dashboard .two-col .ann-date { font-size: 13px; }
+.member-dashboard .two-col .card a:not(.btn) { text-decoration: underline; }
+.member-dashboard .two-col .btn-primary { background: #d8efde; border-color: #9fc9aa; }
+@media (max-width: 540px) {
+    .md-panel-header h2, .md-section-header h2 { font-size: 17px; }
+    .md-profile-grid dd { font-size: 14px; }
+    .md-metric { min-height: 158px; padding: 14px 12px; }
+    .md-metric::before { left: 12px; }
+    .md-metric-label { font-size: 13px; }
+    .md-metric-value { font-size: 18px; }
+    .md-metric-status { font-size: 12px; }
+    .md-team-card span:not(.md-team-icon) { font-size: 13px; }
+    .md-team-card strong { font-size: 17px; }
+    .member-dashboard .md-wallet-grid b { font-size: 16px; }
+    .member-dashboard .md-wallet-grid span { font-size: 12.5px; }
+    .member-dashboard .two-col .kv-table { table-layout: fixed; }
+    .member-dashboard .two-col .kv-table td { overflow-wrap: anywhere; }
+    .member-dashboard .two-col .kv-table td:first-child { width: 55%; }
+    .member-dashboard .two-col span.money { white-space: normal; overflow-wrap: anywhere; }
+}

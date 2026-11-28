@@ -104,7 +104,8 @@ md_check($reached['reached'] && (float)$reached['amount'] === 5000.0, 'milestone
 md_check($progressValue === '9 pts' && strpos($progressStatus, '₹5,000.00') !== false
     && strpos($progressStatus, 'target 10 pts') !== false, 'before the target, the card shows current points and configured amount');
 md_check($reachedValue === '10 pts' && strpos($reachedStatus, '₹5,000.00') !== false
-    && strpos($reachedStatus, 'not paid') !== false, 'at the target, the card shows points and amount without implying a payment');
+    && strpos($reachedStatus, 'target 10 pts') !== false && strpos($reachedStatus, 'not paid') !== false,
+    'at the target, the card still shows its target and amount without implying a payment');
 md_check(member_milestone_text($unconfigured) === ['9 pts', 'Not configured'], 'unconfigured milestones still show current points');
 md_check(!member_display_milestone(10, 0, 5000)['configured'], 'zero target disables a milestone');
 md_check(!member_display_milestone(10, '10.5', 5000)['configured'], 'fractional milestone targets are not silently rounded');

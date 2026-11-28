@@ -89,7 +89,7 @@ function member_milestone_text(array $milestone)
 {
     $value = number_format($milestone['points']) . ' pts';
     if (!$milestone['configured']) { return [$value, 'Not configured']; }
-    $status = money_txt($milestone['amount']) . ' · ';
-    $status .= $milestone['reached'] ? 'reached, not paid' : 'target ' . number_format($milestone['target']) . ' pts';
+    $status = money_txt($milestone['amount']) . ' · target ' . number_format($milestone['target']) . ' pts';
+    if ($milestone['reached']) { $status .= ' · reached, not paid'; }
     return [$value, $status];
 }

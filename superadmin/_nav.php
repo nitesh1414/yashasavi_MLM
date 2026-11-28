@@ -20,6 +20,7 @@ $nav = [
     ['icon' => '<i class="fas fa-wallet" aria-hidden="true"></i>', 'label' => 'E-Wallets', 'href' => 'wallets.php', 'active' => $activeKey === 'wallets'],
     ['label2' => 'Plan & Content'],
     ['icon' => '<i class="fas fa-sliders-h" aria-hidden="true"></i>', 'label' => 'MLM Plan Settings', 'href' => 'plan.php', 'active' => $activeKey === 'plan'],
+    ['icon' => '<i class="fas fa-flag-checkered" aria-hidden="true"></i>', 'label' => 'Dashboard Milestones', 'href' => 'milestones.php', 'active' => $activeKey === 'milestones'],
     ['icon' => '<i class="fas fa-trophy" aria-hidden="true"></i>', 'label' => 'Award & Rewards', 'href' => 'rewards.php', 'active' => $activeKey === 'rewards'],
     ['icon' => '<i class="fas fa-bullhorn" aria-hidden="true"></i>', 'label' => 'Announcements', 'href' => 'announcements.php', 'active' => $activeKey === 'announcements'],
     ['label2' => 'Website'],

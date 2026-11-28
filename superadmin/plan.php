@@ -191,7 +191,7 @@ require __DIR__ . '/../includes/dash_header.php';
         </div>
 
         <h4 style="font-size:14px;margin:16px 0 12px">Dashboard milestones</h4>
-        <p class="form-hint" style="margin-bottom:12px">These milestones are informational only. Reaching a target does not credit a wallet, create a payout, or confirm a reward has been paid. Set Car Fund points to 0 to disable it; leave both Tour/Vacation fields blank to leave it unconfigured.</p>
+        <p class="form-hint" style="margin-bottom:12px">These milestones are informational only. Reaching a target does not credit a wallet, create a payout, or confirm a reward has been paid. Set Car Fund points to 0 to disable it; leave both Tour/Vacation fields blank to leave it unconfigured. <a href="milestones.php">Add or manage other named funds →</a></p>
         <div class="form-grid2">
             <div class="form-group">
                 <label>Car Fund target points</label>

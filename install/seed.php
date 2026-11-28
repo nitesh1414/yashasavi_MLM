@@ -23,7 +23,7 @@ function seed_database($fresh = false)
                    'payout_statement_rows', 'payout_statements', 'points_logs', 'bv_logs',
                    'wallet_transactions', 'commissions', 'payouts', 'order_items', 'orders',
                    'announcements', 'enquiries', 'documents', 'testimonials', 'sliders',
-                   'pages', 'products', 'categories', 'users', 'award_rewards', 'plan_levels',
+                   'pages', 'products', 'categories', 'users', 'dashboard_milestones', 'award_rewards', 'plan_levels',
                    'ranks', 'plan_settings', 'admins', 'settings'];
         foreach ($tables as $t) {
             $pdo->exec("DROP TABLE IF EXISTS `$t`");

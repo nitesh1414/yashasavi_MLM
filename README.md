@@ -73,7 +73,7 @@ deployment procedure in [DATABASE_CHANGES.sql](DATABASE_CHANGES.sql) before use.
 
 ## Requirements
 
-- 64-bit PHP **7.4+** (8.x ready) with `pdo_mysql`, `mbstring` (uses only standard extensions)
+- 64-bit PHP **7.4+** (8.x ready) with `pdo_mysql` and `mbstring`; `gd` is also required to safely upload rank images
 - MySQL **5.7+** / MariaDB 10.3+
 - Apache (or any web server) with `mod_rewrite` optional — pretty URLs work both ways
 
@@ -150,12 +150,36 @@ purchases so far.
 Car Fund and Tour/Vacation use the member's existing matched-pair points and can be
 configured in Superadmin → MLM Plan Settings. The existing Car Fund plan settings
 are used; Tour/Vacation is unconfigured until both its target and amount are set.
-These are **display-only milestones**, not automatic wallet credits, payments or
-payout eligibility. The Royalty card shows existing credited `level` commissions;
-this release does not create a new royalty income stream. Award milestones show
-recognition reached, not proof of delivery. Total Income is the credited commission
-ledger, including applicable adjustments; the payout balance is eligible gross
-limited by the available wallet, before deductions and other payout checks.
+Superadmins can add any number of separately named funds in **Dashboard Milestones**,
+each with one target and amount; active funds get separate cards. All of these are
+**display-only milestones**, not automatic wallet credits, payments or payout
+eligibility. The Rank card displays the member's saved current rank, with an optional
+image uploaded under Superadmin → Ranks. Rank images are decoded and saved as PNG;
+PHP GD and a writable, non-executable `uploads/rank-icons/` folder are required.
+The Royalty card shows existing credited `level` commissions; this release does not
+create a new royalty income stream. Award milestones show recognition reached, not
+proof of delivery. Total Income is the credited commission ledger, including
+applicable adjustments; the payout balance is eligible gross limited by the
+available wallet, before deductions and other payout checks. Database additions
+for this release are listed separately in [DATABASE_CHANGES_1.8.54.md](DATABASE_CHANGES_1.8.54.md).
+
+## Dashboard regression tests
+
+The following PHP tests **drop and reseed every application table** in the named
+`yash_test_*` database. Create a disposable database first; never point them at a
+live installation:
+
+```sh
+YASH_TEST_DB=yash_test_dashboard YASH_TEST_ALLOW_RESET=1 php tests/member_dashboard_test.php
+YASH_TEST_DB=yash_test_dashboard YASH_TEST_ALLOW_RESET=1 php tests/dashboard_calculations_test.php
+YASH_TEST_DB=yash_test_dashboard YASH_TEST_ALLOW_RESET=1 php tests/dashboard_milestones_test.php
+YASH_TEST_DB=yash_test_dashboard YASH_TEST_ALLOW_RESET=1 php tests/dashboard_migration_test.php
+```
+
+`tests/dashboard_admin_http_test.mjs` additionally exercises administrator
+permissions, CSRF, fund CRUD and image uploads against a separately seeded local
+**test site** and database; see its header for its explicit safety flags and
+Node/mysql2 requirements. It must not be run against a live site.
 
 ## Member first login
 

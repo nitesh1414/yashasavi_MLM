@@ -98,6 +98,7 @@ function ug_column_fixes()
         ['users',         'matched_pairs',          "`matched_pairs` INT UNSIGNED NOT NULL DEFAULT 0"],
         ['users',         'reward_points',          "`reward_points` INT UNSIGNED NOT NULL DEFAULT 0"],
         ['ranks',         'min_points',             "`min_points` INT UNSIGNED NOT NULL DEFAULT 0"],
+        ['ranks',         'icon_image',             "`icon_image` VARCHAR(255) NULL DEFAULT NULL"],
         ['plan_settings', 'points_per_unit',        "`points_per_unit` INT UNSIGNED NOT NULL DEFAULT 1"],
         ['users',         'rank_id',                "`rank_id` INT UNSIGNED NULL"],
         ['users',         'wallet_balance',         "`wallet_balance` DECIMAL(12,2) NOT NULL DEFAULT 0"],
@@ -137,7 +138,7 @@ function ug_needs_upgrade($pdo)
         return true;
     }
     foreach (['income_matching_state', 'income_sponsor_events', 'income_rank_events', 'income_recalc_runs', 'income_recalc_entries',
-              'weekly_payout_runs', 'weekly_payout_reservations'] as $table) {
+              'weekly_payout_runs', 'weekly_payout_reservations', 'dashboard_milestones'] as $table) {
         if (!ug_table_exists($table)) { return true; }
     }
     if (!ug_table_exists('settings') || q_val("SELECT svalue FROM settings WHERE skey = 'income_lock_1850'") !== '1') {
